@@ -12,6 +12,7 @@ import {
   buildColorFigure,
   buildFigure,
   buildGridFigure,
+  buildOverlayFigure,
   gridBoxFor,
   plotBoxFor,
   recordTitleFor,
@@ -1438,4 +1439,101 @@ test("a colour plot grids several X across and several Y up each colour", () => 
   // Each colour's bar spans both of its rows.
   const bar = layout.coloraxis.colorbar;
   assert.equal(bar.len, layout.yaxis2.domain[1] - layout.yaxis.domain[0]);
+});
+
+// --- one plot, an axis per variable (pstack) -------------------------------
+
+function overlayFrom(type, panels, extra = {}) {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+  const variables = variablesFrom(VIKING_PALETTES, dataset);
+  const variablesByName = byColumnName(variables);
+  const plan = facetPlanFor(dataset, variables, DATA);
+  return buildOverlayFigure({
+    plan,
+    variablesByName,
+    panels,
+    sharedAxis: plan.sharedAxis,
+    data: DATA,
+    mode: "lines",
+    size: { width: 900, height: 600 },
+    uirevision: "test",
+    ...extra,
+  });
+}
+
+test("a stacked timeseries overlays every y axis on the left, shifting the extras out", () => {
+  const panels = ["TE90_01", "PSAL_01", "CNDC_01", "DOXY_01"];
+  const { data, layout, pinnable } = overlayFrom("TimeSeries", panels);
+  assert.equal(pinnable, false);
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis]),
+    [
+      ["x", "y"],
+      ["x", "y2"],
+      ["x", "y3"],
+      ["x", "y4"],
+    ],
+  );
+  const extras = [layout.yaxis2, layout.yaxis3, layout.yaxis4];
+  assert.equal(layout.yaxis.anchor, "x");
+  assert.equal(layout.yaxis.overlaying, undefined);
+  assert.deepEqual(
+    [layout.yaxis, ...extras].map((axis) => axis.side),
+    ["left", "left", "left", "left"],
+  );
+  extras.forEach((axis) => {
+    assert.equal(axis.anchor, "free");
+    assert.equal(axis.autoshift, true);
+    assert.equal(axis.overlaying, "y");
+  });
+  assert.equal(layout.margin.r, 26);
+  assert.equal(layout.hovermode, "x unified");
+});
+
+test("each stacked axis takes its curve's colour, and only the first draws a grid", () => {
+  const { data, layout } = overlayFrom("TimeSeries", ["TE90_01", "PSAL_01"], {
+    colors: { PSAL_01: "#123456" },
+  });
+  assert.equal(layout.yaxis2.color, "#123456");
+  assert.equal(layout.yaxis2.linecolor, "#123456");
+  assert.equal(data[1].line.color, "#123456");
+  assert.equal(data[1].marker.color, "#123456");
+  assert.equal(layout.yaxis.color, data[0].line.color);
+  assert.equal(layout.yaxis.linecolor, data[0].line.color);
+  assert.equal(layout.yaxis2.showgrid, false);
+  assert.equal(layout.yaxis.showgrid, undefined);
+});
+
+test("a stacked profile runs every x axis across the top, stacking the extras upward", () => {
+  const panels = ["TE90_01", "PSAL_01", "CNDC_01", "DOXY_01"];
+  const { data, layout } = overlayFrom("Profile", panels);
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis]),
+    [
+      ["x", "y"],
+      ["x2", "y"],
+      ["x3", "y"],
+      ["x4", "y"],
+    ],
+  );
+  const axes = [layout.xaxis, layout.xaxis2, layout.xaxis3, layout.xaxis4];
+  assert.deepEqual(
+    axes.map((axis) => axis.side),
+    ["top", "top", "top", "top"],
+  );
+  const [bottom, top] = layout.yaxis.domain;
+  assert.equal(bottom, 0);
+  assert.ok(top < 1, "the plot shrinks to make room above it");
+  assert.equal(layout.xaxis.anchor, "y");
+  const positions = axes.slice(1).map((axis) => axis.position);
+  axes.slice(1).forEach((axis) => assert.equal(axis.anchor, "free"));
+  assert.ok(positions[0] > top && positions[1] > positions[0]);
+  assert.equal(positions[2], 1);
+  assert.equal(layout.yaxis.autorange, "reversed");
+  assert.equal(layout.hovermode, "y unified");
+});
+
+test("a single stacked variable keeps the full plot height", () => {
+  const { layout } = overlayFrom("Profile", ["TE90_01"]);
+  assert.deepEqual(layout.yaxis.domain, [0, 1]);
 });

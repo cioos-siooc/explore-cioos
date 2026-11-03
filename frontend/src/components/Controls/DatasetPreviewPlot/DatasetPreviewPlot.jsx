@@ -44,10 +44,14 @@ import {
   buildColorFigure,
   buildFigure,
   buildGridFigure,
+  buildOverlayFigure,
   gridBoxFor,
   plotBoxFor,
 } from "../DatasetPreview/previewFacetFigure.js";
-import { pinnedAxisSizeFor } from "../DatasetPreview/previewFacetSizing.js";
+import {
+  pinnedAxisSizeFor,
+  MAX_STACKED_AXES,
+} from "../DatasetPreview/previewFacetSizing.js";
 import {
   pinnedAxisFigureFor,
   pinnedViewFor,
@@ -60,7 +64,10 @@ import {
   PANE_MAX_PX,
   PANE_MIN_PX,
 } from "../DatasetPreview/previewPaneLayout.js";
-import { defaultColorFor } from "../DatasetPreview/previewColors.js";
+import {
+  defaultColorFor,
+  distinctColorsFor,
+} from "../DatasetPreview/previewColors.js";
 import { autoScaleNameFor } from "../DatasetPreview/previewColorScales.js";
 import { POSITION_INDEX_COLUMN } from "../DatasetPreview/previewTrackIndex.js";
 import {
@@ -110,6 +117,8 @@ export default function DatasetPreviewPlot() {
     plotLayout,
     setPlotLayout,
     colorPlotAvailable,
+    stacked,
+    setStacked,
     colorXs,
     setColorXs,
     colorYs,
@@ -281,6 +290,23 @@ export default function DatasetPreviewPlot() {
           })
         : null;
     }
+    if (stacked) {
+      return buildOverlayFigure({
+        plan,
+        variablesByName,
+        panels,
+        sharedAxis,
+        data: plotData,
+        colors: variableColors,
+        labels: customLabels,
+        title,
+        mode: plotType,
+        sharedTicks: onPositionAxis ? trackIndex.ticks : null,
+        size: { width, height },
+        uirevision: revision,
+        reversedYAxes,
+      });
+    }
     if (isGrid) {
       return panelXAxes.length && panelYAxes.length
         ? buildGridFigure({
@@ -322,6 +348,7 @@ export default function DatasetPreviewPlot() {
     });
   }, [
     isColorLayout,
+    stacked,
     isGrid,
     colorXs,
     colorYs,
@@ -480,6 +507,12 @@ export default function DatasetPreviewPlot() {
     </ControlRow>
   );
 
+  // On one plot a default colour another curve already has is swapped, so the
+  // picker shows the colour actually drawn.
+  const stackedDefaults = stacked
+    ? distinctColorsFor(panels, variablesByName, {})
+    : null;
+
   // The shared axis draws no trace, so it gets a name but no colour.
   const customizeRow = (columnName, index) => (
     <div className="labelEditorRow" key={columnName}>
@@ -495,10 +528,11 @@ export default function DatasetPreviewPlot() {
         {index !== null && !isColorLayout && (
           <VariableColorPicker
             color={variableColors[columnName] || null}
-            defaultColor={defaultColorFor(
-              variablesByName.get(columnName),
-              index,
-            )}
+            defaultColor={
+              stackedDefaults
+                ? stackedDefaults[columnName]
+                : defaultColorFor(variablesByName.get(columnName), index)
+            }
             onPick={(color) => setVariableColor(columnName, color)}
             label={`${t("datasetPreviewPlotColor")}: ${labelOf(columnName)}`}
           />
@@ -576,6 +610,7 @@ export default function DatasetPreviewPlot() {
         variablesByName={variablesByName}
         onChange={setPanels}
         isMulti={sharedAxes.length <= 1 && colorAxes.length <= 1}
+        maxSelected={stacked ? MAX_STACKED_AXES : undefined}
       />
     </ControlRow>
   );
@@ -641,6 +676,21 @@ export default function DatasetPreviewPlot() {
         </ControlRow>
       )}
 
+      {!isColorLayout && (
+        <ControlRow caption={t("datasetPreviewPlotCurves")}>
+          <SegmentedToggle
+            label={t("datasetPreviewPlotCurves")}
+            data-testid="preview-stack-toggle"
+            options={[
+              { value: "panels", label: t("datasetPreviewPlotCurvesPanels") },
+              { value: "stacked", label: t("datasetPreviewPlotCurvesStacked") },
+            ]}
+            value={stacked ? "stacked" : "panels"}
+            onChange={(value) => setStacked(value === "stacked")}
+          />
+        </ControlRow>
+      )}
+
       {isColorLayout ? (
         <>
           <ControlRow caption={t("datasetPreviewPlotXAxis")}>
@@ -695,18 +745,21 @@ export default function DatasetPreviewPlot() {
             </>
           )}
 
-          <ControlRow caption={t("datasetPreviewPlotColorBy")} startsGroup>
-            <VariablePicker
-              label={t("datasetPreviewPlotColorBy")}
-              choices={colorCandidates}
-              value={colorAxes}
-              variablesByName={variablesByName}
-              placeholder={t("datasetPreviewPlotColorNone")}
-              onChange={setColorAxes}
-              isMulti={panels.length <= 1 && sharedAxes.length <= 1}
-              maxSelected={MAX_COLOR_PANELS}
-            />
-          </ControlRow>
+          {/* On one plot, colour already says which axis a curve reads on. */}
+          {!stacked && (
+            <ControlRow caption={t("datasetPreviewPlotColorBy")} startsGroup>
+              <VariablePicker
+                label={t("datasetPreviewPlotColorBy")}
+                choices={colorCandidates}
+                value={colorAxes}
+                variablesByName={variablesByName}
+                placeholder={t("datasetPreviewPlotColorNone")}
+                onChange={setColorAxes}
+                isMulti={panels.length <= 1 && sharedAxes.length <= 1}
+                maxSelected={MAX_COLOR_PANELS}
+              />
+            </ControlRow>
+          )}
 
           {colorScaleRow}
         </>

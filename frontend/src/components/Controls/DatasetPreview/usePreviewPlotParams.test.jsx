@@ -279,6 +279,37 @@ describe("usePreviewPlotParams", () => {
     expect(api.uirevision).not.toBe(before);
   });
 
+  describe("every variable on one plot", () => {
+    it("writes pstack, and deletes it on the way back", async () => {
+      open("pvars=temperature,salinity");
+      expect(api.stacked).toBe(false);
+      await run(() => api.setStacked(true));
+      expect(param("pstack")).toBe("1");
+      expect(api.stacked).toBe(true);
+      await run(() => api.setStacked(false));
+      expect(param("pstack")).toBeNull();
+    });
+
+    it("keeps one shared axis and no colour dimension while stacked", () => {
+      open("pstack=1&paxis=depth,time&pvars=temperature&pz=salinity");
+      expect(api.sharedAxes).toEqual(["depth"]);
+      expect(api.panels).toEqual(["temperature"]);
+      expect(api.colorAxes).toEqual([]);
+    });
+
+    it("is ignored by the colour plot", () => {
+      openStation("pstack=1&playout=color");
+      expect(api.stacked).toBe(false);
+    });
+
+    it("changes uirevision, so a zoom is not restored onto the other figure", async () => {
+      open("pvars=temperature,salinity");
+      const before = api.uirevision;
+      await run(() => api.setStacked(true));
+      expect(api.uirevision).not.toBe(before);
+    });
+  });
+
   describe("several variables per axis", () => {
     it("reads a comma list of shared axes, the panels never repeating one", () => {
       open("paxis=depth,time&pvars=temperature,time");

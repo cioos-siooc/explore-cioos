@@ -65,3 +65,23 @@ export function formatColorsParam(colors) {
     .map(([columnName, color]) => `${columnName}${PAIR}${color.slice(1)}`);
   return entries.length ? entries.join(SEPARATOR) : null;
 }
+
+// Each column's line colour: the user's pick, else its default — unless that
+// default is already another column's, which on one shared plot would make two
+// curves (and their axes) indistinguishable; it then takes the first unused
+// swatch.
+export function distinctColorsFor(columnNames, variablesByName, overrides) {
+  const used = new Set();
+  const colors = {};
+  columnNames.forEach((columnName, index) => {
+    const picked = overrides && overrides[columnName];
+    let color =
+      picked || defaultColorFor(variablesByName.get(columnName), index);
+    if (!picked && used.has(color)) {
+      color = SWATCHES.find((swatch) => !used.has(swatch)) || color;
+    }
+    used.add(color);
+    colors[columnName] = color;
+  });
+  return colors;
+}

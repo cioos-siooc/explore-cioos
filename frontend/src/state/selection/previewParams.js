@@ -69,6 +69,10 @@ export function parsePeriod(value) {
 //                                  Viridis — and never a rainbow)
 //   pzshare  1: every colour variable in the first one's scale
 //                                  (default: each in its own)
+//   pstack   1: the panel variables on ONE plot, each on its own axis in its
+//            line's colour     (default: one panel per variable; ignored by
+//                                  the colour plot, and drops `pz` and every
+//                                  shared axis but the first while set)
 //   pyflip   the columns whose Y axis is drawn opposite to its default,
 //            comma-separated       (default: none; a depth or pressure on Y
 //                                  is drawn downwards)
@@ -91,6 +95,7 @@ export const PLOT_PARAMS = [
   "pcy",
   "pzscales",
   "pzshare",
+  "pstack",
   "pyflip",
   STEP_PARAM,
 ];

@@ -10,7 +10,7 @@ import {
   labelFor,
   shortLabelFor,
 } from "./previewVariables.js";
-import { defaultColorFor } from "./previewColors.js";
+import { defaultColorFor, distinctColorsFor } from "./previewColors.js";
 import {
   colorDimensionFor,
   colorScaleForVariable,
@@ -40,12 +40,15 @@ import {
   gridSizeFor,
   heightBudgetFor,
   marginFor,
+  overlayMarginFor,
   plotHeightFor,
   plotWidthFor,
   COLORBAR_ROOM_PX,
   COLUMN_GAP,
+  MIN_PLOT_PX,
   PINNED_AXIS_LINES,
   ROW_GAP,
+  STACKED_AXIS_PX,
   TITLE_PAD_PX,
 } from "./previewFacetSizing.js";
 
@@ -633,6 +636,153 @@ export function buildFigure({
   layout.shapes = sharedAxisEdgesFor(panelLetter, panels.length);
   // First, so every panel's markers draw over its line.
   return { data: [...lineTraces, ...traces], layout, colorLegend };
+}
+
+// A stack's value axes all sit left of the plot, a profile's all above it.
+const OVERLAY_SIDE = { y: "left", x: "top" };
+const OVERLAY_GRID_COLOR = "#eee"; // Plotly's own, which `color` would tint
+const round6 = (value) => Number(Math.min(Math.max(value, 0), 1).toFixed(6));
+
+/**
+ * Every panel variable on ONE plot against the shared axis, each on an axis of
+ * its own whose line, ticks and title take the curve's colour. Takes
+ * buildFigure's inputs except the colour dimension: colour here says which
+ * axis a curve is read against.
+ */
+export function buildOverlayFigure({
+  plan,
+  variablesByName,
+  panels,
+  sharedAxis,
+  data,
+  colors = {},
+  labels = {},
+  title = "",
+  mode = "markers",
+  sharedTicks = null,
+  size = {},
+  uirevision,
+  reversedYAxes = new Set(plan.sharedReversed ? [sharedAxis] : []),
+}) {
+  const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
+  const arrangement = ARRANGEMENTS[plan.orientation] || ROWS_LAYOUT;
+  const { shared: sharedLetter, panel: valueLetter } = arrangement;
+  const lineColors = distinctColorsFor(panels, variablesByName, colors);
+
+  const wrappedTitle = wrapTitleFor(title, size.width);
+  const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
+  const margin = overlayMarginFor(plan.orientation, titleLines);
+  const plottingWidth = size.width
+    ? Math.max(size.width - margin.l - margin.r, 0)
+    : 0;
+  const plottingHeight = Math.max(
+    (size.height || MIN_PLOT_PX) - margin.t - margin.b,
+    1,
+  );
+
+  // A profile's value axes past the first are stacked upward, which only fits
+  // inside the paper if the plot shrinks to make room.
+  const step = STACKED_AXIS_PX / plottingHeight;
+  const plotDomain =
+    valueLetter === "x"
+      ? [0, round6(1 - Math.max(panels.length - 1, 0) * step)]
+      : [0, 1];
+
+  const layout = {
+    uirevision,
+    margin,
+    font: { size: TICK_FONT_PX },
+    hoverlabel: { font: { size: HOVER_FONT_PX } },
+    showlegend: false, // each curve's axis is titled in its colour
+    hovermode: `${sharedLetter} unified`,
+    dragmode: "zoom",
+    modebar: { orientation: "v" },
+    ...(size.width ? { width: size.width } : {}),
+    ...(size.height ? { height: size.height } : {}),
+  };
+  if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
+
+  layout[`${sharedLetter}axis`] = {
+    ...AXIS_LINE,
+    automargin: true,
+    domain: plotDomain,
+    anchor: valueLetter,
+    zeroline: false,
+    gridcolor: OVERLAY_GRID_COLOR,
+    ...sharedAxisSpike,
+    ...(sharedTicks
+      ? {
+          tickmode: "array",
+          tickvals: sharedTicks.tickvals,
+          ticktext: sharedTicks.ticktext,
+        }
+      : {}),
+    unifiedhovertitle: { text: hoverLine(sharedAxis, `%{${sharedLetter}}`) },
+    ...(sharedLetter === "y" && reversedYAxes.has(sharedAxis)
+      ? { autorange: "reversed" }
+      : {}),
+    title: axisTitle(
+      wrapLabel(
+        titleFor(sharedAxis),
+        maxCharsFor(
+          sharedLetter === "y"
+            ? plottingHeight * (plotDomain[1] - plotDomain[0])
+            : plottingWidth,
+        ),
+        PINNED_AXIS_LINES,
+      ),
+    ),
+  };
+
+  const traces = panels.map((columnName, index) => {
+    const color = lineColors[columnName];
+    const side = OVERLAY_SIDE[valueLetter];
+    const placement =
+      index === 0
+        ? { anchor: sharedLetter }
+        : valueLetter === "y"
+          ? { anchor: "free", autoshift: true }
+          : {
+              anchor: "free",
+              position: round6(plotDomain[1] + index * step),
+            };
+    layout[axisKey(valueLetter, index)] = {
+      ...AXIS_LINE,
+      ...placement,
+      side,
+      color,
+      linecolor: color,
+      automargin: true,
+      zeroline: false,
+      ...(index === 0
+        ? { domain: [0, 1], gridcolor: OVERLAY_GRID_COLOR }
+        : { overlaying: valueLetter, showgrid: false }),
+      ...(valueLetter === "y" && reversedYAxes.has(columnName)
+        ? { autorange: "reversed" }
+        : {}),
+      title: axisTitle(
+        wrapLabel(
+          titleFor(columnName),
+          maxCharsFor(valueLetter === "y" ? plottingHeight : plottingWidth),
+          PINNED_AXIS_LINES,
+        ),
+      ),
+    };
+    return {
+      type: "scatter",
+      mode,
+      name: titleFor(columnName),
+      [valueLetter]: (data || []).map((row) => row[columnName]),
+      [sharedLetter]: (data || []).map((row) => row[sharedAxis]),
+      [`${valueLetter}axis`]: axisRef(valueLetter, index),
+      [`${sharedLetter}axis`]: sharedLetter,
+      hovertemplate: `${hoverLine(columnName, `%{${valueLetter}}`)}<extra></extra>`,
+      marker: { color },
+      line: { color },
+    };
+  });
+
+  return { data: traces, layout, colorLegend: null, pinnable: false };
 }
 
 /**

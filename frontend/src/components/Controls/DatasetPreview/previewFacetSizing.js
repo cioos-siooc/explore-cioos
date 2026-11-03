@@ -241,3 +241,31 @@ export function gridSizeFor({
     ),
   };
 }
+
+// One plot with every variable on an axis of its own (see buildOverlayFigure).
+// Nothing is pinned, so the figure keeps the shared axis's ticks and title. A
+// profile's value axes all run across the top, each past the first a
+// STACKED_AXIS_PX step further up; a stack's all run up the left, and Plotly's
+// autoshift places the extra ones from their measured labels.
+export const MAX_STACKED_AXES = 4;
+export const STACKED_AXIS_PX =
+  TOP_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX;
+const SIDE_AXIS_ROOM_PX = TICK_ROOM_PX + LABEL_GUTTER_PX;
+
+export function overlayMarginFor(orientation, titleLines = MAX_TITLE_LINES) {
+  const titleRoom = titleRoomFor(titleLines);
+  if (orientation === COLUMNS) {
+    return {
+      l: SIDE_AXIS_ROOM_PX,
+      r: 26,
+      t: 10 + STACKED_AXIS_PX + titleRoom,
+      b: 22,
+    };
+  }
+  return {
+    l: SIDE_AXIS_ROOM_PX,
+    r: 26,
+    t: 30 + titleRoom,
+    b: BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
+  };
+}

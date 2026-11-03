@@ -33,6 +33,7 @@ import {
   normalizeColorScale,
   parseScalesParam,
 } from "./previewColorScales.js";
+import { MAX_STACKED_AXES } from "./previewFacetSizing.js";
 
 // Plot state lives in the query string, each param written ONLY when it differs
 // from the dataset type's default, so an untouched plot adds nothing to a link.
@@ -241,6 +242,14 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams],
   );
 
+  // One plot with an axis per panel variable: a single shared axis, and no
+  // colour dimension, since colour says which axis a curve is read against.
+  const stacked = !isColorLayout && searchParams.get("pstack") === "1";
+  const setStacked = useCallback(
+    (value) => setParams({ pstack: value ? "1" : null }),
+    [setParams],
+  );
+
   const colorCandidates = useMemo(
     () => colorCandidatesFor(variables),
     [variables],
@@ -284,9 +293,14 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
             colorXs,
             colorYs,
           )
-        : resolvePanels(requested, variables, requestedSharedAxes),
+        : resolvePanels(
+            requested,
+            variables,
+            stacked ? requestedSharedAxes.slice(0, 1) : requestedSharedAxes,
+          ).slice(0, stacked ? MAX_STACKED_AXES : undefined),
     [
       isColorLayout,
+      stacked,
       colorCandidates,
       colorXs,
       colorYs,
@@ -304,8 +318,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   // The panels are what the panel layout is for, so they keep their several.
   const sharedAxes = useMemo(
-    () => onlyOneMulti(requestedSharedAxes, panels),
-    [requestedSharedAxes, panels],
+    () =>
+      stacked
+        ? requestedSharedAxes.slice(0, 1)
+        : onlyOneMulti(requestedSharedAxes, panels),
+    [stacked, requestedSharedAxes, panels],
   );
   const sharedAxis = sharedAxes[0] || null;
 
@@ -385,16 +402,20 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // Several columns make a grid: every panel once per colour column.
   const colorAxes = useMemo(
     () =>
-      onlyOneMulti(
-        [...new Set(paramToList(colorParam))]
-          .filter((name) =>
-            colorCandidates.some((variable) => variable.columnName === name),
-          )
-          .slice(0, MAX_COLOR_PANELS),
-        panels,
-        sharedAxes,
-      ),
-    [colorCandidates, colorParam, panels, sharedAxes],
+      stacked
+        ? []
+        : onlyOneMulti(
+            [...new Set(paramToList(colorParam))]
+              .filter((name) =>
+                colorCandidates.some(
+                  (variable) => variable.columnName === name,
+                ),
+              )
+              .slice(0, MAX_COLOR_PANELS),
+            panels,
+            sharedAxes,
+          ),
+    [stacked, colorCandidates, colorParam, panels, sharedAxes],
   );
   const colorAxis = colorAxes[0] ?? null;
 
@@ -549,7 +570,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // old direction's range.
   const axisSet = isColorLayout
     ? `color|${colorXs.join(",")}|${colorYs.join(",")}|${panels.join(",")}`
-    : `${sharedAxes.join(",")}|${panels.join(",")}|${colorAxes.join(",")}`;
+    : `${stacked ? "stack|" : ""}${sharedAxes.join(",")}|${panels.join(",")}|${colorAxes.join(",")}`;
   const uirevision = `${axisSet}|${[...reversedYAxes].join(",")}`;
 
   // The whole search string: panning the map changes the link too.
@@ -591,6 +612,8 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     plotLayout,
     setPlotLayout,
     colorPlotAvailable,
+    stacked,
+    setStacked,
     colorX,
     setColorX,
     colorY,
