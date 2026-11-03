@@ -64,6 +64,13 @@ The SPA calls `/api` relative to its own host, so changing the URL never needs a
 frontend rebuild. `DB_HOST` and `REDIS_HOST` are pinned to the compose service
 names; setting them in `.env` does nothing.
 
+`NOTICES` puts per-deployment messages (such as a beta notice) in a toast and
+in the About window: a JSON array of `{"id", "en", "fr"?, "starts"?, "expires"?,
+"tone"?, "background"?, "icon"?, "css"?}` with markdown text, example
+in `.env.sample`. The frontend container writes it to `/notices.json` at start,
+so changing it needs a restart, not a rebuild. Closing a toast is remembered
+per `id`; it shows from `starts` and is hidden from `expires` (both optional).
+
 ## Harvesting
 
 Harvests are Prefect flows run **in-process** by the `prefect_worker` container
@@ -265,7 +272,7 @@ gh release create v1.2.0-rc.1 --target master --prerelease             # staging
 gh release create v1.2.0 --target master                               # production
 ```
 
-Beta and staging are one stack on one Juno host (`explore.dev.cioos.ca`) and
+Beta and staging are one stack on one Juno host (`beta.explore.cioos.ca`) and
 deploy one at a time; production is another host. All run over WireGuard through
 the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
 roll back or redeploy, dispatch Deploy with an existing published release tag;

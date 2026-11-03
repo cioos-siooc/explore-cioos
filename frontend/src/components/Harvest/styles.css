@@ -307,6 +307,21 @@
   border-bottom: 2px solid var(--cioos-teal-light);
 }
 
+.harvest-section-desc {
+  margin: -0.25rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--harvest-muted);
+}
+
+.harvest-section-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0;
+  font-size: 0.85rem;
+  color: var(--harvest-muted);
+}
+
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 .harvest-filter-bar {
   display: flex;
@@ -738,9 +753,14 @@ a.harvest-link:hover {
 }
 
 /* ── Catalogue section (overview) ────────────────────────────────────────── */
+
+/* The max() floor caps the grid at two columns, one below ~632px. */
 .harvest-catalogue {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(max(300px, calc((100% - 2rem) / 2)), 1fr)
+  );
   gap: 0 2rem;
   margin-bottom: 1rem;
 }
@@ -763,6 +783,44 @@ a.harvest-link:hover {
   display: block;
   height: 100%;
   background: var(--cioos-success);
+}
+
+.harvest-unmatched {
+  margin: 0.75rem 0;
+}
+
+.harvest-unmatched-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.harvest-unmatched-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.harvest-unmatched-bar span {
+  flex-basis: 0;
+  min-width: 2px;
+}
+
+.harvest-unmatched-bar span:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.harvest-unmatched-bar span:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.harvest-unmatched-bar span:only-child {
+  border-radius: 4px;
+}
+
+.harvest-unmatched .harvest-pie-legend {
+  font-size: 0.8rem;
 }
 
 .harvest-ckan-sources {
