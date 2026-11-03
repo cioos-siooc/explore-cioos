@@ -14,6 +14,7 @@ from urllib3.util.retry import Retry
 
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.record_metadata import from_ckan
+from cde_harvester.user_agent import USER_AGENT
 
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
 
@@ -23,6 +24,7 @@ _RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
 
 def _build_ckan_session() -> requests.Session:
     session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
     retry = Retry(
         total=4,
         backoff_factor=1.0,         # waits 0s, 2s, 4s, 8s between attempts

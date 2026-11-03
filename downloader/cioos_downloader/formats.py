@@ -8,6 +8,7 @@ exact formatting; only latitude/longitude are parsed, for the polygon test.
 
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import urllib.error
@@ -25,8 +26,12 @@ import shapely.wkt
 import xarray as xr
 
 # Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
-# urllib's default User-Agent.
-REQUEST_HEADERS = {"User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"}
+# urllib's default User-Agent. The scheduler's compose env names the deployment
+# and build; a user's reproduce.py run has neither and falls back.
+REQUEST_HEADERS = {
+    "User-Agent": f"CIOOS-CDE-Downloader/{os.environ.get('APP_VERSION') or 'dev'} "
+    f"(+{os.environ.get('APP_URL') or 'https://github.com/cioos-siooc/explore-cioos'})"
+}
 
 
 def polygon_regions(polygon_wkt):

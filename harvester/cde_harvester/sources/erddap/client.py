@@ -26,6 +26,7 @@ from cde_harvester.core.errors import (
     ResponseTooLargeError,
 )
 from cde_harvester.sources.erddap.dataset import Dataset
+from cde_harvester.user_agent import USER_AGENT
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -96,6 +97,7 @@ def _parse_erddap_source(source_url):
 
 def _build_retry_session() -> requests.Session:
     session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
     retry = Retry(
         total=3,
         backoff_factor=1.0,         # waits 0s, 2s, 4s between attempts
