@@ -3,9 +3,11 @@ import logging
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pandas as pd
+
+from cde_harvester.user_agent import HEADERS
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +93,7 @@ CF_STANDARD_NAME_MODIFIERS = frozenset(
 
 def get_cf_version_from_xml(url):
     """Fetch just the version number from the CF standard names XML."""
-    with urlopen(url, timeout=10) as response:
+    with urlopen(Request(url, headers=HEADERS), timeout=10) as response:
         tree = ET.parse(response)
     version_element = tree.getroot().find("version_number")
     if version_element is None or not version_element.text:
@@ -174,7 +176,7 @@ if __name__ == "__main__":
     check_cf_version()
     logger.info("Updating CF standard names from %s", CF_NAMES_XML_URL)
 
-    with urlopen(CF_NAMES_XML_URL, timeout=30) as response:
+    with urlopen(Request(CF_NAMES_XML_URL, headers=HEADERS), timeout=30) as response:
         tree = ET.parse(response)
     root = tree.getroot()
 

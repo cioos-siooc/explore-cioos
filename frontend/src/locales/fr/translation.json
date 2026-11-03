@@ -914,7 +914,7 @@
   "legendHelp_trajectories_trail_title": "Fenêtre de trace",
   "legendHelp_trajectories_trail_body": "La durée d'historique tracée avant la date choisie, jusqu'à un an.",
   "legendHelp_trajectories_head_title": "Position à la date",
-  "legendHelp_trajectories_head_body": "Où se trouvait la plate-forme à la date choisie (sa dernière position jusqu'à ce jour), et dans quelle direction elle allait. Une trajectoire terminée avant cette date, ou silencieuse bien avant, n'a pas de marqueur. Réglez la date avec le champ à côté du marqueur ou le rail situé en dessous.",
+  "legendHelp_trajectories_head_body": "Où se trouvait la plate-forme à la date choisie (sa dernière position jusqu'à ce jour), et dans quelle direction elle allait. Le marqueur est pâle quand cette dernière position date de plus d'une semaine avant la date. Réglez la date avec le champ à côté du marqueur ou le rail situé en dessous.",
   "legendHelp_seafloor_title": "Profondeur du fond marin",
   "legendHelp_seafloor_source_title": "Provenance",
   "legendHelp_seafloor_source_body": "Bathymétrie NONNA du SHC, sa grille de 10 m. Ombrée pour le relief ; elle apparaît une fois la carte assez zoomée pour la dessiner.",
