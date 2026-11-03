@@ -13,6 +13,7 @@ from cde_harvester.core.day_sets import (
     days_to_ranges,
     total_days,
 )
+from cde_harvester.core.errors import EmptyVariableError
 from cde_harvester.core.harvest_warnings import (
     DAY_COUNT_FALLBACK,
     DEPTH_RANGE_UNAVAILABLE,
@@ -422,23 +423,19 @@ def extract_features(dataset, handler):
             profile_min_max = dataset.get_max_min(variables)
 
             if profile_min_max.empty:
-                logger.error(f"No data found for  {dataset.id}")
-                dataset.no_features_reason = (
+                raise EmptyVariableError(
                     f"orderByMinMax of {llat_variable} per feature returned no "
                     f"rows: {llat_variable} is never filled"
                 )
-                return profile_min_max
 
         profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
 
     box = _lat_lon_box(dataset, profiles, profile_variable_list, logger, identity)
     if box.empty:
-        logger.error(f"No lat/lon data found for {dataset.id}")
-        dataset.no_features_reason = (
+        raise EmptyVariableError(
             "No latitude/longitude values per feature: the per-feature min/max "
             "query returned no rows"
         )
-        return box
 
     profiles_with_lat_lon = profiles_with_lat_lon.join(box)
 

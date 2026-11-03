@@ -5,6 +5,7 @@ import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
+from cde_harvester.core.errors import EmptyVariableError
 from cde_harvester.core.harvest_warnings import (
     UNKNOWN_PLATFORM_VOCABULARY,
     HarvestWarnings,
@@ -244,12 +245,11 @@ class Dataset:
             ).reset_index()
 
         if profile_ids.empty:
-            self.no_features_reason = (
+            raise EmptyVariableError(
                 f"distinct() of the cf_role variable(s) {', '.join(profile_variable_list)} "
                 "returned no rows: the dataset has no data, or those variables are "
                 "never filled"
             )
-            return profile_ids
 
         self.profile_ids = profile_ids.drop_duplicates(profile_variable_list)
         return profile_ids

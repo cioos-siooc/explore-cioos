@@ -112,7 +112,9 @@ flowchart TD
    shown on the harvest dataset page, so it says what the publisher should
    change.
 6. **Feature extraction** by the type's handler (below). No rows means
-   `NO_PROFILES_FOUND`.
+   `NO_PROFILES_FOUND`, except when a declared variable (the `cf_role` ids,
+   time/depth or lat/lon) comes back with no values at all: that is an
+   `EMPTY_VARIABLE` error.
 
 Unchanged datasets are not re-harvested. The loader only bumps their
 `verified_at` and keeps their stored rows.
@@ -328,7 +330,8 @@ are no longer listed upstream (see [Loading](workflow.md#loading)).
 | `MISSING_REQUIRED_VARS` | skipped | No `time` / `latitude` / `longitude` (or no readable `info` page); a grid without a lat/lon extent |
 | `NO_SUPPORTED_VARIABLES` | skipped | No `standard_name` maps to an EOV |
 | `DEPTH_AND_ALTITUDE` | skipped | Both `depth` and `altitude` present |
-| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable, ids never filled, no lat/lon, or a failed record count); the message names which |
+| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable or a failed record count); the message names which |
+| `EMPTY_VARIABLE` | error | A declared variable (`cf_role` ids, time/depth, lat/lon) has no values: its per-feature query returned no rows |
 | `HTTP_ERROR` | error | ERDDAP answered an error status after retries (other than those read as an empty result); the message holds ERDDAP's own error text |
 | `RESPONSE_TOO_LARGE` | error | A required response passed the 200 MB cap |
 | `UNKNOWN_ERROR` | error | Any other exception |

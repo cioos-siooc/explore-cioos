@@ -5,8 +5,10 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
+    EMPTY_VARIABLE,
     HTTP_ERROR,
     NO_PROFILES_FOUND,
+    EmptyVariableError,
 )
 from cde_harvester.sources.erddap.harvester import harvest_erddap
 from conftest import (
@@ -128,6 +130,22 @@ class TestHarvestErddapSkipping:
         attempt = result.attempts.query("dataset_id == @DATASET_ID").iloc[0]
         assert attempt["reason_code"] == NO_PROFILES_FOUND
         assert attempt["error_message"] == "No variable has a cf_role attribute"
+
+    def test_never_filled_variable_is_an_error(self):
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
+        with (
+            patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+            patch(
+                "cde_harvester.sources.erddap.harvester.extract_features",
+                side_effect=EmptyVariableError("time is never filled"),
+            ),
+        ):
+            erddap_mock.get_dataset.return_value = build_mock_dataset()
+            result = harvest_erddap.fn(ERDDAP_URL)
+        attempt = result.attempts.query("dataset_id == @DATASET_ID").iloc[0]
+        assert attempt["status"] == "error"
+        assert attempt["reason_code"] == EMPTY_VARIABLE
+        assert attempt["error_message"] == "time is never filled"
 
     def test_compliance_skip_records_its_details(self):
         non_compliant = build_mock_dataset(ERDDAP_INFO_NO_EOVS_CSV)

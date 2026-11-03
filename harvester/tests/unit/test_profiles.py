@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pandas as pd
 import pytest
+from cde_harvester.core.errors import EmptyVariableError
 from cde_harvester.dataset_types import extract_features as get_profiles
 from cde_harvester.dataset_types import timeseries_profile
 from conftest import (
@@ -241,6 +242,30 @@ def two_station_dataset(single_station_dataset):
     dataset.get_count.side_effect = _get_count
     dataset.eovs = ["oxygen", "subSurfaceTemperature"]
     return dataset
+
+
+class TestNeverFilledVariables:
+    """A declared variable with no values is a provider data problem: an
+    error, not a NO_PROFILES_FOUND skip."""
+
+    def test_never_filled_time_raises(self, two_station_dataset):
+        answer = two_station_dataset.get_max_min.side_effect
+        two_station_dataset.get_max_min.side_effect = (
+            lambda v: pd.DataFrame() if v[-1] == "time" else answer(v)
+        )
+        with pytest.raises(EmptyVariableError, match="time is never filled"):
+            get_profiles(two_station_dataset)
+
+    def test_never_filled_lat_lon_raises(self, two_station_dataset):
+        two_station_dataset.get_profile_ids.return_value = pd.DataFrame(
+            {"station_id": ["STATION_001", "STATION_002"]}
+        )
+        answer = two_station_dataset.get_max_min.side_effect
+        two_station_dataset.get_max_min.side_effect = (
+            lambda v: pd.DataFrame() if v[-1] == "latitude" else answer(v)
+        )
+        with pytest.raises(EmptyVariableError, match="No latitude/longitude"):
+            get_profiles(two_station_dataset)
 
 
 class TestPerFeatureEovs:
