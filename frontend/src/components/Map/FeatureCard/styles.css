@@ -113,126 +113,15 @@
 }
 
 /* Five rows before the list — not the card — starts scrolling, so a stack of
-   forty gridded datasets is still a card rather than a column down the map. */
+   forty gridded datasets is still a card rather than a column down the map.
+   Otherwise laid out as the datasets list it mirrors (.datasetsCardList). */
 .featureCardList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--cioos-space-xs);
   max-height: 320px;
-  overflow-y: auto;
-  padding: var(--cioos-space-sm);
 }
 
-/* Drawn like the datasets list's cards (.datasetCard in
-   DatasetsTable/styles.css): same datasets, same look in both places. */
-.featureCardRow {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: var(--cioos-space-sm) 10px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-card);
-}
-
-.featureCardRow.clickable {
-  cursor: pointer;
-}
-
-/* Guarded, because a touch device leaves :hover latched on the last thing
-   tapped — and on this card that would mark a row the user has already acted
-   on. Every hover state here is decoration; nothing is only reachable by
-   hovering. */
-@media (hover: hover) {
-  .featureCardRow.clickable:hover {
-    border-color: var(--cioos-primary);
-    background-color: var(--cioos-surface-2);
-  }
-}
-
-.featureCardRow.clickable:has(.featureCardRowTitle:focus-visible) {
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-button.featureCardRowTitle {
-  padding: 0;
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-button.featureCardRowTitle:focus-visible {
-  outline: none;
-}
-
-.featureCardRowHeadline {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-}
-
-/* The download toggle and the platform glyph are each one title line tall,
-   so they sit on its first line however the title wraps. */
-.featureCardRowAdd,
-.featureCardRowIcon {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  min-height: calc(var(--cioos-font-size-sm) * 1.35);
-}
-
-.featureCardRowTitle {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  min-width: 0;
-  overflow: hidden;
-  font-family: var(--cioos-font-display);
-  font-weight: 600;
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.35;
-}
-
-.featureCardRowMeta {
+.featureCardHere {
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
-}
-
-/* Same plain color-only states as the list's own toggle (.datasetCardSelect):
-   the same action on the same dataset reads the same. */
-.featureCardRowAdd {
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--cioos-ink-40);
-  cursor: pointer;
-  transition: color var(--cioos-transition-fast);
-}
-
-.featureCardRowAdd:focus-visible:not(:disabled) {
-  border-radius: 50%;
-  outline: 2px solid var(--cioos-primary-700);
-  outline-offset: 2px;
-}
-
-@media (hover: hover) {
-  .featureCardRowAdd:hover:not(:disabled) {
-    color: var(--cioos-primary-700);
-  }
-}
-
-.featureCardRowAdd.isSelected {
-  color: var(--cioos-primary-700);
-  cursor: default;
-}
-
-/* Griddap: metadata-only, never downloadable — greyed out as in the list. */
-.featureCardRowAdd:disabled:not(.isSelected) {
-  color: var(--cioos-hairline);
-  cursor: not-allowed;
 }
 
 .featureCardMore {
@@ -302,28 +191,6 @@ button.featureCardRowTitle:focus-visible {
   .featureCardList {
     max-height: none;
     flex: 1;
-  }
-
-  /* Comfortable touch targets: the desktop rows are sized for a cursor. */
-  .featureCardRow {
-    /* An explicit min-height replaces the flex item's content-sized minimum,
-       so without this a full list squeezed each row to 44px and its meta
-       spilled out under the next one. */
-    flex-shrink: 0;
-    min-height: 44px;
-    padding: var(--cioos-space-sm) var(--cioos-space-md);
-  }
-
-  /* The list card's title size, a step above the meta under it, on one line
-     so more rows fit the sheet; the full title is the row's tooltip. */
-  .featureCardRowTitle {
-    -webkit-line-clamp: 1;
-    font-size: var(--cioos-font-size-base);
-  }
-
-  .featureCardRowAdd,
-  .featureCardRowIcon {
-    min-height: calc(var(--cioos-font-size-base) * 1.35);
   }
 }
 

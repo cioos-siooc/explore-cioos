@@ -61,7 +61,9 @@ All runs are Prefect flows executed by the `prefect_worker` process pool.
   triggers one **Harvest Source** run per configured source (each ERDDAP URL,
   plus `obis` when OBIS is enabled) and waits for all of them. One failing
   source does not cancel the others. The orchestrator ends red if any source
-  did not complete.
+  did not complete. Only one runs at a time: a run that starts while another
+  is still going is cancelled, since a waiting orchestrator holds a worker
+  slot and overlapping ones would starve their own sources.
 - **Harvest Source** (`cde-harvester-<host-slug>` / `cde-harvester-obis`) is
   one source end to end: harvest, enrich, write CSVs, load into the database,
   and refresh the cache. The dashboard's *Trigger harvest* button starts this

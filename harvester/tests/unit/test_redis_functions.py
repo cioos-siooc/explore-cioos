@@ -19,7 +19,7 @@ def test_reload_top_requests_skips_non_regular_log_files(tmp_path, monkeypatch):
     monkeypatch.setattr(
         redisFunctions.requests,
         "get",
-        lambda url, timeout: warmed.append(url) or type("R", (), {"raise_for_status": lambda self: None})(),
+        lambda url, **_: warmed.append(url) or type("R", (), {"raise_for_status": lambda self: None})(),
     )
 
     redisFunctions.reloadTopRequests.fn()

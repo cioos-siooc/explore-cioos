@@ -50,6 +50,8 @@ export default function DatasetCard({
   tipHighlight,
   t,
   i18n,
+  // Extra lines under the meta, e.g. the "what's here" card's cell figures.
+  children,
 }) {
   const isGrid = row.cdm_data_type === "Grid";
   const isObis = row.source_type === "obis";
@@ -222,6 +224,7 @@ export default function DatasetCard({
         </div>
 
         <DatasetCardMeta row={row} t={t} i18n={i18n} />
+        {children}
 
         {/* Outside the estimates branch: the dataset the queue refuses is the
             one these links are wanted for. */}
@@ -324,8 +327,7 @@ export function DatasetPlatformIcon({
   );
 }
 
-// Shared with the map's "what's here" card so a dataset reads the same in both.
-export function DatasetCardMeta({ row, t, i18n }) {
+function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
     row.erddap_server_url || row.erddap_url,

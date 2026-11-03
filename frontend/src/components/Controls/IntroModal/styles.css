@@ -515,6 +515,10 @@
     display: none;
   }
 
+  .introModal .modal-header > .introReopen + .closeButton {
+    margin-left: auto;
+  }
+
   .introModal .modal-header {
     gap: var(--cioos-space-md);
     padding: var(--cioos-space-sm) var(--cioos-space-md);

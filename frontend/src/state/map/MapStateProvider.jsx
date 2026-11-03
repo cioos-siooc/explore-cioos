@@ -13,8 +13,6 @@ import { server } from "../../config.js";
 import {
   bathymetryPalettes,
   defaultBathymetryPalette,
-  defaultMapCenter,
-  defaultMapZoom,
   defaultTrailingDays,
   HEX_METRIC,
   isMarkerTier,
@@ -97,17 +95,24 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
   // Number.isFinite('12') is false.
   const [mapView, setMapView] = useState(() => {
     const params = new URL(window.location.href).searchParams;
-    const asNumber = (name, fallback) => {
+    const asNumber = (name) => {
       const value = Number(params.get(name));
       return Number.isFinite(value) && params.get(name) !== null
         ? value
-        : fallback;
+        : undefined;
     };
-    return {
-      lat: asNumber("lat", defaultMapCenter.lat),
-      lon: asNumber("lon", defaultMapCenter.lon),
-      zoom: asNumber("zoom", defaultMapZoom),
+    const shared = {
+      lat: asNumber("lat"),
+      lon: asNumber("lon"),
+      zoom: asNumber("zoom"),
     };
+    if (Object.values(shared).every((value) => value !== undefined)) {
+      return shared;
+    }
+    // No camera to restore: Map fits defaultMapBounds to the canvas and
+    // pushes the real view at first paint. Zoom 0 is under every zoom tier,
+    // as that fit is on an ordinary screen.
+    return { zoom: 0 };
   });
   const { zoom } = mapView;
 
