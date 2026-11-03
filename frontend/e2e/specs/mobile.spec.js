@@ -168,11 +168,12 @@ test.describe("the record preview on a phone", () => {
       exact: true,
     });
     await expect(settings).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("preview-mode-dropdown-toggle")).toBeHidden();
+    const firstSetting = page
+      .locator("#datasetPreviewParamsPane .controlRow")
+      .first();
+    await expect(firstSetting).toBeHidden();
     await settings.click();
-    await expect(
-      page.getByTestId("preview-mode-dropdown-toggle"),
-    ).toBeInViewport();
+    await expect(firstSetting).toBeInViewport();
 
     const overflow = await dialog.evaluate(
       (el) => el.scrollWidth - el.clientWidth,

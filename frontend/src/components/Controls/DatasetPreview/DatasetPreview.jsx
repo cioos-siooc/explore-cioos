@@ -9,8 +9,8 @@ import {
 } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
+import SegmentedToggle from "../../ui/SegmentedToggle.jsx";
 import useElementSize from "../../ui/useElementSize.js";
-import { NARROW_QUERY } from "../../../state/ui/useMediaQuery.js";
 
 import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
@@ -98,11 +98,10 @@ export default function DatasetPreview({
   // A viewing preference like the disclosure triangle in the plot, not a view of
   // the data — so not in the URL, and not reset per record.
   const [paneWidth, setPaneWidth] = useState(PANE_DEFAULT_PX);
-  // Folded on a phone, where the settings stack above the plot and would push
-  // it below the fold.
-  const [paneCollapsed, setPaneCollapsed] = useState(
-    () => window.matchMedia(NARROW_QUERY).matches,
-  );
+  // Two states, not one: the pane beside the plot on larger screens starts
+  // shown, the dialog smaller ones open it in starts closed.
+  const [paneCollapsed, setPaneCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // The Table view's scroll container and the ceiling on the plot's height:
   // sized by the modal, not the plot, so it is safe to feed into the plot's
@@ -128,6 +127,8 @@ export default function DatasetPreview({
     setPaneWidth,
     paneCollapsed,
     setPaneCollapsed,
+    settingsOpen,
+    setSettingsOpen,
     availableHeight: scrollSize.height,
   };
 
@@ -152,27 +153,23 @@ export default function DatasetPreview({
         <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && (
-              <div className="previewViewToggle" role="group">
-                {[
-                  ["plot", GraphUp, "datasetPreviewPlotText"],
-                  ["table", TableIcon, "datasetPreviewTableText"],
-                ].map(([vis, Icon, labelKey]) => (
-                  <button
-                    key={vis}
-                    type="button"
-                    className={
-                      selectedVis === vis
-                        ? "toggleButton selected"
-                        : "toggleButton"
-                    }
-                    aria-pressed={selectedVis === vis}
-                    onClick={() => setSelectedVis(vis)}
-                  >
-                    <Icon size={15} aria-hidden="true" />
-                    {t(labelKey)}
-                  </button>
-                ))}
-              </div>
+              <SegmentedToggle
+                className="previewViewToggle"
+                options={[
+                  {
+                    value: "plot",
+                    icon: GraphUp,
+                    label: t("datasetPreviewPlotText"),
+                  },
+                  {
+                    value: "table",
+                    icon: TableIcon,
+                    label: t("datasetPreviewTableText"),
+                  },
+                ]}
+                value={selectedVis}
+                onChange={setSelectedVis}
+              />
             )}
 
             <h4 className="datasetTitle">

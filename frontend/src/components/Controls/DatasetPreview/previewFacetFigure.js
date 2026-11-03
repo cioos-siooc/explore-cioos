@@ -36,6 +36,8 @@ import {
 import {
   boxBudgetFor,
   domainsFor,
+  gridMarginFor,
+  gridSizeFor,
   heightBudgetFor,
   marginFor,
   plotHeightFor,
@@ -181,6 +183,43 @@ export function plotBoxFor({
   return { title, width, height, titleLines };
 }
 
+/**
+ * plotBoxFor for a grid of `columns` by `rows` panels: the same order — width,
+ * then the title wrapped to it, then height — over the grid's own margins.
+ */
+export function gridBoxFor({
+  plan,
+  variablesByName,
+  data,
+  columns,
+  rows,
+  availableHeight,
+  measured = {},
+  withTitle = true,
+  header = false,
+  colorbars = false,
+}) {
+  const title = withTitle
+    ? recordTitleFor({ plan, variablesByName, data })
+    : "";
+  const availableWidth = boxBudgetFor(measured.width);
+  const { width } = gridSizeFor({
+    columns,
+    rows,
+    availableWidth,
+    margin: gridMarginFor(undefined, { header, colorbars }),
+  });
+  const titleLines = titleLinesFor(title, width);
+  const { height } = gridSizeFor({
+    columns,
+    rows,
+    availableWidth,
+    availableHeight: heightBudgetFor(availableHeight, measured.height),
+    margin: gridMarginFor(titleLines, { header, colorbars }),
+  });
+  return { title, width, height, titleLines };
+}
+
 // What the figure calls a column, on an axis and in a hover. Shared by both
 // layouts so a rename reads the same in each.
 function labellerFor(variablesByName, labels) {
@@ -237,6 +276,55 @@ const sharedAxisEdgesFor = (panelLetter, panelCount) =>
         : { yref: panel, y0: 0, y1: 0, xref: "x domain", x0: 0, x1: 1 }),
     };
   });
+
+// A grid draws each axis line once, on the bottom row and the left column;
+// every other panel gets the same two edges as shapes.
+const edgeLine = {
+  type: "line",
+  layer: "below",
+  line: { color: AXIS_LINE_COLOR, width: 1 },
+};
+function gridEdgesFor(columns, rows) {
+  const edges = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const xref = `${axisRef("x", column)} domain`;
+      const yref = `${axisRef("y", row)} domain`;
+      if (row > 0) {
+        edges.push({ ...edgeLine, xref, x0: 0, x1: 1, yref, y0: 0, y1: 0 });
+      }
+      if (column > 0) {
+        edges.push({ ...edgeLine, xref, x0: 0, x1: 0, yref, y0: 0, y1: 1 });
+      }
+    }
+  }
+  return edges;
+}
+
+// A column's caption above the grid: what its panels are coloured by.
+const columnHeaderFor = (text, domain) => ({
+  text,
+  xref: "paper",
+  yref: "paper",
+  x: (domain[0] + domain[1]) / 2,
+  y: 1,
+  xanchor: "center",
+  yanchor: "bottom",
+  yshift: 4,
+  showarrow: false,
+  font: { size: LABEL_FONT_PX },
+});
+
+// The rank axis of a track: ticks named by the caller, and the place each row
+// is in the hover.
+const positionTicksFor = (position, columnName) =>
+  position && position.column === columnName
+    ? {
+        tickmode: "array",
+        tickvals: position.ticks.tickvals,
+        ticktext: position.ticks.ticktext,
+      }
+    : {};
 
 // title.automargin deliberately unset: it would grow the margin inside a fixed
 // height and silently shrink panels below MIN_PANEL_PX.
@@ -547,6 +635,263 @@ export function buildFigure({
   return { data: [...lineTraces, ...traces], layout, colorLegend };
 }
 
+/**
+ * Several variables on BOTH axes, and optionally several colour columns: one
+ * panel per (X, Y, colour) triple. Columns are the X variables, each repeated
+ * once per colour column side by side; rows are the Y variables, the first at
+ * the bottom like a stack. A row shares its Y axis and a column its X axis, so
+ * only the left column and the bottom row carry tick labels.
+ *
+ * @param xAxes, yAxes  the column names on each axis
+ * @param panelAxis     which of the two is the panels' list ("x" | "y"): its
+ *                      variables keep their panel colours
+ * @param colorAxes     the columns shading the panels, [] for none
+ * @param scales        { [columnName]: scale name } — the user's choices only
+ * @param position      { column, ticks, labels } for a track's rank axis, or null
+ * Every other parameter is buildFigure's.
+ */
+export function buildGridFigure({
+  variablesByName,
+  xAxes,
+  yAxes,
+  panelAxis = "y",
+  colorAxes = [],
+  data,
+  colors = {},
+  labels = {},
+  title = "",
+  mode = "markers",
+  scales = {},
+  position = null,
+  size = {},
+  uirevision,
+  reversedYAxes = new Set(),
+}) {
+  const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
+
+  // Decided per column, like buildFigure's: a column with nothing numeric in
+  // it carries no ramp, and its panels draw in their own colour instead.
+  const dimensions = colorAxes.map((columnName) => {
+    const variable = variablesByName.get(columnName);
+    const dimension = colorDimensionFor(variable, data);
+    return (
+      dimension && {
+        columnName,
+        dimension,
+        stops: colorScaleForVariable(variable, scales[columnName]),
+      }
+    );
+  });
+  const shades = dimensions.length ? dimensions : [null];
+  const columnCount = xAxes.length * shades.length;
+  const rowCount = yAxes.length;
+  const header = dimensions.length > 1;
+
+  const wrappedTitle = wrapTitleFor(title, size.width);
+  const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
+  const margin = gridMarginFor(titleLines, { header });
+  const plottingWidth = size.width
+    ? Math.max(size.width - margin.l - margin.r, 0)
+    : 0;
+  const plottingHeight = size.height
+    ? Math.max(size.height - margin.t - margin.b, 0)
+    : 0;
+  const columnDomains = domainsFor(columnCount, COLUMN_GAP);
+  const rowDomains = domainsFor(rowCount, ROW_GAP);
+  const wrapAlong = (text, pixels, maxLines) =>
+    wrapLabel(text, maxCharsFor(pixels), maxLines);
+  const coloredLine = mode.includes("lines");
+  const binLimit = lineBinLimitFor({
+    panelCount: columnCount * rowCount,
+    axisPixels: plottingWidth / Math.max(columnCount, 1),
+  });
+
+  const layout = {
+    uirevision,
+    margin,
+    font: { size: TICK_FONT_PX },
+    hoverlabel: { font: { size: HOVER_FONT_PX } },
+    showlegend: false,
+    // No axis is shared by every panel, so no unified box: the point under
+    // the pointer is the one worth reading.
+    hovermode: "closest",
+    dragmode: "zoom",
+    modebar: { orientation: "v" },
+    ...(size.width ? { width: size.width } : {}),
+    ...(size.height ? { height: size.height } : {}),
+  };
+  if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
+
+  dimensions.forEach((shade, index) => {
+    if (!shade) return;
+    layout[index === 0 ? "coloraxis" : `coloraxis${index + 1}`] = {
+      colorscale: shade.stops,
+      ...(shade.dimension.range
+        ? { cmin: shade.dimension.range[0], cmax: shade.dimension.range[1] }
+        : {}),
+      showscale: false, // drawn outside the figure — see ColorScaleLegend.jsx
+    };
+  });
+
+  const columns = xAxes.flatMap((xAxis, xIndex) =>
+    shades.map((shade, shadeIndex) => ({
+      xAxis,
+      shade,
+      shadeIndex,
+      // Every repeat of an X variable zooms with its first column.
+      matches: shadeIndex > 0 ? axisRef("x", xIndex * shades.length) : null,
+    })),
+  );
+
+  columns.forEach(({ xAxis, matches }, column) => {
+    const domain = columnDomains[column];
+    layout[axisKey("x", column)] = {
+      ...AXIS_LINE,
+      domain,
+      anchor: "y",
+      automargin: true,
+      zeroline: false,
+      ...(matches ? { matches } : {}),
+      ...positionTicksFor(position, xAxis),
+      title: axisTitle(
+        wrapAlong(
+          titleFor(xAxis),
+          plottingWidth * (domain[1] - domain[0]),
+          PINNED_AXIS_LINES,
+        ),
+      ),
+    };
+  });
+  yAxes.forEach((yAxis, row) => {
+    const domain = rowDomains[row];
+    layout[axisKey("y", row)] = {
+      ...AXIS_LINE,
+      domain,
+      anchor: "x",
+      automargin: true,
+      zeroline: false,
+      ...positionTicksFor(position, yAxis),
+      ...(reversedYAxes.has(yAxis) ? { autorange: "reversed" } : {}),
+      title: axisTitle(
+        wrapAlong(titleFor(yAxis), plottingHeight * (domain[1] - domain[0])),
+      ),
+    };
+  });
+
+  const panelColumns = panelAxis === "x" ? xAxes : yAxes;
+  const lineTraces = [];
+  const traces = [];
+  yAxes.forEach((yAxis, row) => {
+    columns.forEach(({ xAxis, shade, shadeIndex }, column) => {
+      const panelColumn = panelAxis === "x" ? xAxis : yAxis;
+      const color =
+        colors[panelColumn] ||
+        defaultColorFor(
+          variablesByName.get(panelColumn),
+          panelColumns.indexOf(panelColumn),
+        );
+      const xValues = (data || []).map((entry) => entry[xAxis]);
+      const yValues = (data || []).map((entry) => entry[yAxis]);
+      const xref = axisRef("x", column);
+      const yref = axisRef("y", row);
+      const colorAxisName =
+        shadeIndex === 0 ? "coloraxis" : `coloraxis${shadeIndex + 1}`;
+
+      if (shade && coloredLine) {
+        coloredLineBinsFor({
+          sharedValues: xValues,
+          panelValues: yValues,
+          colorValues: shade.dimension.values,
+          range: shade.dimension.range,
+          stops: shade.stops,
+          binLimit,
+          fallbackColor: color,
+        }).forEach((bin) =>
+          lineTraces.push({
+            type: "scatter",
+            mode: "lines",
+            hoverinfo: "skip",
+            x: bin.sharedValues,
+            y: bin.panelValues,
+            xaxis: xref,
+            yaxis: yref,
+            line: { color: bin.color },
+          }),
+        );
+      }
+
+      const onPosition =
+        position && position.labels && position.column === xAxis;
+      const colorInHover =
+        shade && shade.columnName !== xAxis && shade.columnName !== yAxis;
+      traces.push({
+        type: "scatter",
+        mode: shade && coloredLine ? "markers" : mode,
+        name: `${titleFor(yAxis)} / ${titleFor(xAxis)}`,
+        x: xValues,
+        y: yValues,
+        xaxis: xref,
+        yaxis: yref,
+        hovertemplate:
+          (onPosition
+            ? `${hoverLine(xAxis, "%{x:d}")}<br>%{text}` // ":d" prints the rank
+            : hoverLine(xAxis, "%{x}")) +
+          `<br>${hoverLine(yAxis, "%{y}")}` +
+          (colorInHover
+            ? `<br>${hoverLine(shade.columnName, "%{customdata}")}`
+            : "") +
+          "<extra></extra>",
+        marker: shade
+          ? {
+              color: shade.dimension.values,
+              coloraxis: colorAxisName,
+              ...(mode.includes("markers") ? {} : { opacity: 0 }), // kept for the hover
+            }
+          : { color },
+        line: { color },
+        ...(onPosition ? { text: position.labels } : {}),
+        ...(shade ? { customdata: shade.dimension.hoverValues } : {}),
+      });
+    });
+  });
+
+  layout.shapes = gridEdgesFor(columnCount, rowCount);
+  if (header) {
+    layout.annotations = columns.map(({ shade }, column) =>
+      columnHeaderFor(
+        // Wrapped to its own column, or it runs over the next one.
+        shade
+          ? wrapAlong(
+              titleFor(shade.columnName),
+              plottingWidth *
+                (columnDomains[column][1] - columnDomains[column][0]),
+              PINNED_AXIS_LINES,
+            )
+          : "",
+        columnDomains[column],
+      ),
+    );
+  }
+
+  const colorLegends = dimensions
+    .map(
+      (shade, index) =>
+        shade && {
+          axis: index === 0 ? "coloraxis" : `coloraxis${index + 1}`,
+          label: titleFor(shade.columnName),
+          stops: shade.stops,
+          ticks: legendTicksFor(shade.dimension),
+        },
+    )
+    .filter(Boolean);
+  return {
+    data: [...lineTraces, ...traces],
+    layout,
+    colorLegends,
+    pinnable: false,
+  };
+}
+
 export const COLORBAR_THICKNESS_PX = 12;
 export const COLORBAR_PAD_PX = 10;
 // The grid's cells along an axis not measured yet.
@@ -555,41 +900,58 @@ const cellsAlong = (pixels) =>
   pixels > 0 ? Math.max(2, Math.floor(pixels / MIN_STEP_PX)) : UNMEASURED_CELLS;
 
 /**
- * The colour plot: every panel draws the same Y against the same X, one panel
- * per colour variable, each filled by its own variable through its own
- * colourbar — a heatmap, so the colour between samples is blended. The bar
- * spans exactly its panel's domain, which is what ties a scale to its graph.
+ * The colour plot: every panel draws Y against X and is filled by its own
+ * colour variable through its own colourbar — a heatmap, so the colour between
+ * samples is blended. The bar spans exactly its variable's rows, which is what
+ * ties a scale to its graphs.
  *
- * Takes buildFigure's inputs, except that `panels` are the colour variables,
- * `xAxis`/`yAxis` replace `sharedAxis`, and there is no plot type. Always
- * stacked: the bars sit inside the figure, and only a stack is guaranteed never
- * to scroll them out of view.
+ * One row per (colour variable, Y) pair, colour-major, and one column per X;
+ * a single X and Y is the plain stack. Takes buildFigure's inputs, except that
+ * `panels` are the colour variables, `xAxes`/`yAxes` replace `sharedAxis`, and
+ * there is no plot type. Only a single X is pinned below the scroller; a grid
+ * keeps every column's X title itself.
  *
  * @param scales { [columnName]: scaleName } — the user's overrides only
- * @param yReversed draw Y downwards; by default when Y is a depth or a pressure
+ * @param reversedYAxes the Y columns drawn downwards; by default a depth or a
+ *                      pressure, and `yReversed` for the first one
  */
 export function buildColorFigure({
   variablesByName,
   panels,
   xAxis,
   yAxis,
+  xAxes = [xAxis],
+  yAxes = [yAxis],
   data,
   labels = {},
   scales = {},
   title = "",
   sharedTicks = null,
   sharedText = null,
+  position = null,
   size = {},
   uirevision,
-  yReversed = isDownwardVertical(variablesByName.get(yAxis)),
+  yReversed = isDownwardVertical(variablesByName.get(yAxes[0])),
+  reversedYAxes = null,
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
-  const domains = domainsFor(panels.length, ROW_GAP);
+  const isReversed = (columnName, index) => {
+    if (reversedYAxes) return reversedYAxes.has(columnName);
+    return index === 0
+      ? yReversed
+      : isDownwardVertical(variablesByName.get(columnName));
+  };
+  const gridded = xAxes.length > 1;
+  const rowCount = panels.length * yAxes.length;
+  const domains = domainsFor(rowCount, ROW_GAP);
+  const columnDomains = domainsFor(xAxes.length, COLUMN_GAP);
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
   const baseMargin = marginFor(ROWS, titleLines);
-  const margin = { ...baseMargin, r: baseMargin.r + COLORBAR_ROOM_PX };
+  const margin = gridded
+    ? gridMarginFor(titleLines, { colorbars: true })
+    : { ...baseMargin, r: baseMargin.r + COLORBAR_ROOM_PX };
   const plottingWidth = size.width
     ? Math.max(size.width - margin.l - margin.r, 0)
     : 0;
@@ -598,8 +960,7 @@ export function buildColorFigure({
     : 0;
   const wrapAlong = (text, pixels, maxLines) =>
     wrapLabel(text, maxCharsFor(pixels), maxLines);
-  const xIsTime = isTimeLike(variablesByName.get(xAxis));
-  const yIsTime = isTimeLike(variablesByName.get(yAxis));
+  const spanOf = (domain) => domain[1] - domain[0];
 
   const layout = {
     uirevision,
@@ -617,47 +978,51 @@ export function buildColorFigure({
   };
   if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
 
-  layout.xaxis = {
-    ...AXIS_LINE,
-    automargin: true,
-    domain: [0, 1],
-    anchor: "y",
-    ...(sharedTicks
-      ? {
-          tickmode: "array",
-          tickvals: sharedTicks.tickvals,
-          ticktext: sharedTicks.ticktext,
-        }
-      : {}),
-    title: axisTitle(
-      wrapAlong(titleFor(xAxis), plottingWidth, PINNED_AXIS_LINES), // the pinned strip's fixed room
-    ),
-  };
+  // The first column's rank labels come from the caller; any other column on
+  // the rank axis gets the same ones from `position`.
+  const textFor = (column, columnName) =>
+    column === 0 && sharedText
+      ? sharedText
+      : position && position.labels && position.column === columnName
+        ? position.labels
+        : null;
 
-  const yTitle = titleFor(yAxis);
-  const xValues = (data || []).map((row) => row[xAxis]);
-  const yValues = (data || []).map((row) => row[yAxis]);
+  xAxes.forEach((columnName, column) => {
+    const domain = columnDomains[column];
+    layout[axisKey("x", column)] = {
+      ...AXIS_LINE,
+      automargin: true,
+      domain,
+      anchor: "y",
+      ...(column === 0 && sharedTicks
+        ? {
+            tickmode: "array",
+            tickvals: sharedTicks.tickvals,
+            ticktext: sharedTicks.ticktext,
+          }
+        : positionTicksFor(position, columnName)),
+      title: axisTitle(
+        wrapAlong(
+          titleFor(columnName),
+          plottingWidth * spanOf(domain),
+          PINNED_AXIS_LINES, // the pinned strip's fixed room
+        ),
+      ),
+    };
+  });
 
-  const traces = panels.map((columnName, index) => {
-    const domain = domains[index];
+  const traces = [];
+  panels.forEach((columnName, index) => {
     const variable = variablesByName.get(columnName);
     const dimension = colorDimensionFor(variable, data);
     const stops = colorScaleForVariable(variable, scales[columnName]);
     const colorAxisName = index === 0 ? "coloraxis" : `coloraxis${index + 1}`;
     const fallbackColor = defaultColorFor(variable, index);
-
-    layout[axisKey("y", index)] = {
-      ...AXIS_LINE,
-      domain,
-      anchor: "x",
-      automargin: true,
-      zeroline: false,
-      ...(index > 0 ? { matches: "y" } : {}), // one zoom for every panel
-      ...(yReversed ? { autorange: "reversed" } : {}),
-      title: axisTitle(
-        wrapAlong(yTitle, plottingHeight * (domain[1] - domain[0])),
-      ),
-    };
+    const firstRow = index * yAxes.length;
+    const barDomain = [
+      domains[firstRow][0],
+      domains[firstRow + yAxes.length - 1][1],
+    ];
 
     if (dimension) {
       layout[colorAxisName] = {
@@ -669,9 +1034,9 @@ export function buildColorFigure({
           x: 1,
           xanchor: "left",
           xpad: COLORBAR_PAD_PX,
-          y: (domain[0] + domain[1]) / 2,
+          y: (barDomain[0] + barDomain[1]) / 2,
           yanchor: "middle",
-          len: domain[1] - domain[0],
+          len: spanOf(barDomain),
           lenmode: "fraction",
           thickness: COLORBAR_THICKNESS_PX,
           tickfont: { size: TICK_FONT_PX },
@@ -681,7 +1046,7 @@ export function buildColorFigure({
             // name runs past the bar into its neighbours'.
             text: wrapAlong(
               titleFor(columnName),
-              plottingHeight * (domain[1] - domain[0]),
+              plottingHeight * spanOf(barDomain),
             ),
             side: "right",
             font: { size: LABEL_FONT_PX },
@@ -690,73 +1055,102 @@ export function buildColorFigure({
       };
     }
 
-    const grid =
-      dimension &&
-      colorGridFor({
-        xValues,
-        yValues,
-        zValues: dimension.values,
-        xIsTime,
-        yIsTime,
-        maxColumns: cellsAlong(plottingWidth),
-        maxRows: cellsAlong(plottingHeight * (domain[1] - domain[0])),
-      });
-    if (grid) {
-      // A time's cell holds epoch milliseconds; the hover reads its date.
-      const timeColor = isTimeLike(variable);
-      return {
-        type: "heatmap",
-        name: titleFor(columnName),
-        x: grid.x,
-        y: grid.y,
-        z: grid.z,
-        xaxis: "x",
-        yaxis: axisRef("y", index),
-        coloraxis: colorAxisName,
-        zsmooth: "best",
-        connectgaps: false, // where nothing was sampled stays blank
-        hovertemplate: `${hoverLine(xAxis, "%{x}")}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, timeColor ? "%{text}" : "%{z}")}<extra></extra>`,
-        ...(timeColor
-          ? {
-              text: grid.z.map((row) =>
-                row.map((value) =>
-                  value === null ? "" : new Date(value).toISOString(),
-                ),
-              ),
-            }
-          : {}),
+    yAxes.forEach((yColumn, yIndex) => {
+      const row = firstRow + yIndex;
+      const domain = domains[row];
+      layout[axisKey("y", row)] = {
+        ...AXIS_LINE,
+        domain,
+        anchor: "x",
+        automargin: true,
+        zeroline: false,
+        // One zoom for every panel drawing the same Y.
+        ...(row >= yAxes.length ? { matches: axisRef("y", yIndex) } : {}),
+        ...(isReversed(yColumn, yIndex) ? { autorange: "reversed" } : {}),
+        title: axisTitle(
+          wrapAlong(titleFor(yColumn), plottingHeight * spanOf(domain)),
+        ),
       };
-    }
+      const yValues = (data || []).map((entry) => entry[yColumn]);
 
-    // Nothing to blend across — a single cast, or no colour at all: one marker
-    // per row, and a row with no colour is a gap, not a grey point.
-    const panelY = dimension
-      ? yValues.map((value, row) =>
-          dimension.values[row] === null ? null : value,
-        )
-      : yValues;
-    const positionLine = sharedText
-      ? `${hoverLine(xAxis, "%{x:d}")}<br>%{text}` // ":d" prints the rank
-      : hoverLine(xAxis, "%{x}");
-    return {
-      type: "scatter",
-      mode: "markers",
-      name: titleFor(columnName),
-      x: xValues,
-      y: panelY,
-      xaxis: "x",
-      yaxis: axisRef("y", index),
-      hovertemplate: `${positionLine}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, "%{customdata}")}<extra></extra>`,
-      marker: dimension
-        ? { color: dimension.values, coloraxis: colorAxisName }
-        : { color: fallbackColor },
-      customdata: dimension
-        ? dimension.hoverValues
-        : (data || []).map((row) => row[columnName]),
-      ...(sharedText ? { text: sharedText } : {}),
-    };
+      xAxes.forEach((xColumn, column) => {
+        const xValues = (data || []).map((entry) => entry[xColumn]);
+        const xref = axisRef("x", column);
+        const yref = axisRef("y", row);
+        const grid =
+          dimension &&
+          colorGridFor({
+            xValues,
+            yValues,
+            zValues: dimension.values,
+            xIsTime: isTimeLike(variablesByName.get(xColumn)),
+            yIsTime: isTimeLike(variablesByName.get(yColumn)),
+            maxColumns: cellsAlong(
+              plottingWidth *
+                (columnDomains[column][1] - columnDomains[column][0]),
+            ),
+            maxRows: cellsAlong(plottingHeight * spanOf(domain)),
+          });
+        if (grid) {
+          // A time's cell holds epoch milliseconds; the hover reads its date.
+          const timeColor = isTimeLike(variable);
+          traces.push({
+            type: "heatmap",
+            name: titleFor(columnName),
+            x: grid.x,
+            y: grid.y,
+            z: grid.z,
+            xaxis: xref,
+            yaxis: yref,
+            coloraxis: colorAxisName,
+            zsmooth: "best",
+            connectgaps: false, // where nothing was sampled stays blank
+            hovertemplate: `${hoverLine(xColumn, "%{x}")}<br>${hoverLine(yColumn, "%{y}")}<br>${hoverLine(columnName, timeColor ? "%{text}" : "%{z}")}<extra></extra>`,
+            ...(timeColor
+              ? {
+                  text: grid.z.map((cells) =>
+                    cells.map((value) =>
+                      value === null ? "" : new Date(value).toISOString(),
+                    ),
+                  ),
+                }
+              : {}),
+          });
+          return;
+        }
+
+        // Nothing to blend across — a single cast, or no colour at all: one
+        // marker per row, and a row with no colour is a gap, not a grey point.
+        const panelY = dimension
+          ? yValues.map((value, at) =>
+              dimension.values[at] === null ? null : value,
+            )
+          : yValues;
+        const text = textFor(column, xColumn);
+        const positionLine = text
+          ? `${hoverLine(xColumn, "%{x:d}")}<br>%{text}` // ":d" prints the rank
+          : hoverLine(xColumn, "%{x}");
+        traces.push({
+          type: "scatter",
+          mode: "markers",
+          name: titleFor(columnName),
+          x: xValues,
+          y: panelY,
+          xaxis: xref,
+          yaxis: yref,
+          hovertemplate: `${positionLine}<br>${hoverLine(yColumn, "%{y}")}<br>${hoverLine(columnName, "%{customdata}")}<extra></extra>`,
+          marker: dimension
+            ? { color: dimension.values, coloraxis: colorAxisName }
+            : { color: fallbackColor },
+          customdata: dimension
+            ? dimension.hoverValues
+            : (data || []).map((entry) => entry[columnName]),
+          ...(text ? { text } : {}),
+        });
+      });
+    });
   });
 
-  layout.shapes = sharedAxisEdgesFor("y", panels.length);
-  return { data: traces, layout, colorLegend: null };
+  layout.shapes = gridEdgesFor(xAxes.length, rowCount);
+  return { data: traces, layout, colorLegend: null, pinnable: !gridded };
 }

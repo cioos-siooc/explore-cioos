@@ -33,9 +33,16 @@ import {
 const columnNameOf = (variable) => variable.columnName;
 
 // The menu portals to document.body (the pane scrolls and the modal clips), so
-// it needs the dropdown layer to show above the dialog.
+// it needs the dropdown layer to show above the dialog. It may grow past the
+// control so long variable names stay readable, but never off-screen.
 const STYLES = {
-  menuPortal: (base) => ({ ...base, zIndex: "var(--cioos-z-dropdown, 1060)" }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: "var(--cioos-z-dropdown, 1060)",
+    width: "max-content",
+    minWidth: base.width,
+    maxWidth: `min(480px, calc(100vw - ${base.left}px - 16px))`,
+  }),
 };
 
 // The cap note and Select all / Clear all ride along the option list, reading
@@ -149,6 +156,7 @@ export default function VariablePicker({
   maxSelected = Infinity,
 }) {
   const { t } = useTranslation();
+  const menuOpen = React.useRef(false);
   const selectable = Math.min(choices.length, maxSelected);
   const atCap = isMulti && selected.length >= maxSelected;
   const allSelected = selected.length === selectable;
@@ -257,12 +265,18 @@ export default function VariablePicker({
           // react-select skips its own handling of a key it sees prevented, which
           // leaves a focused grip's arrows, space and escape to the drag. Tab is
           // spared so focus can still leave the grip.
+          onMenuOpen={() => (menuOpen.current = true)}
+          onMenuClose={() => (menuOpen.current = false)}
           onKeyDown={(event) => {
             if (
               event.key !== "Tab" &&
               event.target.closest?.(".variableSelectDragHandle")
             ) {
               event.preventDefault();
+            }
+            // Escape closes the open menu only, not the dialog around it.
+            if (event.key === "Escape" && menuOpen.current) {
+              event.stopPropagation();
             }
           }}
           reorderable={reorderable}

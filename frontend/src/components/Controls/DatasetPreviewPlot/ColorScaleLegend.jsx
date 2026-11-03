@@ -1,5 +1,10 @@
 import React from "react";
 
+import {
+  LABEL_FONT_PX,
+  TICK_FONT_PX,
+} from "../DatasetPreview/previewLabelText.js";
+
 // The colour dimension's scale, drawn beside the plot rather than inside it.
 //
 // Plotly's own colourbar sat at the right edge of the FIGURE, and a profile with
@@ -26,7 +31,14 @@ export default function ColorScaleLegend({ legend }) {
   if (!legend || !legend.stops.length) return null;
 
   return (
-    <div className="colorScaleLegend">
+    <div
+      className="colorScaleLegend"
+      // The plot's own axis sizes, so this reads as one more axis of it.
+      style={{
+        "--legend-label-font": `${LABEL_FONT_PX}px`,
+        "--legend-tick-font": `${TICK_FONT_PX}px`,
+      }}
+    >
       <div className="colorScaleLegendLabel">{legend.label}</div>
       <div
         className="colorScaleLegendBar"

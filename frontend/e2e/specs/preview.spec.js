@@ -67,24 +67,29 @@ test.describe("record preview", () => {
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);
 
-    const modeToggle = page.getByTestId("preview-mode-dropdown-toggle");
     const mode = (name) =>
-      page.getByTestId("preview-mode-option").getByText(name, { exact: true });
+      page
+        .getByTestId("preview-mode-toggle")
+        .getByRole("button", { name, exact: true });
 
-    await expect(modeToggle).toHaveText("Markers + Line");
-    await modeToggle.click();
+    await expect(mode("Markers + Line")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await mode("Markers").click();
 
-    await expect(modeToggle).toHaveText("Markers");
+    await expect(mode("Markers")).toHaveAttribute("aria-pressed", "true");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBe("markers");
 
     // Back to the default and the param goes, rather than being pinned at it.
-    await modeToggle.click();
     await mode("Markers + Line").click();
 
-    await expect(modeToggle).toHaveText("Markers + Line");
+    await expect(mode("Markers + Line")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBeNull();

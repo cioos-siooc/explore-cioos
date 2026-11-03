@@ -174,14 +174,70 @@ export function plotHeightFor(
   return Math.ceil(Math.max(available, needed));
 }
 
+// MIN_PLOT_PX stands in for a box not measured yet. A measured width is all
+// there is — a phone's is under it — and flooring it only adds a sideways
+// scroll; the panels' own minimum still applies.
+const widthBudgetFor = (availableWidth) =>
+  availableWidth > 0 ? availableWidth : MIN_PLOT_PX;
+
 // Profiles get narrow fast: six panels in a 1140px modal is ~170px each, which
 // still reads. The floor keeps a 14-column selection legible at the cost of a
 // horizontal scroll.
 export function plotWidthFor(orientation, panelCount, availableWidth) {
-  const available = Math.max(availableWidth || 0, MIN_PLOT_PX);
+  const available = widthBudgetFor(availableWidth);
   if (orientation !== COLUMNS) return available;
   const margin = marginFor(orientation, MAX_TITLE_LINES);
   const needed =
     MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
   return Math.ceil(Math.max(available, needed));
+}
+
+// A grid of panels (several variables on both axes): nothing is pinned, so the
+// figure keeps every edge's tick labels and titles itself — X titles under
+// each column, Y titles left of each row — and `header` adds room above the
+// columns naming what each one is coloured by, as many lines as an X title.
+const GRID_MARGIN = {
+  l: TICK_ROOM_PX + LABEL_GUTTER_PX,
+  r: 26,
+  t: 30,
+  b: BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
+};
+
+export function gridMarginFor(
+  titleLines = MAX_TITLE_LINES,
+  { header = false, colorbars = false } = {},
+) {
+  return {
+    ...GRID_MARGIN,
+    r: GRID_MARGIN.r + (colorbars ? COLORBAR_ROOM_PX : 0),
+    t:
+      GRID_MARGIN.t +
+      (header ? PINNED_AXIS_LINES * LABEL_LINE_PX : 0) +
+      titleRoomFor(titleLines),
+  };
+}
+
+// Every panel at least MIN_PANEL_PX square; the scroller takes the rest.
+export function gridSizeFor({
+  columns,
+  rows,
+  availableWidth,
+  availableHeight,
+  margin,
+}) {
+  const needed = (count, gap) => MIN_PANEL_PX * panelPitch(count, gap);
+  return {
+    width: Math.ceil(
+      Math.max(
+        widthBudgetFor(availableWidth),
+        needed(columns, COLUMN_GAP) + margin.l + margin.r,
+      ),
+    ),
+    height: Math.ceil(
+      Math.max(
+        Math.max(availableHeight || 0, MIN_PLOT_PX),
+        needed(rows, ROW_GAP) + margin.t + margin.b,
+      ),
+    ),
+  };
 }

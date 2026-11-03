@@ -38,7 +38,8 @@ export function parsePeriod(value) {
 //                                  cdm_data_type, table for Grid/unknown)
 //   pvars    the panel variables, comma-separated, one panel each
 //                                  (default: the dataset's first EOV column)
-//   paxis    the axis every panel shares
+//   paxis    the axis every panel shares, comma-separated; several make a
+//            grid with the panels on the other axis
 //                                  (default: depth / time / track, per type)
 //   porient  columns | rows        which way the panels run: across with a
 //                                  shared Y, or stacked with a shared X
@@ -47,21 +48,27 @@ export function parsePeriod(value) {
 //   pmode    markers | lines | markers+lines
 //   pcolors  per-variable colours, `column~rrggbb` comma-separated
 //                                  (default: the variable's own ERDDAP palette)
-//   pz       the column whose values shade EVERY panel — the third dimension
+//   pz       the columns whose values shade EVERY panel — the third
+//            dimension, comma-separated; several repeat each panel per column
 //                                  (default: none; colour then says which
 //                                  variable a panel draws, not what a third
 //                                  one was doing)
-//   pzscale  the colourscale that column is drawn in
-//                                  (default: its own colorBarPalette, else
-//                                  Viridis — and never a rainbow)
+//   pzscale  retired single scale, read as the first `pz` column's
+//            `pzscales` entry until the next scale or colour write
 //   playout  color                 (default: one panel per variable against a
 //                                  shared axis; `color` draws the same X and Y
 //                                  in every panel, one panel per `pvars`
 //                                  variable, each shaded by that variable)
-//   pcx      the colour plot's X   (default: time / track, per type)
-//   pcy      the colour plot's Y   (default: depth, else a measurement)
-//   pzscales the colour plot's scale per variable, `column~Scale` comma-
-//            separated             (default: as for pzscale)
+//   pcx      the colour plot's X, comma-separated; several make a grid
+//                                  (default: time / track, per type)
+//   pcy      the colour plot's Y, comma-separated
+//                                  (default: depth, else a measurement)
+//   pzscales the scale per colour variable, in either layout,
+//            `column~Scale` comma-separated
+//                                  (default: its own colorBarPalette, else
+//                                  Viridis — and never a rainbow)
+//   pzshare  1: every colour variable in the first one's scale
+//                                  (default: each in its own)
 //   pyflip   the columns whose Y axis is drawn opposite to its default,
 //            comma-separated       (default: none; a depth or pressure on Y
 //                                  is drawn downwards)
@@ -83,6 +90,7 @@ export const PLOT_PARAMS = [
   "pcx",
   "pcy",
   "pzscales",
+  "pzshare",
   "pyflip",
   STEP_PARAM,
 ];

@@ -125,17 +125,19 @@ describe("usePreviewPlotParams", () => {
       expect(api.panels).toEqual(["salinity"]);
     });
 
-    it("clears the colour scale when the colour column changes", async () => {
+    it("keeps each colour column's own scale", async () => {
       open();
       await run(() => api.setColorAxis("salinity"));
-      await run(() => api.setColorScale("Cividis"));
+      await run(() => api.setVariableScale("salinity", "Cividis"));
       expect(param("pz")).toBe("salinity");
-      expect(param("pzscale")).toBe("Cividis");
+      expect(param("pzscales")).toBe("salinity~Cividis");
 
       await run(() => api.setColorAxis("temperature"));
 
       expect(param("pz")).toBe("temperature");
-      expect(param("pzscale")).toBeNull();
+      expect(api.variableScales.temperature).toBeUndefined();
+      await run(() => api.setColorAxis("salinity"));
+      expect(api.variableScales.salinity).toBe("Cividis");
     });
   });
 
@@ -242,9 +244,9 @@ describe("usePreviewPlotParams", () => {
     });
 
     it("ignores a banned scale from a hand-edited link", () => {
-      open("pz=salinity&pzscale=Jet");
+      open("pz=salinity&pzscale=Jet&pzscales=temperature~Jet");
       expect(api.colorAxis).toBe("salinity");
-      expect(api.colorScale).toBeNull();
+      expect(api.variableScales).toEqual({});
     });
 
     it("ignores an unknown plot mode", () => {
@@ -275,6 +277,120 @@ describe("usePreviewPlotParams", () => {
     const before = api.uirevision;
     await run(() => api.setPanels(["temperature", "salinity"]));
     expect(api.uirevision).not.toBe(before);
+  });
+
+  describe("several variables per axis", () => {
+    it("reads a comma list of shared axes, the panels never repeating one", () => {
+      open("paxis=depth,time&pvars=temperature,time");
+      expect(api.sharedAxes).toEqual(["depth", "time"]);
+      expect(api.sharedAxis).toBe("depth");
+      expect(api.panels).toEqual(["temperature"]);
+    });
+
+    it("keeps one shared axis once the panels hold several", () => {
+      open("paxis=depth,time&pvars=temperature,salinity&pz=salinity,time");
+      expect(api.panels).toEqual(["temperature", "salinity"]);
+      expect(api.sharedAxes).toEqual(["depth"]);
+      expect(api.colorAxes).toEqual(["salinity"]);
+    });
+
+    it("drops an unknown shared axis, falling back once none is left", () => {
+      open("paxis=nope");
+      expect(api.sharedAxes).toEqual(["depth"]);
+    });
+
+    it("writes several shared axes and the panels they took in one write", async () => {
+      open("pvars=temperature,salinity");
+      await run(() => api.setSharedAxes(["depth", "salinity"]));
+      expect(param("paxis")).toBe("depth,salinity");
+      // What is left is the default panel, so it leaves the link.
+      expect(param("pvars")).toBeNull();
+      expect(api.panels).toEqual(["temperature"]);
+    });
+
+    it("writes the default single shared axis as nothing", async () => {
+      open("paxis=depth,time");
+      await run(() => api.setSharedAxes(["depth"]));
+      expect(param("paxis")).toBeNull();
+    });
+
+    it("reads several colour columns, capped and orderable ones only", () => {
+      open("pz=salinity,nope,temperature");
+      expect(api.colorAxes).toEqual(["salinity", "temperature"]);
+      expect(api.colorAxis).toBe("salinity");
+    });
+
+    it("draws every colour column in the first one's scale once shared", async () => {
+      open("pz=salinity,temperature&pzscales=salinity~Cividis");
+      expect(api.colorAxes).toEqual(["salinity", "temperature"]);
+      expect(api.scalesInUse).toEqual({ salinity: "Cividis" });
+
+      await run(() => api.setSharedColorScale(true));
+      expect(param("pzshare")).toBe("1");
+      expect(api.scalesInUse).toEqual({
+        salinity: "Cividis",
+        temperature: "Cividis",
+      });
+      // The per-column choices survive, for when sharing is turned back off.
+      expect(api.variableScales).toEqual({ salinity: "Cividis" });
+
+      await run(() => api.setSharedColorScale(false));
+      expect(param("pzshare")).toBeNull();
+    });
+
+    it("reads an older link's single scale as its first colour column's", async () => {
+      open("pz=salinity&pzscale=Viridis");
+      expect(api.variableScales).toEqual({ salinity: "Viridis" });
+      await run(() => api.setColorAxes(["temperature", "salinity"]));
+      expect(param("pzscale")).toBeNull();
+      expect(param("pzscales")).toBe("salinity~Viridis");
+      expect(api.variableScales).toEqual({ salinity: "Viridis" });
+    });
+
+    it("gives the colour plot several X and Y, never one on both", () => {
+      openStation("playout=color&pcx=time,salinity&pcy=depth,salinity");
+      expect(api.colorXs).toEqual(["time", "salinity"]);
+      expect(api.colorYs).toEqual(["depth"]);
+      expect(api.panels).not.toContain("salinity");
+    });
+
+    it("lets only X, Y or colour hold several in the colour plot", () => {
+      openStation(
+        "playout=color&pcx=time,salinity&pcy=depth,temperature&pvars=temperature,salinity",
+      );
+      expect(api.colorXs).toEqual(["time", "salinity"]);
+      expect(api.colorYs).toEqual(["depth"]);
+      expect(api.panels.length).toBeLessThanOrEqual(1);
+    });
+
+    it("writes the colour plot's X list, dropping it from the panels", async () => {
+      openStation("playout=color&pvars=temperature,salinity");
+      await run(() => api.setColorXs(["time", "salinity"]));
+      expect(param("pcx")).toBe("time,salinity");
+      expect(param("pvars")).toBeNull();
+      expect(api.panels).toEqual(["temperature"]);
+    });
+  });
+
+  describe("reset", () => {
+    it("drops every plot setting in one write, keeping the view and the profile", async () => {
+      open(
+        "vis=table&pstep=cast-2&pmode=lines&pz=salinity&pyflip=depth&pvars=salinity",
+      );
+      expect(api.plotCustomized).toBe(true);
+      await run(() => api.resetPlot());
+      ["pmode", "pz", "pyflip", "pvars"].forEach((name) =>
+        expect(param(name)).toBeNull(),
+      );
+      expect(param("vis")).toBe("table");
+      expect(param("pstep")).toBe("cast-2");
+      expect(api.plotCustomized).toBe(false);
+    });
+
+    it("has nothing to reset on the defaults, nor for the view or the profile alone", () => {
+      open("vis=table&pstep=cast-2");
+      expect(api.plotCustomized).toBe(false);
+    });
   });
 
   it("offers every numeric or time column as a colour candidate", () => {

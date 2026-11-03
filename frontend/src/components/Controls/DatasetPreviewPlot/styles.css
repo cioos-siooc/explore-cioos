@@ -5,9 +5,10 @@
  * flexed height is definite too and a percentage resolves against it. Being
  * exactly 100% of the scroller it sits in means the Plot view never gives that
  * scroller anything to scroll, so the two panes below are the only scrollers on
- * screen — which is what lets "Customize plot" grow the parameters pane without
+ * screen — which is what lets "Labels & colours" grow the parameters pane without
  * moving the figure. */
 .datasetPreviewPlotPanes {
+  position: relative;
   display: flex;
   gap: 8px;
   align-items: stretch;
@@ -77,6 +78,29 @@
   background-color: var(--cioos-white);
   color: var(--cioos-ink-60);
   cursor: pointer;
+}
+
+/* Mid-slide the figure keeps its old size, so it can be briefly wider than
+   its area: clip that rather than flash a scrollbar. */
+.isSliding .datasetPreviewPlotArea {
+  overflow: hidden;
+}
+
+/* Hidden, the pane gives the plot every pixel: no gaps, and the toggle floats
+   over the corner, beside the profile title when there is one. */
+.datasetPreviewPlotPanes.isPaneHidden {
+  gap: 0;
+}
+
+.isPaneHidden .paneCollapseToggle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.isPaneHidden .previewProfileHeader {
+  padding-left: 32px;
 }
 
 .paneCollapseToggle:hover {
@@ -198,12 +222,14 @@
 }
 
 .variableSelect__menu-portal .variableSelect__menu {
+  font-size: var(--cioos-font-size-sm);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-shadow-md);
 }
 
 .variableSelect__menu-portal .variableSelect__option {
+  padding: 6px 10px;
   color: var(--cioos-ink);
   cursor: pointer;
 }
@@ -237,11 +263,6 @@
   border-top: 1px solid var(--cioos-hairline);
 }
 
-/* The caption stays level with the first row of pills as they wrap. */
-.controlRow:has(.variableSelect) {
-  align-items: baseline;
-}
-
 /* Sits in the menu where the options would be, so it takes their inset
    (.dropdown-item, ui/dropdownStyles.css) — a shade less height, since there
    is nothing here to click. */
@@ -251,23 +272,88 @@
   color: var(--cioos-ink-80);
 }
 
-/* One control per row: caption on the left, dropdown button on the right. */
+/* One control per row: the caption above, so the control takes the pane's
+   whole width however narrow it is dragged. */
 .controlRow {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Axes, then colour, then style: a rule between the groups. */
+.controlRow.startsGroup {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cioos-hairline);
 }
 
 .controlCaption {
-  flex: 0 0 auto;
-  width: 90px;
-  text-align: right;
+  color: var(--cioos-ink-80);
   font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.controlCaptionHint {
-  color: var(--cioos-text-muted, #666);
-  white-space: nowrap;
+.controlHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 22px;
+}
+
+/* A small icon button at the caption's end, e.g. inverting the axis it names. */
+.controlAction {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+
+.controlAction:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.controlAction[aria-pressed="true"] {
+  border-color: var(--cioos-primary-800);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.controlAction:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The Layout and Style switches fill the pane, however many options. Columns
+   sized to their labels, not equal shares, so "Markers + Line" gets the room
+   the short "Line" does not need. */
+.datasetPreviewParamsPane .segmentedToggle {
+  display: grid;
+  grid-auto-columns: auto;
+  padding: 2px;
+}
+
+/* French "Marqueurs + Ligne" in a narrow pane: wrap rather than overflow. */
+.datasetPreviewParamsPane .segmentedToggle .toggleButton {
+  height: auto;
+  min-height: 24px;
+  padding: 3px 4px;
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.2;
+  white-space: normal;
 }
 
 /* The toggle grows with the pane, which takes three boxes agreeing: this wrap
@@ -279,6 +365,10 @@
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.controlButtonWrap > .segmentedToggle {
+  flex: 1 1 auto;
 }
 
 .controlButtonWrap .dropdown {
@@ -306,11 +396,15 @@
 .colorScaleLegend {
   flex: 0 0 auto;
   padding: 6px 0 0;
+
+  /* Plotly's default, which every axis of the figure is drawn in. */
+  font-family: "Open Sans", verdana, arial, sans-serif;
 }
 
 .colorScaleLegendLabel {
   margin-bottom: 3px;
-  font-size: var(--cioos-font-size-2xs, 11px);
+  font-size: var(--legend-label-font);
+  line-height: 1.2;
   color: var(--cioos-ink-60);
 }
 
@@ -322,15 +416,18 @@
 
 .colorScaleLegendTicks {
   position: relative;
-  height: 12px;
+
+  /* As tall as a tick's line box, or its glyphs overflow the row and the
+     preview grows a scrollbar for two pixels. */
+  height: calc(var(--legend-tick-font) * 1.25);
   margin-top: 3px;
 }
 
 .colorScaleLegendTicks .colorScaleLegendTick {
   position: absolute;
   top: 0;
-  font-size: var(--cioos-font-size-3xs, 9px);
-  line-height: 1;
+  font-size: var(--legend-tick-font);
+  line-height: 1.25;
   color: var(--cioos-ink-60);
   white-space: nowrap;
   transform: translateX(-50%);
@@ -442,9 +539,13 @@
   flex: 0 0 auto;
 }
 
-/* Collapsible "Customize plot" panel: one block per drawn variable, holding its
-   colour and its display name. */
+/* Collapsible "Labels & colours" panel: one block per drawn variable, holding
+   its colour and its display name. */
 .labelEditorToggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
   margin-top: 8px;
   padding: 4px 0;
   background: none;
@@ -457,6 +558,37 @@
 
 .labelEditorToggle:hover {
   color: var(--cioos-primary-800);
+}
+
+/* Last in the pane: a way back once the plot has been taken apart. */
+.resetPlotButton {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.resetPlotButton:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+}
+
+.resetPlotButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.resetPlotButton:disabled {
+  color: var(--cioos-ink-60);
+  cursor: default;
 }
 
 .labelEditor {
@@ -576,6 +708,29 @@
   border-radius: 3px;
 }
 
+.colorScaleStack {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.colorScaleItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.colorScaleItemName {
+  overflow: hidden;
+  color: var(--cioos-ink-80);
+  font-size: var(--cioos-font-size-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .colorScaleLabel {
   display: flex;
   align-items: center;
@@ -679,45 +834,67 @@
   stroke-linejoin: round;
 }
 
-/* Portrait phones: the settings fold above the plot, which keeps the full
-   width. Collapsed is display: none here, as there is no width to slide. */
-@media (max-width: 700px) {
+/* Up to tablets (PREVIEW_COMPACT_QUERY): the plot keeps the whole width, and
+   the settings open in a dialog over it from a gear. */
+@media (max-width: 1100px) {
   .datasetPreviewPlotPanes {
     flex-direction: column;
     gap: var(--cioos-space-sm);
   }
 
-  .datasetPreviewParamsPane {
-    order: 1;
+  .previewSettingsModal .datasetPreviewParamsPane {
     width: auto;
     max-width: none;
-    max-height: 45%;
-    padding-bottom: var(--cioos-space-sm);
-    border-bottom: 1px solid var(--cioos-hairline);
-    transition: none;
+    overflow: visible;
   }
 
-  .datasetPreviewParamsPane.isCollapsed {
-    display: none;
-  }
-
-  .paneCollapseToggle.isStacked {
-    order: 0;
-    align-self: stretch;
-    justify-content: space-between;
-    width: auto;
+  .paneSettingsButton {
+    display: flex;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
     height: 36px;
-    padding: 0 var(--cioos-space-md);
-    border-radius: var(--cioos-radius-sm, 6px);
+    padding: 0;
+    border: 1px solid var(--cioos-hairline);
+    border-radius: var(--cioos-radius-sm);
+    background-color: var(--cioos-white);
     color: var(--cioos-ink);
-    font-size: var(--cioos-font-size-sm);
-    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .previewProfileHeader .paneSettingsButton {
+    align-self: center;
+  }
+
+  /* The preview behind already sits on the backdrop; a second one would dim
+     the plot the settings are being changed for. */
+  .modal.previewSettingsModal {
+    background-color: transparent;
+  }
+
+  /* Centred with a gutter, rather than edge to edge on a phone. */
+  .previewSettingsModal .modal-dialog {
+    width: calc(100% - 2 * var(--cioos-space-lg));
+  }
+
+  .paneSettingsButton:hover {
+    background-color: var(--cioos-surface-2);
+    color: var(--cioos-primary-800);
+  }
+
+  .paneSettingsButton:focus-visible {
+    outline: none;
+    box-shadow: var(--cioos-focus);
   }
 
   .datasetPreviewPlotColumn {
     order: 2;
   }
+}
 
+@media (max-width: 700px) {
   .controlRow .dropdown-toggle {
     min-height: 36px;
   }

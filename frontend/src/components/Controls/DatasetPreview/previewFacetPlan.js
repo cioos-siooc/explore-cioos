@@ -275,11 +275,12 @@ function defaultPanelsFor(dataset, variables, shared) {
   );
   if (!candidates.length) return [];
   const preferred =
-    dataset &&
-    dataset.first_eov_column &&
-    candidates.find(
-      (variable) => variable.columnName === dataset.first_eov_column,
-    );
+    (dataset &&
+      dataset.first_eov_column &&
+      candidates.find(
+        (variable) => variable.columnName === dataset.first_eov_column,
+      )) ||
+    candidates.find((variable) => variable.eovs && variable.eovs.length);
   return [(preferred || candidates[0]).columnName];
 }
 
@@ -358,13 +359,15 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
 }
 
 // A column named in a link that this dataset lacks is dropped, not drawn empty.
-export function resolvePanels(panels, variables, sharedAxis) {
+// `excluded` is the shared axis, or every shared axis of a grid.
+export function resolvePanels(panels, variables, excluded) {
   const available = new Set(
     (variables || []).map((variable) => variable.columnName),
   );
+  const taken = new Set([].concat(excluded || []));
   const seen = new Set();
   return (panels || []).filter((columnName) => {
-    if (columnName === sharedAxis) return false;
+    if (taken.has(columnName)) return false;
     if (!available.has(columnName)) return false;
     if (seen.has(columnName)) return false;
     seen.add(columnName);

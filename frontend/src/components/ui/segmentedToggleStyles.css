@@ -1,0 +1,56 @@
+/* In the tab strip's language (DESIGN.md): a teal-washed track, the chosen
+   option a solid raised segment. */
+.segmentedToggle {
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: rgb(82 167 155 / 14%);
+}
+
+.segmentedToggle .toggleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-primary-800);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+
+.segmentedToggle .toggleButton:hover:not(.selected) {
+  background-color: rgb(82 167 155 / 18%);
+}
+
+.segmentedToggle .toggleButton.selected {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+  box-shadow: var(--cioos-shadow-3d-sm);
+  cursor: default;
+}
+
+.segmentedToggle .toggleButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmentedToggle .toggleButton {
+    transition: none;
+  }
+}

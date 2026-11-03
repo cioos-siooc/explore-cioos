@@ -11,6 +11,8 @@ import {
 import {
   buildColorFigure,
   buildFigure,
+  buildGridFigure,
+  gridBoxFor,
   plotBoxFor,
   recordTitleFor,
 } from "./previewFacetFigure.js";
@@ -1285,4 +1287,155 @@ test("a colour plot's X title fits its pinned strip: two lines, unit kept", () =
   });
   assert.equal(lineCount(layout.xaxis.title.text), 2);
   assert.ok(layout.xaxis.title.text.endsWith("<br>( UTC )"));
+});
+
+// --- grids -------------------------------------------------------------------
+
+function gridFigure(extra = {}) {
+  const variables = variablesFrom(VIKING_PALETTES, VIKING_DATASET);
+  return buildGridFigure({
+    variablesByName: byColumnName(variables),
+    xAxes: ["TE90_01", "PSAL_01"],
+    yAxes: ["depth", "PRES_01"],
+    panelAxis: "x",
+    data: DATA,
+    mode: "markers",
+    uirevision: "test",
+    ...extra,
+  });
+}
+
+test("a grid draws one panel per X and Y pair, X across and Y up", () => {
+  const { data, layout, pinnable } = gridFigure();
+  assert.equal(pinnable, false);
+  assert.equal(data.length, 4);
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis]),
+    [
+      ["x", "y"],
+      ["x2", "y"],
+      ["x", "y2"],
+      ["x2", "y2"],
+    ],
+  );
+  // A column shares its X axis, a row its Y axis, so only the edges tick.
+  assert.equal(layout.xaxis2.anchor, "y");
+  assert.equal(layout.yaxis2.anchor, "x");
+  assert.equal(layout.hovermode, "closest");
+  assert.ok(layout.xaxis.domain[1] < layout.xaxis2.domain[0]);
+  assert.ok(layout.yaxis.domain[1] < layout.yaxis2.domain[0]);
+});
+
+test("a grid draws its panels' missing edges, and only those", () => {
+  const { layout } = gridFigure();
+  // 2 x 2: three panels lack a bottom or a left line, one lacks both.
+  assert.equal(layout.shapes.length, 4);
+});
+
+test("a grid keeps each panel variable's own colour", () => {
+  const { data } = gridFigure({ colors: { PSAL_01: "#123456" } });
+  assert.deepEqual(
+    data.map((trace) => trace.marker.color),
+    [data[0].marker.color, "#123456", data[0].marker.color, "#123456"],
+  );
+});
+
+test("a grid repeats every X column once per colour column, side by side", () => {
+  const { data, layout, colorLegends } = gridFigure({
+    xAxes: ["TE90_01"],
+    yAxes: ["depth", "PRES_01"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+  });
+  assert.equal(data.length, 4);
+  assert.deepEqual(
+    data.map((trace) => trace.marker.coloraxis),
+    ["coloraxis", "coloraxis2", "coloraxis", "coloraxis2"],
+  );
+  // The repeat zooms with the first, and each column says what it is shaded by.
+  assert.equal(layout.xaxis2.matches, "x");
+  const byName = byColumnName(variablesFrom(VIKING_PALETTES, VIKING_DATASET));
+  assert.deepEqual(
+    layout.annotations.map((annotation) => annotation.text),
+    [labelFor(byName.get("PSAL_01")), labelFor(byName.get("DOXY_01"))],
+  );
+  assert.deepEqual(
+    colorLegends.map((legend) => legend.axis),
+    ["coloraxis", "coloraxis2"],
+  );
+  assert.equal(layout.coloraxis.showscale, false);
+});
+
+test("a grid's colour headers wrap within their own column", () => {
+  const { layout } = gridFigure({
+    xAxes: ["TE90_01"],
+    yAxes: ["depth"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+    size: { width: 400, height: 400 },
+  });
+  const plottingWidth = 400 - layout.margin.l - layout.margin.r;
+  layout.annotations.forEach(({ text }, column) => {
+    const [start, end] = layout[column === 0 ? "xaxis" : "xaxis2"].domain;
+    const fits = maxCharsFor(plottingWidth * (end - start));
+    const lines = text.split("<br>");
+    assert.ok(lines.length > 1);
+    lines
+      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut
+      .forEach((line) => assert.ok(line.length <= fits, `"${line}"`));
+  });
+});
+
+test("a grid shades each colour column in its own scale", () => {
+  const { layout } = gridFigure({
+    xAxes: ["TE90_01"],
+    yAxes: ["depth"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+    scales: { PSAL_01: "Cividis", DOXY_01: "Viridis" },
+  });
+  assert.deepEqual(layout.coloraxis.colorscale, colorScaleFor("Cividis"));
+  assert.deepEqual(layout.coloraxis2.colorscale, colorScaleFor("Viridis"));
+});
+
+test("a grid reverses each row whose Y is drawn downwards", () => {
+  const { layout } = gridFigure({ reversedYAxes: new Set(["PRES_01"]) });
+  assert.equal(layout.yaxis.autorange, undefined);
+  assert.equal(layout.yaxis2.autorange, "reversed");
+});
+
+test("a grid gives every panel at least its minimum size, and scrolls the rest", () => {
+  const box = gridBoxFor({
+    plan: null,
+    variablesByName: new Map(),
+    data: [],
+    columns: 6,
+    rows: 4,
+    availableHeight: 400,
+    measured: { width: 500, height: 400 },
+    withTitle: false,
+  });
+  assert.ok(box.width >= MIN_PANEL_PX * 6);
+  assert.ok(box.height >= MIN_PANEL_PX * 4);
+});
+
+test("a colour plot with one X stays the pinnable stack", () => {
+  const { pinnable } = colorFigure(["TE90_01"]);
+  assert.equal(pinnable, true);
+});
+
+test("a colour plot grids several X across and several Y up each colour", () => {
+  const { data, layout, pinnable } = colorFigure(["TE90_01", "PSAL_01"], {
+    xAxes: ["time", "PRES_01"],
+    yAxes: ["depth", "DOXY_01"],
+    data: SECTION,
+  });
+  assert.equal(pinnable, false);
+  // 2 colour x 2 Y rows, 2 X columns.
+  assert.equal(data.length, 8);
+  assert.ok(layout.yaxis4);
+  assert.ok(layout.xaxis2);
+  // A Y repeated for the second colour zooms with its first row.
+  assert.equal(layout.yaxis3.matches, "y");
+  assert.equal(layout.yaxis4.matches, "y2");
+  // Each colour's bar spans both of its rows.
+  const bar = layout.coloraxis.colorbar;
+  assert.equal(bar.len, layout.yaxis2.domain[1] - layout.yaxis.domain[0]);
 });
