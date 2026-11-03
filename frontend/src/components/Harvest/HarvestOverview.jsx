@@ -7,6 +7,7 @@ import {
   HarvestTableSkeleton,
 } from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
+import Spinner from "../ui/Spinner.jsx";
 import HarvestPie, {
   mergeFailures,
   reasonShades,
@@ -55,6 +56,20 @@ function ServerCard({ server, shades, t }) {
   );
 }
 
+// Holds the section's place while CKAN is paged through on a cold cache.
+function SectionLoading({ titleKey, descKey, t }) {
+  return (
+    <div>
+      <h2 className="harvest-section-title">{t(titleKey)}</h2>
+      <p className="harvest-section-desc">{t(descKey)}</p>
+      <div className="harvest-section-loading" role="status">
+        <Spinner size="md" role="presentation" />
+        <span>{t("harvest.loading.ckanCoverage")}</span>
+      </div>
+    </div>
+  );
+}
+
 function CkanCoverage({ coverage, t }) {
   const total = coverage.n_ckan_records;
   const pct = total ? Math.round((100 * coverage.n_linked) / total) : null;
@@ -63,6 +78,9 @@ function CkanCoverage({ coverage, t }) {
       <h2 className="harvest-section-title">
         {t("harvest.ckanCoverage.title")}
       </h2>
+      <p className="harvest-section-desc">
+        {t("harvest.ckanCoverage.caption")}
+      </p>
       {pct !== null && (
         <>
           <div className="harvest-ckan-pct">{pct}%</div>
@@ -136,7 +154,133 @@ function CkanCoverage({ coverage, t }) {
           {t("harvest.ckanCoverage.stale", { count: coverage.n_linked_stale })}
         </p>
       )}
-      <p className="harvest-card-meta">{t("harvest.ckanCoverage.caption")}</p>
+    </div>
+  );
+}
+
+// Categorical slots 1–7 of the dataviz reference palette, in order, with
+// "Other" in the pie's neutral grey; validated as adjacent stack pairs.
+const SOURCE_COLORS = [
+  "#2a78d6",
+  "#eb6834",
+  "#1baf7a",
+  "#eda100",
+  "#e87ba4",
+  "#008300",
+  "#6250d6",
+];
+const OTHER_SOURCE_COLOR = "#8a8984";
+
+// Largest first, so a source keeps its colour while the counts hold their
+// order; past the palette the remainder folds into "Other".
+function unmatchedBySource(harvested, otherLabel) {
+  const ranked = harvested
+    .map((s) => ({
+      key: s.erddap_url,
+      label: hostname(s.erddap_url),
+      n: s.n_datasets - s.n_matched,
+    }))
+    .filter((s) => s.n > 0)
+    .sort((a, b) => b.n - a.n || a.key.localeCompare(b.key));
+  const shown = ranked
+    .slice(0, SOURCE_COLORS.length)
+    .map((s, i) => ({ ...s, color: SOURCE_COLORS[i] }));
+  const otherN = ranked
+    .slice(SOURCE_COLORS.length)
+    .reduce((sum, s) => sum + s.n, 0);
+  return otherN
+    ? [
+        ...shown,
+        { key: "", label: otherLabel, n: otherN, color: OTHER_SOURCE_COLOR },
+      ]
+    : shown;
+}
+
+function UnmatchedBar({ harvested, t }) {
+  const segments = unmatchedBySource(
+    harvested,
+    t("harvest.ckanCoverage.otherSources"),
+  );
+  const total = segments.reduce((sum, s) => sum + s.n, 0);
+  if (!total) return null;
+  const label = t("harvest.ckanCoverage.notInCkan", { count: total });
+  return (
+    <div className="harvest-unmatched">
+      <div className="harvest-unmatched-title">{label}</div>
+      <div className="harvest-unmatched-bar" role="img" aria-label={label}>
+        {segments.map((s) => (
+          <span
+            key={s.key}
+            style={{ flexGrow: s.n, background: s.color }}
+            title={`${s.label}: ${s.n}`}
+          />
+        ))}
+      </div>
+      <ul className="harvest-pie-legend">
+        {segments.map((s) => (
+          <li key={s.key}>
+            <span
+              className="harvest-pie-swatch"
+              style={{ background: s.color }}
+              aria-hidden="true"
+            />
+            <span className="harvest-pie-name">{s.label}</span>
+            <span className="harvest-pie-value">
+              {s.n} · {Math.round((100 * s.n) / total)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function HarvestedInCkan({ harvested, t }) {
+  const total = harvested.reduce((sum, s) => sum + s.n_datasets, 0);
+  const matched = harvested.reduce((sum, s) => sum + s.n_matched, 0);
+  const pct = total ? Math.round((100 * matched) / total) : 0;
+  const ratio = t("harvest.ckanCoverage.harvestedRatio", { matched, total });
+  return (
+    <div>
+      <h2 className="harvest-section-title">
+        {t("harvest.ckanCoverage.harvestedTitle")}
+      </h2>
+      <p className="harvest-section-desc">
+        {t("harvest.ckanCoverage.harvestedDesc")}
+      </p>
+      <div className="harvest-ckan-pct">{pct}%</div>
+      <div className="harvest-ckan-meter" role="img" aria-label={ratio}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <p className="harvest-card-meta">{ratio}</p>
+      <UnmatchedBar harvested={harvested} t={t} />
+      <ul className="harvest-ckan-sources">
+        {harvested.map((s) => {
+          const matchedPct = s.n_datasets
+            ? Math.round((100 * s.n_matched) / s.n_datasets)
+            : 0;
+          return (
+            <li
+              key={s.erddap_url}
+              title={t("harvest.ckanCoverage.unmatched", {
+                count: s.n_datasets - s.n_matched,
+              })}
+            >
+              <span className="harvest-pie-name">{hostname(s.erddap_url)}</span>
+              <span className="harvest-pie-value">
+                {t("harvest.ckanCoverage.sourceRatio", {
+                  linked: s.n_matched,
+                  total: s.n_datasets,
+                  pct: matchedPct,
+                })}
+              </span>
+              <div className="harvest-ckan-meter" aria-hidden="true">
+                <span style={{ width: `${matchedPct}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -146,7 +290,8 @@ export default function HarvestOverview() {
   const { data: servers, loading: loadingServers } =
     useHarvestFetch("/servers");
   const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
-  const { data: ckanCoverage } = useHarvestFetch("/ckan-coverage");
+  const { data: ckanCoverage, loading: loadingCkan } =
+    useHarvestFetch("/ckan-coverage");
 
   const failureLists = (servers || []).map(serverFailures);
   const shades = reasonShades(failureLists);
@@ -171,6 +316,9 @@ export default function HarvestOverview() {
             <h2 className="harvest-section-title">
               {t("harvest.catalogue.title")}
             </h2>
+            <p className="harvest-section-desc">
+              {t("harvest.catalogue.desc")}
+            </p>
             <div className="harvest-pie-detail">
               <HarvestPie
                 harvested={allHarvested}
@@ -185,10 +333,30 @@ export default function HarvestOverview() {
               <h2 className="harvest-section-title">
                 {t("harvest.catalogue.issues")}
               </h2>
+              <p className="harvest-section-desc">
+                {t("harvest.catalogue.issuesDesc")}
+              </p>
               <HarvestReasonBars failures={allFailures} />
             </div>
           )}
+          {loadingCkan && (
+            <>
+              <SectionLoading
+                titleKey="harvest.ckanCoverage.title"
+                descKey="harvest.ckanCoverage.caption"
+                t={t}
+              />
+              <SectionLoading
+                titleKey="harvest.ckanCoverage.harvestedTitle"
+                descKey="harvest.ckanCoverage.harvestedDesc"
+                t={t}
+              />
+            </>
+          )}
           {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
+          {ckanCoverage?.harvested?.length > 0 && (
+            <HarvestedInCkan harvested={ckanCoverage.harvested} t={t} />
+          )}
         </section>
       )}
 
