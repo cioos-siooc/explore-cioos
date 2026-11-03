@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { noticeStyle, noticeText, parseNotices } from "./notices.js";
+import {
+  noticeIcon,
+  noticeStyle,
+  noticeText,
+  parseNotices,
+} from "./notices.js";
 
 const NOW = Date.parse("2026-11-03T12:00:00Z");
 const beta = { id: "beta", en: "Beta", fr: "Bêta" };
@@ -60,13 +65,14 @@ describe("parseNotices", () => {
           { ...beta, id: "bad-colour", background: "red" },
           { ...beta, id: "bad-icon", icon: "rocket" },
           { ...beta, id: "bad-css", css: { color: "red" } },
+          { ...beta, id: "bad-tone", tone: "loud" },
           "text",
           beta,
         ],
         NOW,
       ),
     ).toEqual([beta]);
-    expect(console.error).toHaveBeenCalledTimes(8);
+    expect(console.error).toHaveBeenCalledTimes(9);
   });
 });
 
@@ -112,5 +118,30 @@ describe("noticeStyle", () => {
       border: "2px solid #b07a00",
       color: "url(http://x)",
     });
+  });
+});
+
+describe("noticeIcon", () => {
+  it("takes the notice's own icon, then its tone's, then the megaphone", () => {
+    expect(noticeIcon({ ...beta, tone: "critical", icon: "event" })).toBe(
+      "event",
+    );
+    expect(noticeIcon({ ...beta, tone: "critical" })).toBe("warning");
+    expect(noticeIcon({ ...beta, tone: "info" })).toBe("info");
+    expect(noticeIcon({ ...beta, icon: "none" })).toBe("none");
+    expect(noticeIcon(beta)).toBe("megaphone");
+  });
+
+  it("accepts the three tones", () => {
+    expect(
+      parseNotices(
+        ["info", "warning", "critical"].map((tone) => ({
+          ...beta,
+          id: tone,
+          tone,
+        })),
+        NOW,
+      ),
+    ).toHaveLength(3);
   });
 });

@@ -18,6 +18,8 @@ export const NOTICE_ICONS = [
   "event",
   "none",
 ];
+export const NOTICE_TONES = ["info", "warning", "critical"];
+const TONE_ICONS = { info: "info", warning: "warning", critical: "warning" };
 const HEX_COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const WHITE = "#ffffff";
 const NAVY = "#152f37";
@@ -35,7 +37,8 @@ function isValid(notice) {
     ) &&
     (notice.background === undefined || HEX_COLOR.test(notice.background)) &&
     (notice.icon === undefined || NOTICE_ICONS.includes(notice.icon)) &&
-    (notice.css === undefined || typeof notice.css === "string")
+    (notice.css === undefined || typeof notice.css === "string") &&
+    (notice.tone === undefined || NOTICE_TONES.includes(notice.tone))
   );
 }
 
@@ -54,6 +57,11 @@ export function parseNotices(raw, now = Date.now()) {
       (notice.expires === undefined || Date.parse(notice.expires) > now)
     );
   });
+}
+
+// One of NOTICE_ICONS: the notice's own, else its tone's, else the megaphone.
+export function noticeIcon(notice) {
+  return notice.icon ?? TONE_ICONS[notice.tone] ?? "megaphone";
 }
 
 export function noticeText(notice, language) {

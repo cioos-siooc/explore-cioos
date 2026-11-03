@@ -12,12 +12,17 @@ import { useTranslation } from "react-i18next";
 
 import CloseButton from "../ui/CloseButton.jsx";
 import { renderMarkdown } from "../../markdown.js";
-import { noticeStyle, noticeText } from "../../state/notices/notices.js";
+import {
+  noticeIcon,
+  noticeStyle,
+  noticeText,
+} from "../../state/notices/notices.js";
 import "./noticeStyles.css";
 
 // Keys are the NOTICES `icon` values notices.sh and parseNotices accept;
 // named rather than open-ended so the whole icon set stays out of the bundle.
 const ICONS = {
+  none: null,
   megaphone: Megaphone,
   info: InfoCircle,
   warning: ExclamationTriangle,
@@ -28,11 +33,11 @@ const ICONS = {
 
 export function Notice({ notice, onClose, className, ...props }) {
   const { t, i18n } = useTranslation();
-  const Icon =
-    notice.icon === "none" ? null : ICONS[notice.icon ?? "megaphone"];
+  const Icon = ICONS[noticeIcon(notice)];
   return (
     <div
       className={classNames("notice", className)}
+      data-tone={notice.tone}
       style={noticeStyle(notice)}
       {...props}
     >

@@ -759,11 +759,13 @@
 }
 
 /* Nested in the window, so a card corner rather than a floating panel's, and
-   a wash rather than white on the white window. A deployment's own background
-   (inline) still wins. */
-.introNotices .notice {
+   untoned ones take a wash rather than white on the white window. A
+   deployment's own background (inline) still wins. */
+.introNotices .notice:not([data-tone]) {
   --notice-bg: var(--cioos-surface-2);
+}
 
+.introNotices .notice {
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
 }

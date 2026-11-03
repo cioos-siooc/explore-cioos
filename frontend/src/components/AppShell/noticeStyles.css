@@ -5,6 +5,7 @@
   --notice-bg: var(--cioos-white);
   --notice-fg: var(--cioos-ink);
   --notice-link: var(--cioos-primary-700);
+  --notice-accent: currentcolor;
 
   display: flex;
   align-items: flex-start;
@@ -26,7 +27,28 @@
   width: 28px;
   height: 28px;
   border-radius: var(--cioos-radius-pill);
-  background-color: color-mix(in srgb, currentcolor 16%, transparent);
+  background-color: color-mix(in srgb, var(--notice-accent) 16%, transparent);
+  color: var(--notice-accent);
+}
+
+/* Status tones from the theme's own status colours. Warning links stay ink:
+   --cioos-warn on its ground is ~3.4:1, enough for the icon, not for text. */
+.notice[data-tone="info"] {
+  --notice-bg: color-mix(in srgb, var(--cioos-info) 12%, var(--cioos-white));
+  --notice-link: var(--cioos-info);
+  --notice-accent: var(--cioos-info);
+}
+
+.notice[data-tone="warning"] {
+  --notice-bg: var(--cioos-warn-bg);
+  --notice-link: var(--cioos-ink);
+  --notice-accent: var(--cioos-warn);
+}
+
+.notice[data-tone="critical"] {
+  --notice-bg: var(--cioos-error-bg);
+  --notice-link: var(--cioos-error-700);
+  --notice-accent: var(--cioos-error-700);
 }
 
 .noticeText {
@@ -123,6 +145,23 @@
   from {
     opacity: 0;
     transform: translate(-50%, 16px) scale(0.98);
+  }
+}
+
+/* Phones: the bottom edge belongs to the legend, so the toast hangs under the
+   top bar instead (its footprint already includes the quick filters). */
+@media (max-width: 700px) {
+  .noticeToast {
+    top: var(--cioos-top-bar-space, 12px);
+    bottom: auto;
+    animation-name: notice-drop;
+  }
+}
+
+@keyframes notice-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -16px) scale(0.98);
   }
 }
 
