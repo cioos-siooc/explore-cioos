@@ -34,6 +34,7 @@ import {
   plotWidthFor,
   titleRoomFor,
   COLORBAR_ROOM_PX,
+  COLUMN_GAP,
   MIN_PANEL_PX,
 } from "./previewFacetSizing.js";
 import { colorScaleFor } from "./previewColorScales.js";
@@ -816,7 +817,7 @@ test("a colour column costs the panels no width at all", () => {
   // the same width whether or not a colour column is set.
   const margin = marginFor(COLUMNS, MAX_TITLE_LINES);
   const width = plotWidthFor(COLUMNS, 6, 800);
-  const panels = (width - margin.l - margin.r) / panelPitch(6, 0.22);
+  const panels = (width - margin.l - margin.r) / panelPitch(6, COLUMN_GAP);
   assert.ok(panels >= MIN_PANEL_PX, `${panels}px panels`);
   assert.deepEqual(colored(ALL_SIX).layout.margin, {
     ...figure("TimeSeriesProfile", ALL_SIX).layout.margin,

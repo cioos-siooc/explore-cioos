@@ -12,10 +12,12 @@ import {
   plotHeightFor,
   plotWidthFor,
   titleRoomFor,
+  COLUMN_GAP,
   LABEL_LINE_PX,
   MIN_PANEL_PX,
   PINNED_AXIS_LINES,
   PINNED_EDGE_PX,
+  ROW_GAP,
   TICK_ROOM_PX,
 } from "./previewFacetSizing.js";
 
@@ -133,7 +135,7 @@ test("the sizing floors pay for the gaps, so a panel really gets its minimum", (
     const width = plotWidthFor(COLUMNS, n, 100);
     const columns = marginFor(COLUMNS);
     const plotting = width - columns.l - columns.r;
-    const [start, end] = domainsFor(n, 0.22)[0];
+    const [start, end] = domainsFor(n, COLUMN_GAP)[0];
     assert.ok(
       plotting * (end - start) >= MIN_PANEL_PX - 1,
       `n=${n}: ${(plotting * (end - start)).toFixed(0)}px panel`,
@@ -142,7 +144,7 @@ test("the sizing floors pay for the gaps, so a panel really gets its minimum", (
     const height = plotHeightFor(ROWS, n, 100);
     const rows = marginFor(ROWS);
     const stacked = height - rows.t - rows.b;
-    const [low, high] = domainsFor(n, 0.12)[0];
+    const [low, high] = domainsFor(n, ROW_GAP)[0];
     assert.ok(
       stacked * (high - low) >= MIN_PANEL_PX - 1,
       `n=${n}: ${(stacked * (high - low)).toFixed(0)}px panel`,

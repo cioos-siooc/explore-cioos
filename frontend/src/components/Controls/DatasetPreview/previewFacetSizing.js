@@ -38,16 +38,19 @@ export function pinnedAxisSizeFor(orientation) {
 // Orientation-dependent because the two layouts spend their other edges
 // differently: a profile puts its panel titles on TOP and nothing at the
 // bottom, a stack labels each panel's own axis on the LEFT.
+// Each edge holds only what reaches it: half a tick label past the last
+// panel, and nothing below a profile, whose ticks and titles are all on top.
 const COLUMNS_MARGIN = {
   l: PINNED_EDGE_PX,
-  r: 26,
+  r: 14,
   t: TOP_TICK_ROOM_PX,
-  b: 22,
+  b: PINNED_EDGE_PX,
 };
+// r stays wider than a profile's: a date tick is half a "May 25" past the end.
 const ROWS_MARGIN = {
   l: TICK_ROOM_PX + LABEL_GUTTER_PX,
   r: 26,
-  t: 30,
+  t: 12,
   b: PINNED_EDGE_PX,
 };
 
@@ -93,12 +96,12 @@ export function marginFor(
 // width on the eighteen gaps between them. A panel-relative gap keeps the same
 // proportions at any n.
 //
-// 0.22 is also what makes six 150px profile panels fit a ~1140px modal exactly.
-// Stacked panels need much less — every panel is labelled beside its own axis
-// and only the bottom one carries tick labels, so the gap is separation and
-// nothing else, and vertical space is the direction the modal scrolls.
-export const COLUMN_GAP = 0.22;
-export const ROW_GAP = 0.12;
+// Just enough to keep one panel's end tick label off the next one's first.
+// Stacked panels need less — every panel is labelled beside its own axis and
+// only the bottom one carries tick labels, so the gap is separation and
+// nothing else.
+export const COLUMN_GAP = 0.15;
+export const ROW_GAP = 0.08;
 
 // Below this a panel is not worth drawing; the container scrolls instead.
 export const MIN_PANEL_PX = 150;
@@ -205,7 +208,7 @@ export function plotWidthFor(orientation, panelCount, availableWidth) {
 const GRID_MARGIN = {
   l: TICK_ROOM_PX + LABEL_GUTTER_PX,
   r: 26,
-  t: 30,
+  t: 12,
   b: BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
 };
 
@@ -265,13 +268,13 @@ export function overlayMarginFor(orientation, titleLines = MAX_TITLE_LINES) {
       l: SIDE_AXIS_ROOM_PX,
       r: 26,
       t: 10 + STACKED_AXIS_PX + titleRoom,
-      b: 22,
+      b: PINNED_EDGE_PX,
     };
   }
   return {
     l: SIDE_AXIS_ROOM_PX,
     r: 26,
-    t: 30 + titleRoom,
+    t: 12 + titleRoom,
     b: BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
   };
 }

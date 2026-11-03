@@ -753,7 +753,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px 16px;
-  padding: 0 0 6px;
+  padding: 0 0 2px;
 }
 
 /* Nothing to drop under the title: the gear stays beside it. */
@@ -844,7 +844,7 @@
 @media (max-width: 1100px) {
   .datasetPreviewPlotPanes {
     flex-direction: column;
-    gap: var(--cioos-space-sm);
+    gap: 0;
   }
 
   .previewSettingsModal .datasetPreviewParamsPane {

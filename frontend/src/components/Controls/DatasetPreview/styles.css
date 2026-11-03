@@ -198,9 +198,10 @@
     border-radius: 0;
   }
 
+  /* The figure carries its own margins; the body adds none beside them. */
   .dataPreviewModal .modal-body {
-    padding: var(--cioos-space-sm) var(--cioos-space-md)
-      max(var(--cioos-space-sm), env(safe-area-inset-bottom));
+    padding: var(--cioos-space-xs) var(--cioos-space-xs)
+      max(var(--cioos-space-xs), env(safe-area-inset-bottom));
   }
 
   .dataPreviewModal .datasetTitle {
