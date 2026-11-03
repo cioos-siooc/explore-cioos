@@ -502,10 +502,13 @@ export default function CreateMap({
     [HEX_FILL_FADE_END_ZOOM, 0],
   ];
 
-  // Continuous with COVERAGE_HEX_OPACITY_STOPS: ends at hexMaxZoom on the value
-  // that one starts with.
+  // Lighter than the coverage cells, where packed hexes would otherwise hide
+  // the coastline. Continuous with COVERAGE_HEX_OPACITY_STOPS: ends at
+  // hexMaxZoom on the value that one starts with.
+  const lowZoomHexOpacity = 0.45;
   const HEX_OPACITY_STOPS = [
-    [hexMinZoom, hexOpacity],
+    [hexMinZoom, lowZoomHexOpacity],
+    [hexMaxZoom - 1, lowZoomHexOpacity],
     [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
   ];
   const [draw] = useState(() => new MapboxDraw(drawControlOptions));
