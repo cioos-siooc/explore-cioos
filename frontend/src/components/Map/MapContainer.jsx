@@ -64,6 +64,7 @@ export default function MapContainer() {
     setSelectedTrajectory,
     selectTrajectoryFromMap,
     mappedRecord,
+    previewMapLayer,
     pointsData,
     combinedQueries,
   } = useSelection();
@@ -143,6 +144,7 @@ export default function MapContainer() {
         trailingDays={trailingDays}
         selectedTrajectory={selectedTrajectory}
         mappedRecord={mappedRecord}
+        previewMapLayer={previewMapLayer}
         dataLayers={dataLayers}
         griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
         dataLayersVisible={dataLayersVisible}

@@ -127,6 +127,9 @@ export default function SelectionProvider({ children }) {
   // {datasetPk, recordId, frameView} | undefined.
   const [mappedRecord, setMappedRecord] = useState();
 
+  // What the preview's map view draws (previewMapLayerFor), while it is shown.
+  const [previewMapLayer, setPreviewMapLayer] = useState();
+
   // A share link's ?record= / ?track= / ?onMap= waits here until its dataset
   // resolves out of pointsData. Consumed once, by the effect below.
   const [pendingHighlight, setPendingHighlight] = useState(() => {
@@ -678,8 +681,10 @@ export default function SelectionProvider({ children }) {
   // usePreviewPlotParams: they change what is fetched, not how the rows are
   // drawn, so they ride this fetch instead of a second one — one request, one
   // previewError, one recordLoading.
+  // The map view colours one marker per profile, so it needs them all too.
   const inspectAllProfiles =
-    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
+    (searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT ||
+      searchParams.get("vis") === "map") &&
     hasColorPlotFor(inspectDataset);
   const inspectRecordStep = inspectAllProfiles
     ? undefined
@@ -756,6 +761,8 @@ export default function SelectionProvider({ children }) {
     setHighlightedRecord,
     mappedRecord,
     setMappedRecord,
+    previewMapLayer,
+    setPreviewMapLayer,
     pointsData,
     inspectDataset,
     inspectDatasetExcluded,

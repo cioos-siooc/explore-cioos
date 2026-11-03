@@ -217,3 +217,107 @@
     height: 32px;
   }
 }
+
+/* The map view's stand-in for the modal: top right, clear of the datasets
+   column and the map card on the left. */
+.previewMapPanel {
+  position: fixed;
+  top: max(12px, var(--cioos-top-bar-space, 0px));
+  right: 12px;
+  z-index: calc(var(--cioos-z-shell, 30) - 2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 24px));
+  max-height: calc(
+    100vh - max(12px, var(--cioos-top-bar-space, 0px)) - 12px -
+      var(--cioos-time-bar-space, 0px)
+  );
+  overflow: hidden auto;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-lg);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+  color: var(--cioos-ink);
+
+  --legend-label-font: var(--cioos-font-size-xs);
+  --legend-tick-font: var(--cioos-font-size-2xs);
+}
+
+.previewMapPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.previewMapPanelTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.previewMapPanelControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.previewMapPanelStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.previewMapPanelDepth {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.previewMapPanelDepthLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.previewMapPanelDepthLabel output {
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink);
+}
+
+.previewMapPanelDepth input[type="range"] {
+  width: 100%;
+  accent-color: var(--cioos-primary);
+}
+
+.previewMapPanelCount {
+  margin: 0;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+/* Phones: a bottom sheet, short enough to leave the track in view. */
+@media (max-width: 700px), (max-height: 500px) {
+  .previewMapPanel {
+    inset: auto 0 0;
+    width: auto;
+    max-height: 40vh;
+    border-bottom: none;
+    border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
+  }
+}

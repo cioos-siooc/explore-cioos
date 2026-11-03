@@ -310,12 +310,12 @@ test("vis default comes from the type alone, never the payload", () => {
     "Profile",
     "TimeSeries",
     "TimeSeriesProfile",
-    "Trajectory",
     "TrajectoryProfile",
     "Point",
   ]) {
     assert.equal(defaultVisFor({ cdm_data_type: type }), "plot", type);
   }
+  assert.equal(defaultVisFor({ cdm_data_type: "Trajectory" }), "map");
   assert.equal(defaultVisFor({ cdm_data_type: "Grid" }), "table");
   assert.equal(defaultVisFor({ cdm_data_type: "Other" }), "table");
   assert.equal(defaultVisFor(undefined), "table");

@@ -138,6 +138,7 @@ const CDM_LAYOUTS = {
     leadingAxesFor: timeLeadingAxis,
   },
   Trajectory: {
+    defaultVis: "map",
     orientation: ROWS,
     wanted: "track",
     sharedAxisFor: trackAxisFor,
@@ -468,7 +469,9 @@ export function resolvePanels(panels, variables, excluded) {
 // from "table" to "plot" once rows landed. A plottable type with no plottable
 // column is reported by plotBlockerFor instead.
 export function defaultVisFor(dataset) {
-  return layoutFor(dataset) ? "plot" : "table";
+  const layout = layoutFor(dataset);
+  if (!layout) return "table";
+  return layout.defaultVis || "plot";
 }
 
 export function hasColorPlotFor(dataset) {

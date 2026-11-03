@@ -26,6 +26,12 @@ vi.mock("../DatasetPreviewPlot/DatasetPreviewPlot.jsx", async () => {
   };
 });
 
+// The map view hands its layer to the shell's map through the selection.
+const selection = vi.hoisted(() => ({ setPreviewMapLayer: null }));
+vi.mock("../../../state/selection/SelectionProvider.jsx", () => ({
+  useSelection: () => selection,
+}));
+
 const PROFILE_TABLE = {
   columnNames: ["depth", "temperature", "salinity"],
   columnTypes: ["float", "float", "float"],
@@ -83,6 +89,7 @@ describe("DatasetPreview", () => {
     // The profile list is fetched separately and is allowed to fail: a record
     // whose list does not arrive simply gets no slider.
     global.fetch = vi.fn(() => Promise.reject(new Error("no profile list")));
+    selection.setPreviewMapLayer = vi.fn();
   });
 
   describe("which of the five states the body shows", () => {
@@ -255,6 +262,112 @@ describe("DatasetPreview", () => {
       await waitFor(() => expect(global.fetch).toHaveBeenCalled());
       await act(() => new Promise((resolve) => setTimeout(resolve, 0))); // the list lands
       expect(screen.getByText("Sample: 3 of 1,500 rows")).toBeInTheDocument();
+    });
+  });
+
+  describe("the map view", () => {
+    const TRACK_TABLE = {
+      columnNames: ["time", "longitude", "latitude", "temperature"],
+      columnTypes: ["String", "double", "double", "float"],
+      columnUnits: ["UTC", "degrees_east", "degrees_north", "degree_C"],
+      rows: [
+        ["2024-01-01T00:00:00Z", -63, 44, 4],
+        ["2024-01-01T01:00:00Z", -62.9, 44.1, 6],
+        ["2024-01-01T02:00:00Z", -62.8, 44.2, 5],
+      ],
+    };
+    const TRACK = {
+      dataset_id: "glider",
+      title: "Glider",
+      cdm_data_type: "Trajectory",
+    };
+    const CAST_TABLE = {
+      columnNames: [
+        "cast",
+        "time",
+        "longitude",
+        "latitude",
+        "depth",
+        "temperature",
+      ],
+      columnTypes: ["String", "String", "double", "double", "float", "float"],
+      columnUnits: [
+        null,
+        "UTC",
+        "degrees_east",
+        "degrees_north",
+        "m",
+        "degree_C",
+      ],
+      rows: [
+        ["a", "2024-01-01T00:00:00Z", -60, 45, 0, 10],
+        ["a", "2024-01-01T00:00:00Z", -60, 45, 50, 4],
+        ["b", "2024-01-02T00:00:00Z", -59, 45, 0, 12],
+        ["b", "2024-01-02T00:00:00Z", -59, 45, 20, 9],
+      ],
+    };
+    const CASTS = {
+      dataset_id: "ship",
+      title: "Ship",
+      cdm_data_type: "TrajectoryProfile",
+      profile_id_variable: "cast",
+    };
+    const lastLayer = () => selection.setPreviewMapLayer.mock.calls.at(-1)[0];
+
+    it("opens a trajectory on the map instead of the modal", async () => {
+      open({ table: TRACK_TABLE, dataset: TRACK });
+
+      expect(
+        await screen.findByTestId("preview-map-panel"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("preview-plot")).not.toBeInTheDocument();
+      expect(screen.getByText("3 positions")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(lastLayer()).toMatchObject({
+          frameKey: "glider|record-1",
+          markerCount: 3,
+        }),
+      );
+    });
+
+    it("goes back to the modal's plot from the panel's toggle", async () => {
+      const { user } = open({ table: TRACK_TABLE, dataset: TRACK });
+      await screen.findByTestId("preview-map-panel");
+
+      await user.click(screen.getByRole("button", { name: "Plot" }));
+
+      expect(await screen.findByTestId("preview-plot")).toBeInTheDocument();
+      expect(screen.queryByTestId("preview-map-panel")).not.toBeInTheDocument();
+      expect(lastLayer()).toBeUndefined();
+    });
+
+    it("is not offered for a record sitting at one position", async () => {
+      open();
+      await screen.findByTestId("preview-plot");
+      expect(
+        screen.queryByRole("button", { name: "Map" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("colours a TrajectoryProfile's casts at the depth on its slider", async () => {
+      open({ table: CAST_TABLE, dataset: CASTS, url: "/?vis=map&pdepth=30" });
+
+      expect(await screen.findByTestId("preview-map-depth")).toHaveValue("30");
+      expect(
+        screen.getByText("1 of 2 profiles sampled at this depth"),
+      ).toBeInTheDocument();
+    });
+
+    it("leaves a refused record to the modal, which can explain it", async () => {
+      open({
+        table: null,
+        dataset: TRACK,
+        previewError: { code: PREVIEW_ERROR.NO_DATA },
+      });
+      expect(
+        await screen.findByText(/no data in the preview window/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("preview-map-panel")).not.toBeInTheDocument();
     });
   });
 });

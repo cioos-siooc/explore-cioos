@@ -34,8 +34,9 @@ export function parsePeriod(value) {
 
 // Each is written ONLY when it differs from the dataset type's default.
 //
-//   vis      table | plot          (default: plot for every plottable
-//                                  cdm_data_type, table for Grid/unknown)
+//   vis      table | plot | map    (default: map for Trajectory, plot for
+//                                  every other plottable cdm_data_type,
+//                                  table for Grid/unknown)
 //   pvars    the panel variables, comma-separated, one panel each
 //                                  (default: the dataset's first EOV column)
 //   paxis    the axis every panel shares, comma-separated; several make a
@@ -81,6 +82,10 @@ export function parsePeriod(value) {
 //                                  (default: none, meaning the window
 //                                  /preview returns on its own — every profile
 //                                  in the tail of the record at once)
+//   pmapz    the column colouring the map view's markers
+//                                  (default: the first panel variable)
+//   pdepth   the depth a TrajectoryProfile's map markers are coloured at
+//                                  (default: the shallowest sampled)
 export const PLOT_PARAMS = [
   "vis",
   "pvars",
@@ -98,6 +103,8 @@ export const PLOT_PARAMS = [
   "pstack",
   "pyflip",
   STEP_PARAM,
+  "pmapz",
+  "pdepth",
 ];
 
 // Never read back; kept only so old links don't leave orphans in the address

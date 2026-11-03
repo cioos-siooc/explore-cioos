@@ -8,7 +8,12 @@ import {
   isDownwardVertical,
   withDataPresence,
 } from "./previewVariables.js";
-import { positionRowsFor, trackIndexFor } from "./previewTrackIndex.js";
+import {
+  positionRowsFor,
+  timeCoordinateOf,
+  trackIndexFor,
+} from "./previewTrackIndex.js";
+import { hasMapViewFor } from "./previewMapFeatures.js";
 import { distanceRowsFor, trackDistancesFor } from "./previewTrackDistance.js";
 import {
   colorCandidatesFor,
@@ -51,6 +56,8 @@ export const PLOT_MODES = [
 ];
 
 const DEFAULT_MODE = "markers+lines";
+
+const VIS_VALUES = new Set(["plot", "table", "map"]);
 
 // X, Y and colour each multiply the grid, so only one of them may hold several
 // variables: `list` keeps just its first when any of `others` already does.
@@ -202,8 +209,14 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   const defaultVis = defaultVisFor(inspectDataset);
   const visParam = searchParams.get("vis");
+  const mapAvailable = hasMapViewFor(inspectDataset, variables);
+  const requestedVis = VIS_VALUES.has(visParam) ? visParam : defaultVis;
+  // Held until /preview lands: the columns that say whether there is a
+  // position to map are not known before.
   const selectedVis =
-    visParam === "table" || visParam === "plot" ? visParam : defaultVis;
+    requestedVis === "map" && columns.length && !mapAvailable
+      ? "plot"
+      : requestedVis;
   const setSelectedVis = useCallback(
     (vis) => setParams({ vis: vis === defaultVis ? null : vis }),
     [setParams, defaultVis],
@@ -565,6 +578,30 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams],
   );
 
+  // The map view's colour column follows the first panel, so a plot switched
+  // to the map keeps showing what it was showing.
+  const mapColor = useMemo(() => {
+    const colorable = new Set(colorCandidates.map((v) => v.columnName));
+    const requested = searchParams.get("pmapz");
+    if (colorable.has(requested)) return requested;
+    return (
+      panels.find((name) => colorable.has(name)) ||
+      timeCoordinateOf(variables)?.columnName ||
+      colorCandidates[0]?.columnName ||
+      null
+    );
+  }, [searchParams, colorCandidates, panels, variables]);
+  const setMapColor = useCallback(
+    (columnName) => setParams({ pmapz: columnName }),
+    [setParams],
+  );
+  const depthParam = Number.parseFloat(searchParams.get("pdepth"));
+  const mapDepth = Number.isFinite(depthParam) ? depthParam : null;
+  const setMapDepth = useCallback(
+    (depth) => setParams({ pdepth: depth === null ? null : String(depth) }),
+    [setParams],
+  );
+
   // Changes with the axis set, so Plotly does not restore a zoom onto an axis
   // that no longer exists. A flipped Y counts too: a kept zoom would hold the
   // old direction's range.
@@ -595,6 +632,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     plan,
     selectedVis,
     setSelectedVis,
+    mapAvailable,
+    mapColor,
+    setMapColor,
+    mapDepth,
+    setMapDepth,
     sharedAxis,
     setSharedAxis,
     sharedAxes,
