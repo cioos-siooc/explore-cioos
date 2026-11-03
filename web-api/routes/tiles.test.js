@@ -173,7 +173,7 @@ test("GET /tiles/tracks/:z/:x/:y.mvt returns a binary MVT tile with both track l
   assert.match(db.queries[0], /track-heads/);
 });
 
-test("GET /tiles/tracks/:z/:x/:y.mvt keeps every head, flagging the ones live on the selected date", async () => {
+test("GET /tiles/tracks/:z/:x/:y.mvt keeps every head, flagging the ones seen in the window's last week", async () => {
   db.queueRaw([{ st_asmvt: FAKE_TILE }]);
   await agent.get("/tiles/tracks/6/20/20.mvt").query({
     timeMin: "2020-01-01T00:00:00Z",
@@ -185,12 +185,8 @@ test("GET /tiles/tracks/:z/:x/:y.mvt keeps every head, flagging the ones live on
     sql.indexOf("SELECT coalesce"),
   );
   const [selectList, where] = headMvt.split(/\bWHERE\b/);
-  assert.match(selectList, /h\.trajectory_end >= .*- interval '1 day'/);
-  assert.match(
-    selectList,
-    /make_interval\(secs => h\.gap_secs\)\s+AS active/,
-  );
-  assert.doesNotMatch(where, /trajectory_end|gap_secs/);
+  assert.match(selectList, /h\.time >= \S+ - interval '7 days' AS active/);
+  assert.doesNotMatch(where, /h\.time/);
 });
 
 test("GET /tiles/tracks/:z/:x/:y.mvt rejects an unrecognized trajectoryTypes entry", async () => {

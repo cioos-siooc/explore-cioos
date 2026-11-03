@@ -304,8 +304,7 @@ const MAP_VIEW_DEBOUNCE_MS = 250;
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
 const TRACK_LINE_OPACITY = 0.55;
-// A head the trajectory has since left behind (ended, or silent past its
-// reporting gap): where it was last seen in the window, not where it is.
+// A head last seen before the window's final week (the server's `active`).
 const TRACK_HEAD_INACTIVE_OPACITY = 0.35;
 const trackHeadOpacity = (scale) => [
   "case",
