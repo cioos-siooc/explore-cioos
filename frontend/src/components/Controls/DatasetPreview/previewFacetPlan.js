@@ -13,6 +13,7 @@ import {
   preferWithData,
 } from "./previewVariables.js";
 import {
+  instantOf,
   POSITION_INDEX_COLUMN,
   timeCoordinateOf,
 } from "./previewTrackIndex.js";
@@ -108,11 +109,13 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // several of them side by side.
 const CDM_LAYOUTS = {
   Profile: {
+    defaultPanelCount: 3,
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
   },
   TimeSeriesProfile: {
+    defaultPanelCount: 3,
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
@@ -120,6 +123,7 @@ const CDM_LAYOUTS = {
     colorPlot: true,
   },
   TrajectoryProfile: {
+    defaultPanelCount: 3,
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
@@ -127,6 +131,7 @@ const CDM_LAYOUTS = {
     colorPlot: true,
   },
   TimeSeries: {
+    defaultPanelCount: 3,
     orientation: ROWS,
     wanted: "time",
     sharedAxisFor: timeCoordinateOf,
@@ -267,22 +272,92 @@ function defaultPanelCandidatesFor(variables, sharedAxis) {
   );
 }
 
+// Depth or pressure drawn against the shared axis only restates the vertical
+// coordinate.
+const VERTICAL_NAME = /depth|pressure/i;
+const isVerticalLike = (variable) =>
+  isDownwardVertical(variable) ||
+  VERTICAL_NAME.test(variable.standardName || "");
+
+const numberOf = (value) =>
+  value === null || value === undefined || value === "" ? null : Number(value); // Number() reads these as 0
+
+// Two sensors logging the same values (a primary and its backup) draw one
+// curve twice.
+const sameValuesIn = (data, a, b) =>
+  (data || []).every((row) => row[a.columnName] === row[b.columnName]);
+
+const LINEAR_R = 0.999;
+
+// A column that is a straight line in the shared axis (a counter, a pressure
+// against depth) draws nothing worth opening on. |r| close to 1, from rows
+// where both hold a number; fewer than three such rows say nothing either.
+function isLinearIn(data, variable, shared) {
+  const readShared = isTimeLike(shared) ? instantOf : numberOf;
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  (data || []).forEach((row) => {
+    const x = readShared(row[shared.columnName]);
+    const y = numberOf(row[variable.columnName]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    n += 1;
+    sx += x;
+    sy += y;
+    sxx += x * x;
+    syy += y * y;
+    sxy += x * y;
+  });
+  if (n < 3) return true;
+  const cov = n * sxy - sx * sy;
+  const varX = n * sxx - sx * sx;
+  const varY = n * syy - sy * sy;
+  if (varX <= 0 || varY <= 0) return true;
+  return Math.abs(cov) / Math.sqrt(varX * varY) > LINEAR_R;
+}
+
 // An EOV first: the dataset's first_eov_column when plottable, else any column
-// mapped to an EOV, else the first candidate.
-function defaultPanelsFor(dataset, variables, shared) {
+// mapped to an EOV, else the first candidate. Up to `count` of them when the
+// rows show which vary — leaving out depth, pressure and straight lines;
+// otherwise, or when none is left, the single first pick.
+function defaultPanelsFor(dataset, variables, data, shared, count) {
   const candidates = defaultPanelCandidatesFor(
     variables,
     shared && shared.columnName,
   );
   if (!candidates.length) return [];
+  const isEov = (variable) => variable.eovs && variable.eovs.length;
   const preferred =
     (dataset &&
       dataset.first_eov_column &&
       candidates.find(
         (variable) => variable.columnName === dataset.first_eov_column,
       )) ||
-    candidates.find((variable) => variable.eovs && variable.eovs.length);
-  return [(preferred || candidates[0]).columnName];
+    candidates.find(isEov) ||
+    candidates[0];
+  const ordered = uniqueColumns([
+    preferred,
+    ...candidates.filter(isEov),
+    ...candidates,
+  ]);
+  const varying = [];
+  for (const variable of ordered) {
+    if (varying.length >= count) break;
+    if (
+      variable.varies &&
+      !isVerticalLike(variable) &&
+      !varying.some((picked) => sameValuesIn(data, picked, variable)) &&
+      !isLinearIn(data, variable, shared)
+    ) {
+      varying.push(variable);
+    }
+  }
+  return count > 1 && varying.length
+    ? varying.map((variable) => variable.columnName)
+    : [preferred.columnName];
 }
 
 // Why a record has no plan. Four codes rather than one "not plottable", because
@@ -318,7 +393,13 @@ function planOrBlockerFor(dataset, variables, data) {
     return blocked(PLOT_BLOCKED.NO_SHARED_AXIS, { wanted: layout.wanted });
   }
 
-  const panelDefaults = defaultPanelsFor(dataset, variables, shared);
+  const panelDefaults = defaultPanelsFor(
+    dataset,
+    variables,
+    data,
+    shared,
+    layout.defaultPanelCount || 1,
+  );
   if (!panelDefaults.length) return blocked(PLOT_BLOCKED.NO_MEASUREMENTS);
 
   return {

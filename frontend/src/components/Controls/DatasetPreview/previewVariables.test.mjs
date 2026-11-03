@@ -559,3 +559,18 @@ test("preferWithData keeps every column when none has data", () => {
   ];
   assert.equal(preferWithData(empty), empty);
 });
+
+test("a column varies when its rows hold two distinct values", () => {
+  const variables = ["flat", "moving", "empty"].map((columnName) => ({
+    columnName,
+  }));
+  const rows = [
+    { flat: 4, moving: 1, empty: null },
+    { flat: 4, moving: null, empty: null },
+    { flat: 4, moving: 2, empty: null },
+  ];
+  assert.deepEqual(
+    withDataPresence(variables, rows).map((variable) => variable.varies),
+    [false, true, false],
+  );
+});

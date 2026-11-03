@@ -711,3 +711,83 @@ test("Point shares its first measurement that has data", () => {
   assert.equal(plan.sharedAxis, "CNDC_01");
   assert.deepEqual(plan.panelDefaults, ["PSAL_01"]);
 });
+
+// Four VIKING rows down a profile through time: depth and time step, the
+// `curved` columns bend (each offset, so none repeats another), the `linear` ones rise in step, the rest hold still.
+const vikingRows = ({ curved = [], linear = [] }) =>
+  [0, 1, 2, 3].map((step) =>
+    Object.fromEntries(
+      VIKING.columnNames.map((columnName) => [
+        columnName,
+        columnName === "time"
+          ? `2020-01-0${step + 1}T00:00:00Z`
+          : columnName === "depth"
+            ? step
+            : curved.includes(columnName)
+              ? step * step + curved.indexOf(columnName)
+              : linear.includes(columnName)
+                ? 2 * step + 1
+                : 7,
+      ]),
+    ),
+  );
+const defaultsFor = (cdm_data_type, columns) => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type };
+  const rows = vikingRows(columns);
+  const variables = withDataPresence(variablesFrom(VIKING, dataset), rows);
+  return facetPlanFor(dataset, variables, rows).panelDefaults;
+};
+
+test("profiles and timeseries open on up to three varying measurements, the EOV first", () => {
+  ["Profile", "TimeSeriesProfile", "TrajectoryProfile", "TimeSeries"].forEach(
+    (cdm_data_type) => {
+      assert.deepEqual(
+        defaultsFor(cdm_data_type, {
+          curved: ["CNDC_01", "PSAL_01", "DOXY_01", "TE90_01"],
+        }),
+        ["TE90_01", "CNDC_01", "PSAL_01"],
+        cdm_data_type,
+      );
+    },
+  );
+});
+
+test("a constant measurement is left out of the default panels", () => {
+  assert.deepEqual(
+    defaultsFor("TimeSeries", { curved: ["PSAL_01", "DOXY_01"] }),
+    ["PSAL_01", "DOXY_01"],
+  );
+});
+
+test("pressure and straight lines are left out of the default panels", () => {
+  assert.deepEqual(
+    defaultsFor("Profile", {
+      curved: ["PRES_01", "PSAL_01"],
+      linear: ["TE90_01", "CNDC_01"],
+    }),
+    ["PSAL_01"],
+  );
+});
+
+test("columns repeating another's values open once", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  const rows = vikingRows({ curved: ["TE90_01", "CNDC_01", "PSAL_01"] }).map(
+    (row) => ({ ...row, CNDC_01: row.TE90_01 }),
+  );
+  const variables = withDataPresence(variablesFrom(VIKING, dataset), rows);
+  assert.deepEqual(facetPlanFor(dataset, variables, rows).panelDefaults, [
+    "TE90_01",
+    "PSAL_01",
+  ]);
+});
+
+test("with no measurement varying, the usual single default stays", () => {
+  assert.deepEqual(defaultsFor("Profile", {}), ["TE90_01"]);
+});
+
+test("a trajectory still opens on a single panel", () => {
+  assert.equal(
+    defaultsFor("Trajectory", { curved: ["CNDC_01", "PSAL_01"] }).length,
+    1,
+  );
+});

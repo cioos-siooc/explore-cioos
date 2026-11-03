@@ -252,12 +252,27 @@ const isPresent = (value) =>
 
 // Judged on the rows the preview holds, which is what the plot draws: a column
 // empty there draws an empty panel however full the rest of the record is.
+// `varies`: a column holding one value draws a flat line, so the default
+// panels skip it.
 export function withDataPresence(variables, rows) {
   if (!rows || !rows.length) return variables;
-  return (variables || []).map((variable) => ({
-    ...variable,
-    hasData: rows.some((row) => isPresent(row[variable.columnName])),
-  }));
+  return (variables || []).map((variable) => {
+    let first;
+    let hasData = false;
+    let varies = false;
+    for (const row of rows) {
+      const value = row[variable.columnName];
+      if (!isPresent(value)) continue;
+      if (!hasData) {
+        hasData = true;
+        first = value;
+      } else if (value !== first) {
+        varies = true;
+        break;
+      }
+    }
+    return { ...variable, hasData, varies };
+  });
 }
 
 // Unannotated counts as having data: before /preview lands nothing is known.
