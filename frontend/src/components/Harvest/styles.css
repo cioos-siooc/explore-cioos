@@ -753,6 +753,7 @@ a.harvest-link:hover {
 }
 
 /* ── Catalogue section (overview) ────────────────────────────────────────── */
+
 /* The max() floor caps the grid at two columns, one below ~632px. */
 .harvest-catalogue {
   display: grid;
