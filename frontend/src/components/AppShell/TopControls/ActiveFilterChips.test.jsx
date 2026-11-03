@@ -59,7 +59,9 @@ describe("ActiveFilterChips", () => {
     expect(excluded.querySelector(".activeFilterItemNot")).toHaveTextContent(
       "not",
     );
-    expect(within(excluded).getByRole("button")).toHaveAccessibleName(/: not /);
+    expect(
+      within(excluded).getByTestId("filter-chip-item-remove"),
+    ).toHaveAccessibleName(/: not /);
     expect(
       within(group("dataLayers")).getByTestId("filter-chip-item"),
     ).toHaveAttribute("data-excluded", "true");
@@ -209,6 +211,33 @@ describe("ActiveFilterChips", () => {
     expect(seen).toEqual({
       showFiltersModal: true,
       openFilter: "textSearchFilterName",
+    });
+  });
+
+  it("opens a value's filter page from the value chip", async () => {
+    const seen = {};
+    function UIProbe() {
+      const { showFiltersModal, openFilter } = useUI();
+      Object.assign(seen, { showFiltersModal, openFilter });
+      return null;
+    }
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <ActiveFilterChips />
+        <UIProbe />
+      </>,
+      { url: "/?eovs=oxygen", providers: "app" },
+    );
+    await waitFor(() => expect(group("eovs")).toBeInTheDocument());
+
+    await user.click(
+      within(group("eovs")).getByTestId("filter-chip-item-label"),
+    );
+
+    expect(seen).toEqual({
+      showFiltersModal: true,
+      openFilter: "oceanVariablesFiltername",
     });
   });
 
