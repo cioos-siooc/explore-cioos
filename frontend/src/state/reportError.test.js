@@ -40,7 +40,7 @@ describe("reportError", () => {
   });
 
   it.each([
-    "Failed to fetch (explore.dev.cioos.ca)",
+    "Failed to fetch (beta.explore.cioos.ca)",
     "NetworkError when attempting to fetch resource.",
     "Load failed",
   ])(
