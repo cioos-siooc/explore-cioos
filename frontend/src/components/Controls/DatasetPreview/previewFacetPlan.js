@@ -27,7 +27,7 @@ export const ROWS = "rows"; // timeseries: panels stacked, shared X
 
 const find = (variables, predicate) => (variables || []).find(predicate);
 
-const verticalCoordinate = (variables) =>
+export const verticalCoordinate = (variables) =>
   find(
     variables,
     (variable) =>
