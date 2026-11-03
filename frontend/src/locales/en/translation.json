@@ -913,7 +913,7 @@
   "legendHelp_trajectories_trail_title": "Track window",
   "legendHelp_trajectories_trail_body": "How much history is drawn before the selected date, up to one year.",
   "legendHelp_trajectories_head_title": "Position on date",
-  "legendHelp_trajectories_head_body": "Where the platform was on the selected date (its last fix up to that day) and which way it was going. A trajectory that ended before the date, or went silent well before it, has no marker. Set the date with the field beside the marker or the rail underneath.",
+  "legendHelp_trajectories_head_body": "Where the platform was on the selected date (its last fix up to that day) and which way it was going. The marker is faded when that last fix is more than a week before the date. Set the date with the field beside the marker or the rail underneath.",
   "legendHelp_seafloor_title": "Seafloor depth",
   "legendHelp_seafloor_source_title": "Source",
   "legendHelp_seafloor_source_body": "CHS NONNA bathymetry, its 10 m grid. Shaded for relief; it appears once the map is zoomed in far enough to draw it.",
