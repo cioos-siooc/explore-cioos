@@ -372,6 +372,7 @@ function buildHeadArrowImage(fillColor, strokeColor = "#ffffff") {
 // gridded field reads cleanly.
 const observationLayerIds = [
   "hexes",
+  "hex-outlines",
   "points",
   "points-halo",
   "points-highlighted",
@@ -407,6 +408,7 @@ const TRACK_HEAD_HAS_COURSE = ["has", "cog"];
 // each layer's own filter.
 const SELECTION_FILTERED_LAYERS = {
   hexes: undefined,
+  "hex-outlines": undefined,
   points: undefined,
   "points-halo": undefined,
   "coverage-hexes": undefined,
@@ -661,6 +663,9 @@ export default function CreateMap({
         "fill-opacity",
         hexOpacityExpression(scale),
       );
+    }
+    if (map.current.getLayer("hex-outlines")) {
+      map.current.setPaintProperty("hex-outlines", "line-opacity", scale);
     }
     if (map.current.getLayer("coverage-hexes")) {
       map.current.setPaintProperty(
@@ -2242,7 +2247,26 @@ export default function CreateMap({
           // the 'case' dimmable wraps it in.
           "fill-color": dimmable(hexFillColor()),
           "fill-color-transition": NO_TRANSITION,
-          "fill-outline-color": hexOutlineColor,
+        },
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+
+    // A fill's outline is drawn at the fill's opacity, too faint to pick out a
+    // lone cell.
+    map.current.addLayer(
+      {
+        id: "hex-outlines",
+        type: "line",
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        paint: {
+          "line-color": hexOutlineColor,
+          "line-opacity": dataRevealed.current ? 1 : 0,
+          "line-opacity-transition": NO_TRANSITION,
+          "line-width": 1,
         },
       },
       FIRST_LABEL_LAYER_ID,
