@@ -174,6 +174,32 @@ test("502s ERDDAP_UNAVAILABLE for a genuine upstream failure", async () => {
   assert.equal(res.status, 502);
   assert.equal(res.body.error, "ERDDAP_UNAVAILABLE");
   assert.equal(res.body.upstreamStatus, null);
+  // So the UI can link the request that failed.
+  assert.equal(res.body.erddapQuery, axios.calls[0].url);
+});
+
+test("/preview/query names the ERDDAP request /preview makes, without making it", async () => {
+  db.queueRaw([FEATURE_ROW]);
+  const planned = await agent
+    .get("/preview/query")
+    .query({ dataset: "obs_270", profile: "1" });
+  assert.equal(planned.status, 200);
+  assert.equal(axios.calls.length, 0);
+
+  resetCache();
+  db.queueRaw([FEATURE_ROW]);
+  axios.queueResponse({ data: { table: { columnNames: [], rows: [[1]] } } });
+  await agent.get("/preview").query({ dataset: "obs_270", profile: "1" });
+  assert.equal(planned.body.erddapQuery, axios.calls[0].url);
+});
+
+test("/preview/query refuses an unknown record the way /preview does", async () => {
+  db.queueRaw([]);
+  const res = await agent
+    .get("/preview/query")
+    .query({ dataset: "obs_270", profile: "nope" });
+  assert.equal(res.status, 404);
+  assert.equal(res.body.error, "RECORD_NOT_FOUND");
 });
 
 // NOTE: isLength() without .exists() does not reject an absent field in

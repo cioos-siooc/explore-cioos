@@ -27,7 +27,8 @@ const SERVER_CODES = new Set([
 ]);
 
 /**
- * What stopped this preview: `{ code, upstreamStatus }`.
+ * What stopped this preview: `{ code, upstreamStatus, erddapQuery }`, the last
+ * being the ERDDAP request that failed when the route got that far.
  *
  * `body` is whatever parsed, which may be nothing at all — a 502 from a proxy in
  * front of the API is HTML, and a dropped connection is not even that. The
@@ -45,15 +46,22 @@ export function previewErrorFrom(status, body) {
       : (Number.isFinite(Number(declaredStatus)) && Number(declaredStatus)) ||
         null;
 
+  const erddapQuery =
+    body && typeof body.erddapQuery === "string" ? body.erddapQuery : null;
+
   if (declared && SERVER_CODES.has(declared)) {
-    return { code: declared, upstreamStatus };
+    return { code: declared, upstreamStatus, erddapQuery };
   }
   // 5xx is the API or something in front of it; either way the data server is
   // what the reader cannot reach.
   if (status >= 500) {
-    return { code: PREVIEW_ERROR.ERDDAP_UNAVAILABLE, upstreamStatus };
+    return {
+      code: PREVIEW_ERROR.ERDDAP_UNAVAILABLE,
+      upstreamStatus,
+      erddapQuery,
+    };
   }
-  return { code: PREVIEW_ERROR.UNKNOWN, upstreamStatus };
+  return { code: PREVIEW_ERROR.UNKNOWN, upstreamStatus, erddapQuery };
 }
 
 // The request never arrived, or its answer did not: there is no status to read.

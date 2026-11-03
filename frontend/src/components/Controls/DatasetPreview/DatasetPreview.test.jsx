@@ -11,10 +11,12 @@ import { PREVIEW_ERROR } from "./previewErrors.js";
 // answer. The stand-in reads the context instead, so what these assert is the
 // thing the modal is actually responsible for: that the plot is reached, and
 // reached with the settings the record opened on.
+const plotCrash = vi.hoisted(() => ({ error: null }));
 vi.mock("../DatasetPreviewPlot/DatasetPreviewPlot.jsx", async () => {
   const { usePreviewPlot } = await import("./PreviewPlotProvider.jsx");
   return {
     default: function MockPlot() {
+      if (plotCrash.error) throw plotCrash.error;
       const { sharedAxis, panels, plotType, availableHeight } =
         usePreviewPlot();
       return (
@@ -56,6 +58,7 @@ function open({
   table = PROFILE_TABLE,
   dataset = DATASET,
   previewError = null,
+  previewQuery,
   recordLoading = false,
   setInspectRecordID = vi.fn(),
   url = "/",
@@ -66,6 +69,7 @@ function open({
     <DatasetPreview
       datasetPreview={table ? { table, sample } : null}
       previewError={previewError}
+      previewQuery={previewQuery}
       inspectDataset={dataset}
       inspectRecordID="record-1"
       setInspectRecordID={setInspectRecordID}
@@ -83,6 +87,7 @@ describe("DatasetPreview", () => {
     // The profile list is fetched separately and is allowed to fail: a record
     // whose list does not arrive simply gets no slider.
     global.fetch = vi.fn(() => Promise.reject(new Error("no profile list")));
+    plotCrash.error = null;
   });
 
   describe("which of the five states the body shows", () => {
@@ -110,8 +115,22 @@ describe("DatasetPreview", () => {
     });
 
     it("shows only the loading scrim while the record is still arriving", () => {
+      global.fetch = vi.fn(() => new Promise(() => {}));
       open({ recordLoading: true });
       expect(screen.queryByTestId("preview-plot")).not.toBeInTheDocument();
+      // Names what it is waiting on, like the app's splash.
+      const loading = screen.getByTestId("preview-loading");
+      expect(loading).toHaveTextContent(/fetching the record/i);
+      expect(loading).toHaveTextContent(/listing the profiles/i);
+    });
+
+    it("links the ERDDAP request while it is running", () => {
+      global.fetch = vi.fn(() => new Promise(() => {}));
+      const url = "https://erddap.example.com/erddap/tabledap/d1.json?&id=1";
+      open({ recordLoading: true, previewQuery: url });
+      const link = screen.getByRole("link", { name: url });
+      expect(link).toHaveAttribute("href", url);
+      expect(link).toHaveAttribute("target", "_blank");
       // The Table/Plot toggle is withheld too until there is something to show.
       expect(
         screen.queryByRole("button", { name: "Table" }),
@@ -124,6 +143,37 @@ describe("DatasetPreview", () => {
         screen.getByText(/no data in the preview window/i),
       ).toBeInTheDocument();
       expect(screen.queryByTestId("preview-plot")).not.toBeInTheDocument();
+    });
+
+    it("gives the error code and the data server's status beneath the sentence", () => {
+      open({
+        table: null,
+        previewError: {
+          code: PREVIEW_ERROR.ERDDAP_UNAVAILABLE,
+          upstreamStatus: 503,
+          erddapQuery: "https://erddap.example.com/erddap/tabledap/d1.json",
+        },
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Error: ERDDAP_UNAVAILABLE (the data server answered HTTP 503)",
+      );
+      // The request that failed, so the reader can try it themselves.
+      expect(
+        screen.getByRole("link", {
+          name: "https://erddap.example.com/erddap/tabledap/d1.json",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps a plot that throws inside the modal and says why", async () => {
+      plotCrash.error = new Error("bad trace");
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      open();
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(/figure could not be drawn/i);
+      expect(alert).toHaveTextContent("bad trace");
+      // The Table view stays reachable.
+      expect(screen.getByRole("button", { name: "Table" })).toBeInTheDocument();
     });
 
     it("falls back to the generic sentence for a failure it has no words for", () => {

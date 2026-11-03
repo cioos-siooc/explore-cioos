@@ -243,6 +243,88 @@ CROSS JOIN LATERAL (
 ) win
 LIMIT 1`;
 
+const PREVIEW_CHECKS = [
+  check(["dataset", "profile", "at"]).isLength({ max: 256 }),
+  check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
+  check("allProfiles").optional().isIn(["true", "false"]),
+];
+
+// The ERDDAP request /preview makes for this record, or the refusal it sends
+// instead. Shared with /preview/query, so the link the UI shows while waiting
+// is the request actually running.
+async function resolvePreview(query) {
+  const { dataset, profile, at, timeMin, timeMax } = query;
+  const allProfiles = query.allProfiles === "true";
+
+  // NOTE: filtered by dataset_id alone, so a dataset_id published on two
+  // ERDDAP servers resolves to whichever row sorts first.
+  const rows = await db.raw(FEATURE_SQL, {
+    profile,
+    dataset,
+    NUM_RECORDS: PREVIEW_ROW_LIMIT,
+    WHOLE_STATION: allProfiles,
+  });
+
+  if (!rows.rows?.length) {
+    return {
+      refusal: {
+        status: 404,
+        body: { error: "RECORD_NOT_FOUND", dataset, profile },
+      },
+    };
+  }
+
+  const record = rows.rows[0];
+  const {
+    profile_variable,
+    step_variable,
+    dataset_id,
+    cdm_data_type,
+    erddap_url,
+    profile_id,
+    new_start_time,
+    use_whole_profile,
+    record_step,
+  } = record;
+
+  if (!profile_variable) {
+    return {
+      refusal: {
+        status: 422,
+        body: {
+          error: "NO_RECORD_ID_VARIABLE",
+          dataset: dataset_id,
+          cdm_data_type,
+        },
+      },
+    };
+  }
+
+  const constraint = constraintFor(profile_variable, profile_id);
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
+  // `at` names one profile inside the record, to reach one OUTSIDE the tail
+  // window below, so the two are exclusive. A cast record with no `at` draws
+  // its own cast.
+  const step =
+    steppedRecord(profile_variable, step_variable) && !allProfiles
+      ? at || record_step
+      : null;
+  const windowed = !step && !timeMin && !timeMax && !use_whole_profile;
+  if (step) {
+    erddapQuery += `&${constraintFor(step_variable, step)}`;
+  } else if (timeMin || timeMax) {
+    if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
+    if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
+  } else if (!use_whole_profile) {
+    // Lower bound only, so near-real-time records newer than the last
+    // harvest still show. Anchored on this record's own time_max, not the
+    // dataset's, whose newest data usually belongs to another record.
+    erddapQuery += `&time>${new_start_time}`;
+  }
+
+  return { record, erddapQuery, windowed };
+}
+
 router.get(
   "/",
   ...pipeline({
@@ -250,75 +332,21 @@ router.get(
     // Never cache a live-ERDDAP failure.
     cacheFor: "5 minutes",
     cacheToggle: cache.onlyOk,
-    checks: [
-      check(["dataset", "profile", "at"]).isLength({ max: 256 }),
-      check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
-      check("allProfiles").optional().isIn(["true", "false"]),
-    ],
+    checks: PREVIEW_CHECKS,
   }),
   async (req, res, next) => {
-    const { dataset, profile, at, timeMin, timeMax } = req.query;
-    const allProfiles = req.query.allProfiles === "true";
-
-    // NOTE: filtered by dataset_id alone, so a dataset_id published on two
-    // ERDDAP servers resolves to whichever row sorts first.
-    const rows = await db.raw(FEATURE_SQL, {
-      profile,
-      dataset,
-      NUM_RECORDS: PREVIEW_ROW_LIMIT,
-      WHOLE_STATION: allProfiles,
-    });
-
-    if (!rows.rows?.length) {
-      return res
-        .status(404)
-        .send({ error: "RECORD_NOT_FOUND", dataset, profile });
-    }
+    const { refusal, record, erddapQuery, windowed } = await resolvePreview(
+      req.query,
+    );
+    if (refusal) return res.status(refusal.status).send(refusal.body);
 
     const {
-      profile_variable,
-      step_variable,
       dataset_id,
-      cdm_data_type,
-      erddap_url,
       profile_id,
       n_records,
-      new_start_time,
-      use_whole_profile,
       table_variables,
       cdm_altitude_proxy,
-      record_step,
-    } = rows.rows[0];
-
-    if (!profile_variable) {
-      return res.status(422).send({
-        error: "NO_RECORD_ID_VARIABLE",
-        dataset: dataset_id,
-        cdm_data_type,
-      });
-    }
-
-    const constraint = constraintFor(profile_variable, profile_id);
-    let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
-    // `at` names one profile inside the record, to reach one OUTSIDE the tail
-    // window below, so the two are exclusive. A cast record with no `at` draws
-    // its own cast.
-    const step =
-      steppedRecord(profile_variable, step_variable) && !allProfiles
-        ? at || record_step
-        : null;
-    const windowed = !step && !timeMin && !timeMax && !use_whole_profile;
-    if (step) {
-      erddapQuery += `&${constraintFor(step_variable, step)}`;
-    } else if (timeMin || timeMax) {
-      if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
-      if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
-    } else if (!use_whole_profile) {
-      // Lower bound only, so near-real-time records newer than the last
-      // harvest still show. Anchored on this record's own time_max, not the
-      // dataset's, whose newest data usually belongs to another record.
-      erddapQuery += `&time>${new_start_time}`;
-    }
+    } = record;
 
     console.log("Fetching preview from ", erddapQuery);
     try {
@@ -330,9 +358,12 @@ router.get(
       });
       console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
       if (!data?.table?.rows?.length) {
-        return res
-          .status(404)
-          .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
+        return res.status(404).send({
+          error: "NO_DATA",
+          dataset: dataset_id,
+          profile: profile_id,
+          erddapQuery,
+        });
       }
       const fetchedRowCount = data.table.rows.length;
       trimPreviewRows(data.table, PREVIEW_ROW_LIMIT);
@@ -371,9 +402,12 @@ router.get(
         body.includes("Your query produced no matching results");
 
       if (isEmpty) {
-        return res
-          .status(404)
-          .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
+        return res.status(404).send({
+          error: "NO_DATA",
+          dataset: dataset_id,
+          profile: profile_id,
+          erddapQuery,
+        });
       }
 
       console.error("Preview upstream failure", status, error.message);
@@ -385,8 +419,45 @@ router.get(
         error: "ERDDAP_UNAVAILABLE",
         dataset: dataset_id,
         upstreamStatus: status ?? null,
+        erddapQuery,
       });
     }
+  },
+);
+
+/**
+ * @swagger
+ * /preview/query:
+ *   get:
+ *     summary: The ERDDAP request /preview makes for a record, without making it
+ *     tags: [Preview]
+ *     description: >
+ *       Takes the same parameters as /preview and answers from the database
+ *       alone, so a caller can show the request while /preview is waiting on
+ *       ERDDAP.
+ *     responses:
+ *       200:
+ *         description: "{ erddapQuery }"
+ *       400:
+ *         description: Missing or invalid parameters.
+ *       404:
+ *         description: Unknown dataset or unknown record.
+ *       422:
+ *         description: The dataset declares no CF role variable to constrain on.
+ */
+router.get(
+  "/query",
+  ...pipeline({
+    filters: false,
+    // Matches /preview: the query moves with new_start_time.
+    cacheFor: "5 minutes",
+    cacheToggle: cache.onlyOk,
+    checks: PREVIEW_CHECKS,
+  }),
+  async (req, res) => {
+    const { refusal, erddapQuery } = await resolvePreview(req.query);
+    if (refusal) return res.status(refusal.status).send(refusal.body);
+    return res.send({ erddapQuery });
   },
 );
 

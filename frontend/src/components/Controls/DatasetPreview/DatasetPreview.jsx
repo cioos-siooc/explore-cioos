@@ -29,6 +29,7 @@ const NO_LINK_COPIED = Symbol("no link copied");
 export default function DatasetPreview({
   datasetPreview,
   previewError,
+  previewQuery,
   inspectDataset,
   inspectRecordID,
   // {start, end} UTC days when one period of the record is shown (a
@@ -231,6 +232,7 @@ export default function DatasetPreview({
                 datasetPreview={datasetPreview}
                 rows={rows}
                 previewError={previewError}
+                previewQuery={previewQuery}
               />
             </div>
           </Modal.Body>

@@ -164,6 +164,8 @@ export default function SelectionProvider({ children }) {
   // Set and cleared in the same tick as datasetPreview, so the modal can never
   // hold one record's rows beside another's excuse.
   const [previewError, setPreviewError] = useState();
+  // The ERDDAP request /preview is waiting on, so the modal can show it running.
+  const [previewQuery, setPreviewQuery] = useState();
   const [combinedQueries, setCombinedQueries] = useState([]);
   const [onlyInView, setOnlyInView] = useState(
     () => initialParams.get("onlyInView") === "true",
@@ -699,6 +701,19 @@ export default function SelectionProvider({ children }) {
       (inspectRecordPeriod
         ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
         : "");
+    // A record switched mid-flight must not show the previous one's request.
+    let current = true;
+    setPreviewQuery(undefined);
+    // Answered from the database alone, so it lands while /preview still waits
+    // on ERDDAP. Best effort: without it the modal just names the step.
+    fetch(previewUrl.replace("/preview?", "/preview/query?"))
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null)
+      .then((body) => {
+        if (current && typeof body?.erddapQuery === "string") {
+          setPreviewQuery(body.erddapQuery);
+        }
+      });
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) {
@@ -731,6 +746,9 @@ export default function SelectionProvider({ children }) {
           reportError("preview upstream failure", new Error(previewUrl));
         }
       });
+    return () => {
+      current = false;
+    };
   }, [
     inspectRecordID,
     inspectDatasetId,
@@ -775,6 +793,7 @@ export default function SelectionProvider({ children }) {
     // dataset never resolves.
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
     previewError,
+    previewQuery,
     recordLoading,
     setRecordLoading,
     datasetPreview,

@@ -97,12 +97,61 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Without a floor the container is at its minimum when Plotly measures it.
-   Reserves the panes' box so the modal does not jump when the chunk lands. */
-.datasetPreviewPlotLoading {
-  display: grid;
+/* Loading and failure share the splash's shape: one mark, words beneath.
+   The floor matters while loading: without it the container is at its minimum
+   when Plotly measures it, and the modal jumps when the chunk lands. */
+.previewStatus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cioos-space-md, 12px);
   height: 100%;
   min-height: 320px;
+  padding: var(--cioos-space-lg, 16px);
+  text-align: center;
+  color: var(--cioos-primary);
+}
+
+.previewStatusSteps,
+.previewStatusDetail,
+.previewStatusQuery {
+  max-width: 60ch;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.previewStatus-error {
+  color: var(--cioos-ink-80);
+}
+
+.previewStatus-error > svg {
+  color: var(--cioos-error-700);
+}
+
+.previewStatusMessage {
+  max-width: 60ch;
+  margin: 0;
+}
+
+.previewStatusDetail {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A URL runs to hundreds of characters; it wraps anywhere and stays a small
+   footnote under the steps rather than the headline. */
+.previewStatusQuery {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.previewStatusQuery a {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+  color: var(--cioos-primary-800);
 }
 
 /* Why a record refused to plot, in the plot's place. The columns it did find are
@@ -117,17 +166,6 @@
   color: var(--cioos-text-muted, #666);
   font-size: 0.9em;
   overflow-wrap: anywhere;
-}
-
-.datasetPreviewPlotLoading .cioosSkeleton {
-  height: auto;
-}
-
-.datasetPreviewTableSkeleton {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px 16px;
-  padding: 12px;
 }
 
 .dataPreviewModal .datasetPreviewPeriod,
