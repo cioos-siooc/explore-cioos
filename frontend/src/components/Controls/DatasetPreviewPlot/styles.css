@@ -756,6 +756,11 @@
   padding: 0 0 6px;
 }
 
+/* Nothing to drop under the title: the gear stays beside it. */
+.previewProfileHeader.isSingleRow {
+  flex-wrap: nowrap;
+}
+
 .previewProfileTitle {
   flex: 1 1 auto;
   min-width: 0;
@@ -866,12 +871,7 @@
 
   .previewProfileHeader .paneSettingsButton {
     align-self: center;
-  }
-
-  /* The preview behind already sits on the backdrop; a second one would dim
-     the plot the settings are being changed for. */
-  .modal.previewSettingsModal {
-    background-color: transparent;
+    margin-left: auto; /* right-aligned even with no title beside it */
   }
 
   /* Centred with a gutter, rather than edge to edge on a phone. */

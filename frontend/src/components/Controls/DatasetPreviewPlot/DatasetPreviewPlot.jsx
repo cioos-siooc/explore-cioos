@@ -19,6 +19,7 @@ import useElementSize from "../../ui/useElementSize.js";
 import useMediaQuery, {
   PREVIEW_COMPACT_QUERY,
   REDUCED_MOTION_QUERY,
+  TOUCH_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import ControlRow from "./ControlRow.jsx";
 import VariablePicker from "./VariablePicker.jsx";
@@ -47,6 +48,7 @@ import {
   buildOverlayFigure,
   gridBoxFor,
   plotBoxFor,
+  recordTitleFor,
 } from "../DatasetPreview/previewFacetFigure.js";
 import {
   pinnedAxisSizeFor,
@@ -88,6 +90,13 @@ const PROFILE_RECORD_TYPES = ["TimeSeriesProfile", "TrajectoryProfile"];
 const Plot = createPlotlyComponent(Plotly);
 
 const PINNED_AXIS_CONFIG = { staticPlot: true, displayModeBar: false };
+
+// Only on the plot itself: the modebar's buttons still need their click.
+const suppressEmulatedMouse = (event) => {
+  if (event.cancelable && event.target.closest(".nsewdrag")) {
+    event.preventDefault();
+  }
+};
 
 // Controls only; layout, box and figure are pure in previewFacetPlan.js /
 // previewFacetSizing.js / previewFacetFigure.js. All plot state comes from
@@ -157,6 +166,8 @@ export default function DatasetPreviewPlot() {
   const [resizing, setResizing] = useState(false);
   // Too narrow for two panes side by side: the settings fold above the plot.
   const settingsInDialog = useMediaQuery(PREVIEW_COMPACT_QUERY);
+  // A finger's drag has to scroll the panels, not zoom them.
+  const touch = useMediaQuery(TOUCH_QUERY);
 
   // The plot pane's own box. Its width is what the figure is drawn to; its
   // height enters only through plotBoxFor, which can lower the ceiling that
@@ -188,7 +199,12 @@ export default function DatasetPreviewPlot() {
   const hasProfileHeader = PROFILE_RECORD_TYPES.includes(
     inspectDataset?.cdm_data_type,
   );
+  // Compact, the figure is often wider than its scroller, and a title centred
+  // over it would be cut off; the header row the settings gear needs holds it.
+  const titleInHeader = hasProfileHeader || settingsInDialog;
   const isColorLayout = plotLayout === "color";
+  // The colour plot draws every profile at once.
+  const showSlice = hasProfileHeader && !isColorLayout;
   const axisCaptionFor = (direction) =>
     direction === "horizontal"
       ? t("datasetPreviewPlotXAxis")
@@ -218,7 +234,7 @@ export default function DatasetPreviewPlot() {
       data: plotData,
       availableHeight,
       measured: plotAreaSize,
-      withTitle: !hasProfileHeader,
+      withTitle: !titleInHeader,
     };
     if (isGrid) {
       return gridBoxFor({
@@ -241,7 +257,7 @@ export default function DatasetPreviewPlot() {
     panels.length,
     availableHeight,
     plotAreaSize,
-    hasProfileHeader,
+    titleInHeader,
     isColorLayout,
     isGrid,
     gridColumns,
@@ -390,6 +406,20 @@ export default function DatasetPreviewPlot() {
         : splitPinnedAxis(figure, pinnedOrientation)),
     [figure, pinnedOrientation],
   );
+  // Toolbar zoom stays available, and picking the zoom tool brings drag back.
+  const mainLayout = useMemo(
+    () =>
+      split && touch
+        ? { ...split.figure.layout, dragmode: false }
+        : split?.figure.layout,
+    [split, touch],
+  );
+  let headerTitle = "";
+  if (hasProfileHeader) {
+    headerTitle = t("previewProfileTitle", { record: inspectRecordID });
+  } else if (titleInHeader) {
+    headerTitle = recordTitleFor({ plan, variablesByName, data: plotData });
+  }
   const [pinnedView, setPinnedView] = useState(null);
   const [showInteractionHelp, setShowInteractionHelp] = useState(false);
   // Fired after every draw and every zoom; the main Plot redraws on each render
@@ -814,7 +844,6 @@ export default function DatasetPreviewPlot() {
     >
       {settingsInDialog ? (
         <>
-          {!hasProfileHeader && settingsButton}
           {/* Over the plot rather than beside or above it: there is not the
               width to share, nor the height to fold into. */}
           <Modal
@@ -891,12 +920,20 @@ export default function DatasetPreviewPlot() {
         {/* Above the figure rather than in the parameters pane: this says WHICH
             rows are drawn where every control in the pane says how, and the
             pane is too narrow to read a cast's date in. */}
-        {hasProfileHeader && (
-          <div className="previewProfileHeader">
-            <h5 className="previewProfileTitle" title={inspectRecordID}>
-              {t("previewProfileTitle", { record: inspectRecordID })}
-            </h5>
-            {!isColorLayout && ( // the colour plot draws every profile at once
+        {titleInHeader && (
+          <div
+            className={
+              showSlice
+                ? "previewProfileHeader"
+                : "previewProfileHeader isSingleRow"
+            }
+          >
+            {headerTitle && (
+              <h5 className="previewProfileTitle" title={headerTitle}>
+                {headerTitle}
+              </h5>
+            )}
+            {showSlice && (
               <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
             )}
             {settingsButton}
@@ -906,11 +943,18 @@ export default function DatasetPreviewPlot() {
         <div
           className={`datasetPreviewPlotBody ${pinnedLeft ? "isPinnedLeft" : "isPinnedBelow"}`}
         >
-          <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
+          <div
+            className="datasetPreviewPlotArea"
+            ref={plotAreaRef}
+            // Plotly already answers the tap itself; the browser's emulated
+            // mouse events after it would count as a second tap (a double tap
+            // resets the zoom) and their mouseout would unhover the values.
+            onTouchEndCapture={touch ? suppressEmulatedMouse : undefined}
+          >
             {split ? (
               <Plot
                 data={split.figure.data}
-                layout={split.figure.layout}
+                layout={mainLayout}
                 onInitialized={readPinnedView}
                 onUpdate={readPinnedView}
                 // Explicit width/height so Plotly never runs plotAutoSize, which
@@ -919,6 +963,8 @@ export default function DatasetPreviewPlot() {
                 useResizeHandler={false}
                 config={{
                   displaylogo: false,
+                  // No hover to reveal it on a touch screen.
+                  displayModeBar: touch || "hover",
                   // Plotly 4 defaults this on; it posts the chart to cloud.plotly.com.
                   showSendToCloud: false,
                   modeBarButtonsToRemove: [
@@ -995,7 +1041,11 @@ export default function DatasetPreviewPlot() {
         title={t("datasetPreviewPlotInteractionHelpTitle")}
       >
         <ul className="helpModalText plotInteractionHelpList">
-          {t("datasetPreviewPlotInteractionHelp")
+          {t(
+            touch
+              ? "datasetPreviewPlotInteractionHelpTouch"
+              : "datasetPreviewPlotInteractionHelp",
+          )
             .split("\n")
             .map((line) => (
               <li key={line}>{line}</li>

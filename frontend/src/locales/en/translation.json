@@ -550,6 +550,7 @@
   "datasetPreviewPlotDownloadPng": "Download plot as a PNG",
   "datasetPreviewPlotInteractionHelpTitle": "How to use the plot",
   "datasetPreviewPlotInteractionHelp": "Hover over the plot to read values.\nDrag across the plot to zoom into an area.\nDrag straight across or straight down to zoom on one axis only.\nScroll to zoom in or out.\nDouble-click to reset the view.\nCamera icon: download as a PNG.",
+  "datasetPreviewPlotInteractionHelpTouch": "Tap the plot to read values.\nSwipe to scroll through the panels.\nUse + and − in the toolbar to zoom, and Autoscale to reset the view.\nThe magnifier turns on drag-to-zoom.\nDouble-tap to reset the view.\nCamera icon: download as a PNG.",
   "datasetPreviewPlotColor": "Color",
   "datasetPreviewPlotColorBy": "Color by",
   "datasetPreviewPlotLayout": "Layout",

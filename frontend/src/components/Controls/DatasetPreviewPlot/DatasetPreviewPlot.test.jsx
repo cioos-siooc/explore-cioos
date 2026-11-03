@@ -4,7 +4,11 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
-import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
+import {
+  MOBILE_WIDTH,
+  setTouchScreen,
+  setViewportWidth,
+} from "../../../test/viewport.js";
 import DatasetPreview from "../DatasetPreview/DatasetPreview.jsx";
 
 // Plotly itself is stubbed at the factory, so the real tree — DatasetPreview ->
@@ -23,6 +27,8 @@ vi.mock("react-plotly.js/factory", () => ({
           data-traces={data.length}
           data-hovermode={layout.hovermode}
           data-y-autorange={layout.yaxis.autorange}
+          data-dragmode={String(layout.dragmode)}
+          data-modebar={String(config.displayModeBar)}
           data-removed-buttons={config.modeBarButtonsToRemove?.join(" ")}
           data-added-buttons={config.modeBarButtonsToAdd
             ?.map((button) => button.name)
@@ -382,6 +388,45 @@ describe("DatasetPreviewPlot", () => {
       ).toBeNull(),
     );
     expect(gear).toHaveFocus();
+  });
+
+  it("lets a finger scroll the plot rather than zoom it", async () => {
+    setTouchScreen(true);
+    open();
+    const plot = await plotted();
+    expect(plot).toHaveAttribute("data-dragmode", "false");
+    // No hover to reveal the toolbar, which is where zooming went.
+    expect(plot).toHaveAttribute("data-modebar", "true");
+  });
+
+  it("keeps drag-to-zoom and a hover toolbar for a mouse", async () => {
+    open();
+    const plot = await plotted();
+    expect(plot).toHaveAttribute("data-dragmode", "zoom");
+    expect(plot).toHaveAttribute("data-modebar", "hover");
+  });
+
+  it("names the record above the plot on a phone, not inside the figure", async () => {
+    const table = {
+      ...TABLE,
+      columnNames: [...TABLE.columnNames, "cast"],
+      columnTypes: [...TABLE.columnTypes, "String"],
+      columnUnits: [...TABLE.columnUnits, null],
+      columnMeta: [
+        {},
+        {},
+        {},
+        {},
+        { long_name: "Cast", cf_role: "profile_id" },
+      ],
+      rows: TABLE.rows.map((row) => [...row, "cast-7"]),
+    };
+    setViewportWidth(MOBILE_WIDTH);
+    open("/", DATASET, table);
+    await plotted();
+    expect(
+      screen.getByRole("heading", { name: "Cast: cast-7" }),
+    ).toBeInTheDocument();
   });
 
   it("lets only one axis hold several variables", async () => {

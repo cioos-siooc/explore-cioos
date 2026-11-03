@@ -16,6 +16,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: var(--cioos-space-sm); /* the figure's own margins are its inset */
 }
 
 .tableAndPlotGridItem.tableAndPlot {
@@ -168,54 +169,51 @@
     flex: 1 1 auto;
     min-width: 0;
     margin: 0;
-    font-size: var(--cioos-font-size-md);
+    font-size: var(--cioos-font-size-sm);
     line-height: 1.3;
   }
 
-  .dataPreviewModal .datasetPreviewDatasetTitle {
-    display: -webkit-box;
+  /* One line each, cut short: the plot needs the height more than the full
+     name, which the title attribute and the dataset page still carry. */
+  .dataPreviewModal .datasetTitle > * {
+    display: block;
     overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .dataPreviewModal .datasetPreviewRecord {
-    display: block;
-    overflow-wrap: anywhere;
+  .dataPreviewModal .datasetPreviewPeriod,
+  .dataPreviewModal .datasetPreviewSample {
+    margin-top: 0;
+  }
+
+  /* Icon-only: the words stay for screen readers. */
+  .previewViewToggle .toggleButton {
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .previewViewToggle .toggleLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
-/* Portrait: who and what on the first row beside the actions, then the
-   Plot/Table switch as one full-width segmented control under it. */
+/* Portrait: the view switch, who and what, then the actions, on one row. */
 @media (max-width: 700px) {
   .tableAndPlotGridContainer {
     display: grid;
-    grid-template:
-      "title link close" auto
-      "view view view" auto / minmax(0, 1fr) auto auto;
-    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
     gap: var(--cioos-space-sm);
   }
 
-  .tableAndPlotGridContainer .datasetTitle {
-    grid-area: title;
-  }
-
   .tableAndPlotGridContainer .copyLinkButton {
-    grid-area: link;
-  }
-
-  .tableAndPlotGridContainer > :last-child {
-    grid-area: close;
-  }
-
-  .previewViewToggle {
-    grid-area: view;
-    display: grid;
-  }
-
-  .previewViewToggle .toggleButton {
-    height: 34px;
+    width: 32px;
+    height: 32px;
   }
 }

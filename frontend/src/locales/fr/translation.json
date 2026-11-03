@@ -551,6 +551,7 @@
   "datasetPreviewPlotDownloadPng": "Télécharger le graphique en PNG",
   "datasetPreviewPlotInteractionHelpTitle": "Comment utiliser le graphique",
   "datasetPreviewPlotInteractionHelp": "Survolez le graphique pour lire les valeurs.\nGlissez sur le graphique pour zoomer sur une zone.\nGlissez à l'horizontale ou à la verticale pour zoomer sur un seul axe.\nDéfilez pour zoomer ou dézoomer.\nDouble-cliquez pour réinitialiser la vue.\nIcône d'appareil photo : télécharger en PNG.",
+  "datasetPreviewPlotInteractionHelpTouch": "Touchez le graphique pour lire les valeurs.\nBalayez pour faire défiler les panneaux.\nUtilisez + et − dans la barre d'outils pour zoomer, et Échelle automatique pour réinitialiser la vue.\nLa loupe active le zoom par glissement.\nTouchez deux fois pour réinitialiser la vue.\nIcône d'appareil photo : télécharger en PNG.",
   "datasetPreviewPlotColor": "Couleur",
   "datasetPreviewPlotColorBy": "Colorer selon",
   "datasetPreviewPlotLayout": "Disposition",

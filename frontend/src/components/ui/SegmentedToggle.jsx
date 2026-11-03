@@ -29,7 +29,7 @@ export default function SegmentedToggle({
           onClick={() => onChange(optionValue)}
         >
           {Icon && <Icon size={15} aria-hidden="true" />}
-          {optionLabel}
+          <span className="toggleLabel">{optionLabel}</span>
         </button>
       ))}
     </div>
