@@ -37,25 +37,26 @@ export const defaultQuery = {
 // The one hex ramp for every hexagon at every zoom, so darkness means the
 // same thing everywhere; colour is reserved for "how much". Fifteen stops so
 // interpolation reads as one wash, fully opaque because the layer opacity is
-// applied once (hexOpacity in Map.jsx). White, then CIOOS tokens teal-light ->
-// primary -> navy at even L* steps (~6.4), then two steps past navy so the
-// busiest cells stand off deep water.
+// applied once (hexOpacity in Map.jsx). Built the cmocean way (tempo-like):
+// stops at equal CAM02-UCS distance (~6), lightness falling evenly, chroma
+// arching through CIOOS primary and staying up in the darks, hue turning teal
+// -> navy-blue. Ends at navy's lightness; a near-black tail read too dark.
 export const colorScale = [
   "#FFFFFF",
-  "#C6E3DF", // teal-light
-  "#AAD3CD",
-  "#8DC4BC",
-  "#6EB5AA",
-  "#55A598",
-  "#469387",
-  "#3C8277",
-  "#347069",
-  "#2B5F5C",
-  "#244F4F",
-  "#1D3E43",
-  "#152F37", // navy
-  "#0B2128",
-  "#001419",
+  "#ECF1F0",
+  "#D3E4E2",
+  "#B9D7D4",
+  "#9FCAC5",
+  "#85BDB6",
+  "#69B1A7",
+  "#4FA399", // ~primary
+  "#429390",
+  "#358486",
+  "#2D757B",
+  "#28656F",
+  "#225662",
+  "#1B4754",
+  "#133846",
 ];
 
 // White separates cells against every part of the ramp; a mid-ramp teal vanished.
