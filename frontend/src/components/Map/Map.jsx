@@ -493,7 +493,7 @@ export default function CreateMap({
 
   const circleOpacity = 0.7;
   // Count is carried by colour alone; opacity varies with zoom alone.
-  const hexOpacity = 0.8;
+  const hexOpacity = 0.65;
   const hexMinZoom = 0;
   // Shared with the Legend: the hex band and the marker tier must not drift.
   const hexMaxZoom = MARKER_MIN_ZOOM;
