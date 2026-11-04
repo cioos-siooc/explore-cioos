@@ -35,11 +35,13 @@ export const defaultQuery = {
 };
 
 // The one hex ramp for every hexagon at every zoom, so darkness means the
-// same thing everywhere; colour is reserved for "how much". Twelve stops so
+// same thing everywhere; colour is reserved for "how much". Fifteen stops so
 // interpolation reads as one wash, fully opaque because the layer opacity is
-// applied once (hexOpacity in Map.jsx). CIOOS tokens teal-light -> primary ->
-// navy at even L* steps (~6.4); a paler head washed out over the basemap.
+// applied once (hexOpacity in Map.jsx). White, then CIOOS tokens teal-light ->
+// primary -> navy at even L* steps (~6.4), then two steps past navy so the
+// busiest cells stand off deep water.
 export const colorScale = [
+  "#FFFFFF",
   "#C6E3DF", // teal-light
   "#AAD3CD",
   "#8DC4BC",
@@ -52,6 +54,8 @@ export const colorScale = [
   "#244F4F",
   "#1D3E43",
   "#152F37", // navy
+  "#0B2128",
+  "#001419",
 ];
 
 // White separates cells against every part of the ramp; a mid-ramp teal vanished.
