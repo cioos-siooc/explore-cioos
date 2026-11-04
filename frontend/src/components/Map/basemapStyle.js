@@ -171,6 +171,8 @@ export function buildBasemapStyle(
           0,
         ],
         "raster-saturation": -0.15,
+        // EMODnet's deep blue swallowed the darker end of the hex ramp.
+        "raster-brightness-min": 0.25,
       },
     },
     // Esri tiles arrive far slower than this vector line, so on a pan to a
