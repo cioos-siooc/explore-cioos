@@ -28,6 +28,7 @@ import {
   splitAtAntimeridian,
   splitTrackRuns,
   validateEmail,
+  viewportCountRange,
 } from "./utilities.jsx";
 import { defaultQuery } from "./components/config.js";
 import erddapServers from "./erddapServers.json";
@@ -596,6 +597,25 @@ describe("legend range helpers", () => {
   it("rejects a range that describes no data", () => {
     expect(quantizeCountRange([null, null])).toBeUndefined();
     expect(quantizeCountRange(undefined)).toBeUndefined();
+  });
+
+  it("caps the viewport ramp at the 99th percentile, not one outlier hex", () => {
+    const counts = [...Array.from({ length: 199 }, (_, i) => i + 1), 1e6];
+    // Unclipped, the ramp would run to 1e6 and paint every other hex pale.
+    expect(viewportCountRange(counts)).toEqual([1, 200, 1e6]);
+  });
+
+  it("keeps a two-element range when the percentile clips nothing", () => {
+    expect(viewportCountRange([1, 5, 10])).toEqual([1, 10]);
+  });
+
+  it("answers no counts with the global domain", () => {
+    expect(viewportCountRange([])).toBeUndefined();
+  });
+
+  it("tells ranges apart by their clipped maximum", () => {
+    expect(rangesEqual([1, 200, 1e6], [1, 200, 2e6])).toBe(false);
+    expect(rangesEqual([1, 200], [1, 200, 1e6])).toBe(false);
   });
 });
 

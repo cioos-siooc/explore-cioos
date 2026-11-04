@@ -31,7 +31,7 @@ import {
   getCurrentRangeLevel,
   mapCoverPadding,
   polygonIsRectangle,
-  quantizeCountRange,
+  viewportCountRange,
   rangesEqual,
   revealOffset,
   zoomToDatasetCamera,
@@ -1136,23 +1136,17 @@ export default function CreateMap({
     // Hidden layers and layers outside their zoom range return nothing.
     const features = map.current.queryRenderedFeatures({ layers });
     if (features.length < MIN_VIEWPORT_HEXES) return undefined;
-    let lo = Infinity;
-    let hi = -Infinity;
-    // A plain loop: intermediate arrays would be the expensive part over every
-    // rendered hex. Duplicates across tile boundaries are harmless for a
-    // min/max.
+    const counts = [];
+    // Duplicates across tile boundaries nudge the percentile negligibly.
     for (const feature of features) {
       // Greyed cells carry none of the ramp's colours, so they don't set its
       // domain.
       if (focusPk !== undefined && !featureHasDataset(feature, focusPk))
         continue;
       const count = Number(feature.properties?.count);
-      if (!Number.isFinite(count) || count <= 0) continue;
-      if (count < lo) lo = count;
-      if (count > hi) hi = count;
+      if (Number.isFinite(count) && count > 0) counts.push(count);
     }
-    if (!Number.isFinite(hi)) return undefined;
-    return quantizeCountRange([lo, hi]);
+    return viewportCountRange(counts);
   }
 
   // Re-measure only when the counts change meaning (rampQueryEpoch), the ramp
