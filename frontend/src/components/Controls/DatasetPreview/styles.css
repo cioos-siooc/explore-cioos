@@ -147,3 +147,46 @@
   font-weight: normal;
   color: var(--cioos-ink-80);
 }
+
+/* Phones: full-screen like the other dialogs, with the title, link and close on
+   the first row and the view toggles wrapping under them. */
+@media (max-width: 700px), (max-height: 500px) {
+  .dataPreviewModal .modal-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100dvh;
+    margin: 0;
+  }
+
+  .dataPreviewModal .modal-content {
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .tableAndPlotGridContainer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .dataPreviewModal .datasetTitle,
+  .tableAndPlotGridContainer .copyLinkButton,
+  .tableAndPlotGridContainer > .closeButton {
+    order: -1;
+  }
+
+  .dataPreviewModal .datasetTitle {
+    flex: 1 1 calc(100% - 100px);
+    min-width: 0;
+    margin: 0;
+    font-size: var(--cioos-font-size-md);
+    overflow-wrap: anywhere;
+  }
+
+  .tableAndPlotGridContainer .toggleButton {
+    flex: 1 1 0;
+    height: 36px;
+    margin: 0;
+    max-width: none;
+  }
+}
