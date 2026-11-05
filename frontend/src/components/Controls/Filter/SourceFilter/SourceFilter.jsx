@@ -98,7 +98,7 @@ export default function SourceFilter({ searchTerms, ...lists }) {
 
 function SourceGroup({ portal, shown, forceExpanded, children }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(portal.someSet);
   const { label, state } = portal;
 
   const childrenVisible = expanded || forceExpanded;

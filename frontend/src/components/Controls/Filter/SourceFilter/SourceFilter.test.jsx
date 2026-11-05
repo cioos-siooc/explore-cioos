@@ -69,18 +69,47 @@ describe("SourceFilter", () => {
     expect(screen.getByText("No filter options")).toBeInTheDocument();
   });
 
-  it("lists the portals alphabetically, each over the ERDDAP and OBIS it has, an unclaimed server as its own portal", () => {
+  it("lists the portals alphabetically and collapsed, an unclaimed server as its own portal", () => {
     renderWithProviders(<Harness />);
+    expect(names()).toEqual(["CIOOS Pacific", "OBIS", "SLGO", "Zeta ERDDAP"]);
+  });
+
+  it("a portal's chevron shows the ERDDAP and OBIS it has, without toggling it", async () => {
+    let state;
+    const { user } = renderWithProviders(
+      <Harness onState={(s) => (state = s)} />,
+    );
+    await user.click(
+      within(portalRow("SLGO")).getByRole("button", { expanded: false }),
+    );
     expect(names()).toEqual([
       "CIOOS Pacific",
       "OBIS",
-      "OBIS",
-      "OBIS Canada",
       "SLGO",
       "ERDDAP",
       "OBIS",
       "Zeta ERDDAP",
+    ]);
+    expect(ticked(state.servers)).toEqual([]);
+    await user.click(
+      within(portalRow("SLGO")).getByRole("button", { expanded: true }),
+    );
+    expect(names()).toEqual(["CIOOS Pacific", "OBIS", "SLGO", "Zeta ERDDAP"]);
+  });
+
+  it("a portal with a set leaf starts expanded", () => {
+    renderWithProviders(
+      <Harness
+        initial={{ servers: [{ ...SERVERS[0], isExcluded: true }, SERVERS[1]] }}
+      />,
+    );
+    expect(names()).toEqual([
+      "CIOOS Pacific",
+      "OBIS",
+      "SLGO",
       "ERDDAP",
+      "OBIS",
+      "Zeta ERDDAP",
     ]);
   });
 
@@ -103,6 +132,9 @@ describe("SourceFilter", () => {
     const { user } = renderWithProviders(
       <Harness onState={(s) => (state = s)} />,
     );
+    await user.click(
+      within(portalRow("SLGO")).getByRole("button", { expanded: false }),
+    );
     const leaves = portalRow("SLGO").nextElementSibling;
     await user.click(within(leaves).getByText("OBIS"));
     expect(ticked(state.obisCatalogues)).toEqual(["SLGO"]);
@@ -112,19 +144,6 @@ describe("SourceFilter", () => {
       within(leaves).getByRole("button", { name: "Exclude: ERDDAP" }),
     );
     expect(state.servers.find((s) => s.pk === 0).isExcluded).toBe(true);
-  });
-
-  it("a portal's chevron collapses its leaves without toggling it", async () => {
-    let state;
-    const { user } = renderWithProviders(
-      <Harness onState={(s) => (state = s)} />,
-    );
-    await user.click(
-      within(portalRow("SLGO")).getByRole("button", { expanded: true }),
-    );
-    expect(names()).not.toContain("ERDDAP: OGSL ERDDAP");
-    expect(names().filter((n) => n === "ERDDAP")).toEqual(["ERDDAP"]);
-    expect(ticked(state.servers)).toEqual([]);
   });
 
   it("the OBIS portal includes or excludes every node at once", async () => {
