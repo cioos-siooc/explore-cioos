@@ -76,7 +76,7 @@ def _stored_ckan_rows(dataset_ids, erddap_url):
             "ckan_id": row.ckan_id,
             "ckan_eovs": list(row.eovs or []),
             "ckan_organizations": list(row.organizations or []),
-            "ckan_owner": None,
+            "ckan_owner": row.ckan_owner,
             "ckan_title": row.title,
             "title_fr": row.title_fr,
             "ckan_metadata": row.metadata,

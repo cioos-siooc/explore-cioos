@@ -102,15 +102,16 @@ def test_ckan_record_without_organizations_keeps_obis_institutes(harvester, mock
     assert _enrich(harvester).loc[MATCHED, "organizations"] == ["OBIS institute"]
 
 
-def test_ckan_owner_added_after_the_institutes_fallback(harvester, mocker):
+def test_ckan_owner_kept_apart_from_organizations(harvester, mocker):
     mocker.patch.object(
         obis_harvester, "get_ckan_obis_records",
         return_value=_ckan(MATCHED, organizations=(), owner="St. Lawrence Global Observatory (SLGO)"),
     )
     mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
     df = _enrich(harvester)
-    assert df.loc[MATCHED, "organizations"] == ["OBIS institute", "St. Lawrence Global Observatory (SLGO)"]
-    assert df.loc[UNMATCHED, "organizations"] == ["OBIS institute"]
+    assert df.loc[MATCHED, "organizations"] == ["OBIS institute"]
+    assert df.loc[MATCHED, "ckan_owner"] == "St. Lawrence Global Observatory (SLGO)"
+    assert pd.isna(df.loc[UNMATCHED, "ckan_owner"])
 
 
 def test_unmatched_dataset_takes_converted_eovs_and_abstract(harvester, mocker):

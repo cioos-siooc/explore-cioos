@@ -26,6 +26,7 @@ DEFAULT_VIEW_ROUTES = [
     "/api/oceanVariables",
     "/api/organizations",
     "/api/obisNodes",
+    "/api/catalogues",
     "/api/datasets",
     "/api/erddapServers",
     "/api/timeExtent",

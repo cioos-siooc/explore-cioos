@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import requests
 from cde_harvester.core.errors import HASH_CKAN_UNAVAILABLE
+from cde_harvester.core.schemas import DatasetSchema
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     erddap_join_key,
     get_ckan_records,
@@ -255,7 +256,7 @@ class TestCkanUnavailable:
             return_value=pd.DataFrame([
                 {"erddap_url": "https://obis.org", "dataset_id": d, "ckan_id": f"ckan-{d}",
                  "title": "Stored", "title_fr": "Stocké", "organizations": [], "eovs": ["fish"],
-                 "metadata": {"abstract": {"en": "Stored abstract"}}}
+                 "metadata": {"abstract": {"en": "Stored abstract"}}, "ckan_owner": "SLGO"}
                 for d in ("uuid-1", "uuid-other")
             ]),
         )
@@ -263,7 +264,7 @@ class TestCkanUnavailable:
         load.assert_called_once_with(["https://obis.org"])
         assert df.to_dict("records") == [{
             "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
-            "ckan_organizations": [], "ckan_owner": None, "ckan_title": "Stored", "title_fr": "Stocké",
+            "ckan_organizations": [], "ckan_owner": "SLGO", "ckan_title": "Stored", "title_fr": "Stocké",
             "ckan_metadata": {"abstract": {"en": "Stored abstract"}},
         }]
 
@@ -344,9 +345,9 @@ class TestGetCkanObisRecords:
     @pytest.mark.parametrize(("owner", "expected"), [
         ("slgo", "St. Lawrence Global Observatory (SLGO)"),
         ("cioos-pacific", "CIOOS Pacific"),
-        ("unknown-owner", None),
+        ("unknown-owner", "Titre en français"),
     ])
-    def test_owner_named_from_the_owner_map(self, mocker, owner, expected):
+    def test_owner_named_from_the_owner_map_or_its_title(self, mocker, owner, expected):
         record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
         record["organization"] = {"name": owner, "title": "Titre en français"}
         _make_ckan_get(mocker, _search_pages(record))
@@ -368,7 +369,7 @@ class TestGetCkanObisRecords:
 
 
 class TestMergeCkanJoin:
-    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True, **ckan_columns):
+    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True, erddap_columns=(), **ckan_columns):
         from cde_harvester.__main__ import merge_and_write_csvs
 
         logger = mocker.MagicMock()
@@ -382,6 +383,9 @@ class TestMergeCkanJoin:
             "content_hash_reason": [None, None],
             "metadata": [{"abstract": {"en": "ERDDAP"}, "lineage": "history"}, {}],
         })
+        for column in erddap_columns:
+            if column not in erddap_datasets:
+                erddap_datasets[column] = None
         df_ckan = pd.DataFrame({
             "erddap_url": [ckan_erddap_url],
             "dataset_id": ["matched"],
@@ -460,16 +464,17 @@ class TestMergeCkanJoin:
         datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")
         assert datasets.loc["matched", "content_hash"] == "h1"
 
-    def test_owner_added_to_ckan_organizations(self, mocker, tmp_path):
+    def test_owner_kept_apart_from_organizations(self, mocker, tmp_path):
         datasets, _ = self._merge(
             mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_owner=["Amundsen Science"],
         )
-        assert ast.literal_eval(datasets.loc["matched", "organizations"]) == ["CKAN org", "Amundsen Science"]
-        assert ast.literal_eval(datasets.loc["orphan", "organizations"]) == ["org"]
+        assert ast.literal_eval(datasets.loc["matched", "organizations"]) == ["CKAN org"]
+        assert datasets.loc["matched", "ckan_owner"] == "Amundsen Science"
+        assert pd.isna(datasets.loc["orphan", "ckan_owner"])
 
-    def test_owner_does_not_suppress_the_erddap_fallback(self, mocker, tmp_path):
+    def test_joins_onto_every_column_the_erddap_harvester_emits(self, mocker, tmp_path):
         datasets, _ = self._merge(
-            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap",
-            ckan_organizations=[[]], ckan_owner=["Amundsen Science"],
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_owner=["SLGO"],
+            erddap_columns=DatasetSchema.to_schema().columns.keys(),
         )
-        assert ast.literal_eval(datasets.loc["matched", "organizations"]) == ["org", "Amundsen Science"]
+        assert datasets.loc["matched", "ckan_owner"] == "SLGO"

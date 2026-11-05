@@ -95,7 +95,7 @@ def remove_newlines(s):
 
 
 # Owners' CKAN titles are French; these names match the cited organizations.
-CKAN_OWNER_ORGANIZATIONS = {
+CKAN_OWNER_NAMES = {
     "slgo": "St. Lawrence Global Observatory (SLGO)",
     "cioos-pacific": "CIOOS Pacific",
     "cioos-atlantic": "CIOOS Atlantic",
@@ -114,14 +114,8 @@ def ckan_organizations(record):
 
 
 def ckan_owner(record):
-    return CKAN_OWNER_ORGANIZATIONS.get((record.get("organization") or {}).get("name"))
-
-
-def with_owner(organizations, owner):
-    """Owner added after the source fallback: it alone must not suppress it."""
-    if isinstance(owner, str) and owner not in organizations:
-        return [*organizations, owner]
-    return organizations
+    owner = record.get("organization") or {}
+    return CKAN_OWNER_NAMES.get(owner.get("name")) or owner.get("title") or None
 
 
 @task(task_run_name="fetch-ckan-metadata")

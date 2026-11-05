@@ -55,6 +55,8 @@ CREATE TABLE datasets (
     organizations text[],
     eovs text[],
     ckan_id text,
+    -- The CKAN organization that owns the record (SLGO, CIOOS Pacific, …).
+    ckan_owner text,
     timeseries_id_variable text,
     profile_id_variable text,
     trajectory_id_variable text,

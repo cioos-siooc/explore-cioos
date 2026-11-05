@@ -28,7 +28,6 @@ from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
     unescape_ascii_list,
-    with_owner,
 )
 from cde_harvester.sources.ckan.state import load_previous_ckan
 from cde_harvester.sources.erddap.harvester import harvest_erddap
@@ -197,8 +196,8 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
             )
         if ckan_links.empty:
             ckan_links = pd.DataFrame(columns=["erddap_url", "dataset_id", "ckan_id",
-                                               "ckan_organizations", "ckan_title", "title_fr",
-                                               "ckan_metadata"])
+                                               "ckan_organizations", "ckan_owner", "ckan_title",
+                                               "title_fr", "ckan_metadata"])
         ckan_by_key = ckan_links.assign(
             _erddap_key=ckan_links["erddap_url"].map(erddap_join_key)
         ).drop(columns="erddap_url")
@@ -236,9 +235,7 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         erddap_datasets["ckan_title"] = erddap_datasets["ckan_title"].fillna(erddap_datasets["title"])
 
         erddap_datasets["organizations"] = erddap_datasets.apply(
-            lambda x: with_owner(
-                x["ckan_organizations"] or unescape_ascii_list(x["organizations"]), x.get("ckan_owner"),
-            ),
+            lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
             axis=1,
         )
         erddap_datasets["metadata"] = [
@@ -247,7 +244,6 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         ]
         del erddap_datasets["title"]
         del erddap_datasets["ckan_organizations"]
-        erddap_datasets = erddap_datasets.drop(columns="ckan_owner", errors="ignore")
         del erddap_datasets["ckan_metadata"]
 
         erddap_datasets.rename(
