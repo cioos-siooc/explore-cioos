@@ -14,47 +14,31 @@ import {
   toggleOptionExcluded,
   toggleOptionIncluded,
 } from "../../../../utilities";
+import { buildPortals } from "../../../../state/portals.js";
 import { featuredObisNodes } from "../../../config.js";
 import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
-export default function SourceFilter({
-  erddapServersSelected,
-  setErddapServersSelected,
-  obisNodesSelected,
-  setObisNodesSelected,
-  searchTerms,
-}) {
+export default function SourceFilter({ searchTerms, ...lists }) {
   const { t, i18n } = useTranslation();
   const [showAllNodes, setShowAllNodes] = useState(false);
 
   const search = (searchTerms || "").toString().toLowerCase();
-  const byTitle = (a, b) => a.title.localeCompare(b.title, i18n.language);
-  const matching = (options, groupLabel) =>
-    options
-      .filter(
-        (option) =>
-          !search ||
-          groupLabel.toLowerCase().includes(search) ||
-          option.title.toLowerCase().includes(search),
-      )
-      .sort(byTitle);
+  const matches = (text) => text.toLowerCase().includes(search);
+  const portals = buildPortals(lists, i18n.language)
+    .map((portal) => ({
+      ...portal,
+      shown: portal.leaves
+        .filter(
+          (leaf) => !search || matches(portal.label) || matches(leaf.label),
+        )
+        .sort((a, b) =>
+          portal.isObis ? a.label.localeCompare(b.label, i18n.language) : 0,
+        ),
+    }))
+    .filter((portal) => portal.shown.length > 0);
 
-  const serversShown = matching(erddapServersSelected, "ERDDAP");
-  const nodesMatching = matching(obisNodesSelected, "OBIS");
-  // A node the user has set stays listed, so its state is never out of sight.
-  const nodesShown =
-    search || showAllNodes
-      ? nodesMatching
-      : nodesMatching.filter(
-          (node) =>
-            featuredObisNodes.includes(node.title) ||
-            node.isSelected ||
-            node.isExcluded,
-        );
-  const moreNodesCount = nodesMatching.length - nodesShown.length;
-
-  if (serversShown.length === 0 && nodesMatching.length === 0) {
+  if (portals.length === 0) {
     return (
       <div className="multiCheckboxFilter sourceFilter">
         <div>{t("multiCheckboxFilterNoFilterWarning")}</div>
@@ -64,62 +48,58 @@ export default function SourceFilter({
 
   return (
     <div className="multiCheckboxFilter sourceFilter">
-      {serversShown.length > 0 && (
-        <SourceGroup
-          label="ERDDAP"
-          options={erddapServersSelected}
-          setOptions={setErddapServersSelected}
-          shown={serversShown}
-          forceExpanded={Boolean(search)}
-        />
-      )}
-      {nodesMatching.length > 0 && (
-        <SourceGroup
-          label="OBIS"
-          options={obisNodesSelected}
-          setOptions={setObisNodesSelected}
-          shown={nodesShown}
-          forceExpanded={Boolean(search)}
-        >
-          {(moreNodesCount > 0 || showAllNodes) && !search && (
-            <button
-              type="button"
-              className="sourceGroupMore"
-              onClick={() => setShowAllNodes(!showAllNodes)}
-            >
-              {showAllNodes
-                ? t("sourceFilterShowFewer")
-                : t("sourceFilterShowMore", { count: moreNodesCount })}
-            </button>
-          )}
-        </SourceGroup>
-      )}
+      {portals.map((portal) => {
+        if (!portal.isObis) {
+          return (
+            <SourceGroup
+              key={portal.key}
+              portal={portal}
+              shown={portal.shown}
+              forceExpanded={Boolean(search)}
+            />
+          );
+        }
+        // A node the user has set stays listed, so its state is never out of
+        // sight.
+        const nodesShown =
+          search || showAllNodes
+            ? portal.shown
+            : portal.shown.filter(
+                (leaf) =>
+                  featuredObisNodes.includes(leaf.label) ||
+                  leaf.option.isSelected ||
+                  leaf.option.isExcluded,
+              );
+        const moreNodesCount = portal.shown.length - nodesShown.length;
+        return (
+          <SourceGroup
+            key={portal.key}
+            portal={portal}
+            shown={nodesShown}
+            forceExpanded={Boolean(search)}
+          >
+            {(moreNodesCount > 0 || showAllNodes) && !search && (
+              <button
+                type="button"
+                className="sourceGroupMore"
+                onClick={() => setShowAllNodes(!showAllNodes)}
+              >
+                {showAllNodes
+                  ? t("sourceFilterShowFewer")
+                  : t("sourceFilterShowMore", { count: moreNodesCount })}
+              </button>
+            )}
+          </SourceGroup>
+        );
+      })}
     </div>
   );
 }
 
-function SourceGroup({
-  label,
-  options,
-  setOptions,
-  shown,
-  forceExpanded,
-  children,
-}) {
+function SourceGroup({ portal, shown, forceExpanded, children }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
-
-  const allSelected = options.length > 0 && options.every((o) => o.isSelected);
-  const allExcluded = options.length > 0 && options.every((o) => o.isExcluded);
-  const someSet = options.some((o) => o.isSelected || o.isExcluded);
-
-  function update(pk, toggle) {
-    setOptions(options.map((o) => (o.pk === pk ? toggle(o) : o)));
-  }
-
-  function setAll({ isSelected, isExcluded }) {
-    setOptions(options.map((o) => ({ ...o, isSelected, isExcluded })));
-  }
+  const { label, state } = portal;
 
   const childrenVisible = expanded || forceExpanded;
 
@@ -131,21 +111,17 @@ function SourceGroup({
         <FilterOption
           className="sourceGroupButton"
           label={label}
-          isSelected={allSelected}
-          isExcluded={allExcluded}
-          onInclude={() =>
-            setAll({ isSelected: !allSelected, isExcluded: false })
-          }
-          onExclude={() =>
-            setAll({ isSelected: false, isExcluded: !allExcluded })
-          }
+          isSelected={state === "include"}
+          isExcluded={state === "exclude"}
+          onInclude={() => portal.toggle("include")}
+          onExclude={() => portal.toggle("exclude")}
           title={t("sourceFilterGroupTooltip", { group: label })}
           icon={
-            allSelected ? (
+            state === "include" ? (
               <CheckSquare />
-            ) : allExcluded ? (
+            ) : state === "exclude" ? (
               <XSquare />
-            ) : someSet ? (
+            ) : portal.someSet ? (
               <DashSquare />
             ) : (
               <Square />
@@ -159,25 +135,25 @@ function SourceGroup({
           className="sourceGroupChevron"
           aria-expanded={childrenVisible}
           aria-label={t("sourceFilterGroupExpandLabel", { group: label })}
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setExpanded(!childrenVisible)}
         >
           {childrenVisible ? <ChevronDown /> : <ChevronRight />}
         </button>
       </div>
       {childrenVisible && (
         <div className="sourceGroupChildren">
-          {shown.map((option) => (
+          {shown.map((leaf) => (
             <FilterOption
-              key={option.pk}
-              label={option.title}
-              isSelected={option.isSelected}
-              isExcluded={option.isExcluded}
-              onInclude={() => update(option.pk, toggleOptionIncluded)}
-              onExclude={() => update(option.pk, toggleOptionExcluded)}
-              title={option.title}
+              key={leaf.id}
+              label={leaf.label}
+              isSelected={leaf.option.isSelected}
+              isExcluded={leaf.option.isExcluded}
+              onInclude={() => setLeaf(leaf, toggleOptionIncluded)}
+              onExclude={() => setLeaf(leaf, toggleOptionExcluded)}
+              title={leaf.option.url ?? leaf.label}
             >
               <span className="optionName">
-                {capitalizeFirstLetter(option.title)}
+                {capitalizeFirstLetter(leaf.label)}
               </span>
             </FilterOption>
           ))}
@@ -185,5 +161,11 @@ function SourceGroup({
         </div>
       )}
     </>
+  );
+}
+
+function setLeaf(leaf, toggle) {
+  leaf.setList((prev) =>
+    prev.map((o) => (o.pk === leaf.option.pk ? toggle(o) : o)),
   );
 }

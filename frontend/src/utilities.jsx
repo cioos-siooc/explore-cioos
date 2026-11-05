@@ -143,6 +143,7 @@ export function createDataFilterQueryString(query) {
     scientificNamesExcluded,
     obisNodesSelected,
     erddapServersSelected,
+    obisCataloguesSelected,
     realtimeOnly,
     eovsMatchAll,
     orgsMatchAll,
@@ -226,6 +227,9 @@ export function createDataFilterQueryString(query) {
     (s) => s.isSelected,
   );
   const selectedNodes = (obisNodesSelected || []).filter((n) => n.isSelected);
+  const selectedObisCatalogues = (obisCataloguesSelected || []).filter(
+    (c) => c.isSelected,
+  );
   const allServersSelected =
     erddapServersSelected?.length > 0 &&
     selectedServers.length === erddapServersSelected.length;
@@ -236,22 +240,27 @@ export function createDataFilterQueryString(query) {
   let erddapServers = "";
   let obisNodes = "";
   let includeObis = "";
+  // Every server and node ticked is everything: catalogue owners only add
+  // datasets to that "or".
   const sourceFilterActive =
-    (selectedServers.length > 0 || selectedNodes.length > 0) &&
+    (selectedServers.length > 0 ||
+      selectedNodes.length > 0 ||
+      selectedObisCatalogues.length > 0) &&
     !(allServersSelected && allNodesSelected);
+  const obisCatalogues = sourceFilterActive
+    ? selectedObisCatalogues.map((c) => encodeURIComponent(c.title)).join(",")
+    : "";
   if (sourceFilterActive) {
     if (selectedNodes.length > 0) {
       obisNodes = selectedNodes
         .map((n) => encodeURIComponent(n.title))
         .join(",");
-      if (selectedServers.length > 0) {
-        erddapServers = selectedServers.map((s) => s.url).join();
-      }
-    } else {
-      includeObis = "false";
-      if (!allServersSelected) {
-        erddapServers = selectedServers.map((s) => s.url).join();
-      }
+    }
+    const serversOnly =
+      selectedNodes.length === 0 && selectedObisCatalogues.length === 0;
+    if (serversOnly) includeObis = "false";
+    if (!(serversOnly && allServersSelected)) {
+      erddapServers = selectedServers.map((s) => s.url).join();
     }
   }
 
@@ -270,6 +279,10 @@ export function createDataFilterQueryString(query) {
     excludeErddapServers: excludedList(erddapServersSelected, (s) => s.url),
     excludeObisNodes: excludedList(obisNodesSelected, (n) =>
       encodeURIComponent(n.title),
+    ),
+    obisCatalogues,
+    excludeObisCatalogues: excludedList(obisCataloguesSelected, (c) =>
+      encodeURIComponent(c.title),
     ),
     timeMin: startDate,
     timeMax: endDate,

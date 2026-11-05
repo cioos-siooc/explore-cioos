@@ -47,9 +47,11 @@ function filterValidators() {
       "platforms",
       "obisNodes",
       "erddapServers",
+      "obisCatalogues",
       "excludePlatforms",
       "excludeObisNodes",
       "excludeErddapServers",
+      "excludeObisCatalogues",
     ])
       .isLength({ max: MAX_LIST_LENGTH })
       .optional(),

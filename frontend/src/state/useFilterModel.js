@@ -24,6 +24,8 @@ import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import useEovCategories from "./useEovCategories.js";
 import { useApplyArea } from "./useRegionSearch.js";
+import { ERDDAP_KEY } from "./datasetGroups.js";
+import { buildPortals, setLeaves } from "./portals.js";
 import useSourceKinds from "./useSourceKinds.js";
 
 const stateOf = (option) =>
@@ -35,7 +37,9 @@ const stateOf = (option) =>
 // toggledDataLayerChoice). Groups carry `panelName` and `clear`; options may
 // carry `closes` (palette closes on pick), `action`, `includeOnly`, and
 // `shortcut` with `covers` (listed as applied in place of the options it
-// covers when all are set, see appliedOptions). A typedRange or typedArea
+// covers when all are set, see appliedOptions). Groups that can require every
+// value carry `match: { all, set }`, read by the chips' and/or connectors. A
+// typedRange or typedArea
 // group is `pinned`: offered as typed rather than matched.
 export default function useFilterModel(
   scientificNameMatches = [],
@@ -46,7 +50,8 @@ export default function useFilterModel(
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const filters = useFilters();
   const eovCategories = useEovCategories();
-  const sourceKinds = useSourceKinds();
+  const portals = buildPortals(filters, i18n.language);
+  const erddapKind = useSourceKinds().find((kind) => kind.key === ERDDAP_KEY);
   const { dataLayerChoices, toggleDataLayer, resetDataLayers, requestDraw } =
     useMapState();
   const {
@@ -294,6 +299,7 @@ export default function useFilterModel(
       );
       return {
         ...group,
+        match: { all: filters.eovsMatchAll, set: filters.setEovsMatchAll },
         options: [
           ...eovCategories.map((c) => ({
             id: `category-${c.category}`,
@@ -329,57 +335,78 @@ export default function useFilterModel(
       filters.setPlatformsSelected,
       true,
     ),
-    listGroup(
-      "orgs",
-      t("organizationFilterName"),
-      "organizationFilterName",
-      filters.orgsSelected,
-      filters.setOrgsSelected,
-      false,
-      filters.orgsMatchAll,
-    ),
+    {
+      ...listGroup(
+        "orgs",
+        t("organizationFilterName"),
+        "organizationFilterName",
+        filters.orgsSelected,
+        filters.setOrgsSelected,
+        false,
+        filters.orgsMatchAll,
+      ),
+      match: { all: filters.orgsMatchAll, set: filters.setOrgsMatchAll },
+    },
     {
       key: "sources",
       label: t("sourceFilterName"),
       panelName: "sourceFilterName",
-      // pk values collide between the two lists, hence the prefixed ids.
+      // A portal stands in for its leaves when all are set, and ERDDAP for
+      // every server; a leaf is named with its portal, as "OBIS" alone says
+      // nothing.
       options: [
-        ...sourceKinds.map((kind) => ({
-          id: `source-${kind.key}`,
-          label: kind.label,
-          description: t("filterSearchSourceKindDescription", {
-            count: kind.members.length,
+        ...(erddapKind
+          ? [
+              {
+                id: `source-${erddapKind.key}`,
+                label: erddapKind.label,
+                description: t("filterSearchSourceKindDescription", {
+                  count: erddapKind.members.length,
+                }),
+                state: erddapKind.state,
+                shortcut: true,
+                covers: [
+                  ...erddapKind.members.map((o) => `erddap-${o.pk}`),
+                  ...portals
+                    .filter((p) => p.leaves.every((l) => l.kind === "erddap"))
+                    .map((p) => `portal-${p.key}`),
+                ],
+                toggle: erddapKind.toggle,
+              },
+            ]
+          : []),
+        ...portals.flatMap((portal) => [
+          {
+            id: `portal-${portal.key}`,
+            label: portal.label,
+            description: t("filterSearchSourceKindDescription", {
+              count: portal.leaves.length,
+            }),
+            state: portal.state,
+            shortcut: true,
+            covers: portal.leaves.map((leaf) => leaf.id),
+            toggle: portal.toggle,
+          },
+          ...portal.leaves.map((leaf) => {
+            const state = stateOf(leaf.option);
+            return {
+              id: leaf.id,
+              label: portal.isObis
+                ? leaf.label
+                : `${portal.label} · ${leaf.label}`,
+              description: leaf.option.url,
+              state,
+              toggle: (target) =>
+                setLeaves([leaf], state === target ? undefined : target),
+            };
           }),
-          state: kind.state,
-          shortcut: true,
-          covers: kind.members.map((o) => `${kind.key}-${o.pk}`),
-          toggle: kind.toggle,
-        })),
-        ...listOptions(
-          filters.erddapServersSelected,
-          filters.setErddapServersSelected,
-          false,
-          "erddap-",
-        ),
-        ...listOptions(
-          filters.obisNodesSelected,
-          filters.setObisNodesSelected,
-          false,
-          "obis-",
-        ),
+        ]),
       ],
-      clear: () => {
-        setAllOptionsIsSelectedTo(
-          false,
-          filters.erddapServersSelected,
-          filters.setErddapServersSelected,
-        );
-        setAllOptionsIsSelectedTo(
-          false,
-          filters.obisNodesSelected,
-          filters.setObisNodesSelected,
-        );
-      },
+      clear: () =>
+        setLeaves(
+          portals.flatMap((portal) => portal.leaves),
+          undefined,
+        ),
     },
     {
       key: "dataLayers",
@@ -402,6 +429,10 @@ export default function useFilterModel(
         picked.length,
       ),
       panelName: "scientificNameFilterName",
+      match: {
+        all: filters.scientificNamesMatchAll,
+        set: filters.setScientificNamesMatchAll,
+      },
       options: [
         ...scientificNames.map((name) => scientificNameOption(name)),
         ...scientificNameMatches

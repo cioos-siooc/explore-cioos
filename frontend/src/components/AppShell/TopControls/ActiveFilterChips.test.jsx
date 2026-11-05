@@ -228,7 +228,7 @@ describe("ActiveFilterChips", () => {
     it("explains all-selected-values matching once several variables are matched together", async () => {
       openWithTips("eovs=oxygen,subSurfaceTemperature&eovsMatch=all");
       expect(await screen.findByTestId("tip-card")).toHaveTextContent(
-        /Includes all selected/,
+        /Set “Combine ticked options” to “Any”/,
       );
     });
 

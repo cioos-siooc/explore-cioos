@@ -26,7 +26,8 @@ import FilterSection from "../../Controls/Filter/FilterMenu/FilterSection.jsx";
 import DataLayersFilter from "../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx";
 import MultiCheckboxFilter from "../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx";
 import SourceFilter from "../../Controls/Filter/SourceFilter/SourceFilter.jsx";
-import Switch from "../../ui/Switch.jsx";
+import useActiveFilters from "../../../state/useActiveFilters.js";
+import MatchToggle from "../../ui/MatchToggle.jsx";
 import ScientificNameFilter from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
 import SpatialFilter from "../../Controls/Filter/SpatialFilter/SpatialFilter.jsx";
 import TimeSelector from "../../Controls/Filter/TimeSelector/TimeSelector.jsx";
@@ -103,6 +104,9 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     setErddapServersSelected,
     obisNodesSelected,
     setObisNodesSelected,
+    portalOwners,
+    obisCataloguesSelected,
+    setObisCataloguesSelected,
     sourcesSearchTerms,
     setSourcesSearchTerms,
     startDate,
@@ -123,8 +127,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     setRealtimeOnly,
     timeFilterActive,
     depthFilterActive,
-    allObisNodesSelected,
-    allObisNodesExcluded,
     showObis,
     obisDataAvailable,
   } = useFilters();
@@ -202,30 +204,21 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
   );
   const sourcesFilterTranslationKey = "sourceFilterName";
 
+  const sourceLists = {
+    erddapServersSelected,
+    setErddapServersSelected,
+    obisNodesSelected,
+    setObisNodesSelected,
+    portalOwners,
+    obisCataloguesSelected,
+    setObisCataloguesSelected,
+  };
+  const activeFilters = useActiveFilters();
   const sourcesBadgeTitle = (() => {
     const notTitle = (title) => t("filterExcludedOption", { title });
-    const allServersSelected =
-      erddapServersSelected.length > 0 &&
-      erddapServersSelected.every((s) => s.isSelected);
-    const allServersExcluded =
-      erddapServersSelected.length > 0 &&
-      erddapServersSelected.every((s) => s.isExcluded);
-    const selectedTitles = [
-      ...(allServersSelected
-        ? ["ERDDAP"]
-        : allServersExcluded
-          ? [notTitle("ERDDAP")]
-          : erddapServersSelected
-              .filter(isSet)
-              .map((s) => (s.isExcluded ? notTitle(s.title) : s.title))),
-      ...(allObisNodesSelected
-        ? ["OBIS"]
-        : allObisNodesExcluded
-          ? [notTitle("OBIS")]
-          : obisNodesSelected
-              .filter(isSet)
-              .map((n) => (n.isExcluded ? notTitle(n.title) : n.title))),
-    ];
+    const selectedTitles = (
+      activeFilters.find((f) => f.key === "sources")?.items ?? []
+    ).map((item) => (item.excluded ? notTitle(item.label) : item.label));
     if (selectedTitles.length === 0) return t(sourcesFilterTranslationKey);
     if (selectedTitles.length === 1) {
       return capitalizeFirstLetter(selectedTitles[0]);
@@ -254,13 +247,12 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
         : scientificNamesPicked.length + t("scientificNamesMulti");
 
   const matchAllSwitch = (id, checked, setChecked, tipTarget) => (
-    <Switch
-      id={id}
+    <MatchToggle
       data-testid={id}
       tipTarget={tipTarget}
-      label={t("filterMatchAllLabel")}
-      checked={checked}
-      onChange={(e) => setChecked(e.target.checked)}
+      all={checked}
+      setAll={setChecked}
+      hints={{ any: t("matchToggleAnyHint"), all: t("matchToggleAllHint") }}
     />
   );
 
@@ -493,7 +485,8 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
             <Filter
               active={
                 erddapServersSelected.some(isSet) ||
-                obisNodesSelected.some(isSet)
+                obisNodesSelected.some(isSet) ||
+                obisCataloguesSelected.some(isSet)
               }
               badgeTitle={sourcesBadgeTitle}
               tooltip={t("sourceFilterTooltip")}
@@ -518,15 +511,14 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                   obisNodesSelected,
                   setObisNodesSelected,
                 );
+                setAllOptionsIsSelectedTo(
+                  false,
+                  obisCataloguesSelected,
+                  setObisCataloguesSelected,
+                );
               }}
             >
-              <SourceFilter
-                erddapServersSelected={erddapServersSelected}
-                setErddapServersSelected={setErddapServersSelected}
-                obisNodesSelected={obisNodesSelected}
-                setObisNodesSelected={setObisNodesSelected}
-                searchTerms={sourcesSearchTerms}
-              />
+              <SourceFilter {...sourceLists} searchTerms={sourcesSearchTerms} />
             </Filter>
           </FilterSection>
           <FilterSection title={t("filterGroupWhenWhere")}>

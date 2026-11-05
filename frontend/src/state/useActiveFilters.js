@@ -47,7 +47,7 @@ export function iconForKey(key) {
 
 export const QUICK_FILTER_KEYS = new Set(["area", "inView", "realtime"]);
 
-// `{ key, label, icon, goToFilter, removeAll, items }` per group, read off
+// `{ key, label, icon, goToFilter, removeAll, match, items }` per group, read off
 // useFilterModel so chips, the Filters badge and the palette cannot disagree.
 export default function useActiveFilters() {
   const model = useFilterModel();
@@ -62,6 +62,7 @@ export default function useActiveFilters() {
       label: group.label,
       icon: iconForKey(group.key),
       removeAll: group.clear,
+      match: group.match,
       // The title search has no Filters modal row: it is the palette's.
       goToFilter: group.panelName
         ? () => {

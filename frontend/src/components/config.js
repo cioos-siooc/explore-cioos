@@ -13,6 +13,7 @@ export const defaultScientificNamesSelected = [];
 // download_scheduler deletes download zips after DOWNLOAD_RETENTION_DAYS.
 export const downloadRetentionDays = 7;
 export const defaultObisNodesSelected = [];
+export const defaultCataloguesSelected = [];
 // Listed before "show more": the two Canadian nodes the harvest is built
 // around; the others only contribute datasets inside Canadian waters.
 export const featuredObisNodes = ["OBIS Canada", "OTN-OBIS"];
