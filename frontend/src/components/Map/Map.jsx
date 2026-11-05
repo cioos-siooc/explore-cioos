@@ -504,9 +504,8 @@ export default function CreateMap({
   // of anything. Across the basemap hand-over the fill goes to nothing and the
   // border carries the ramp (HEX_FILL_FADE_*_ZOOM).
   const COVERAGE_HEX_OPACITY_STOPS = [
-    [hexMaxZoom, 0.6],
-    [hexMaxZoom + 1.5, 0.5],
-    [HEX_FILL_FADE_START_ZOOM, 0.43],
+    [hexMaxZoom, 0.4],
+    [HEX_FILL_FADE_START_ZOOM, 0.4],
     [HEX_FILL_FADE_END_ZOOM, 0],
   ];
 
