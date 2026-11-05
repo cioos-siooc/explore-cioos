@@ -47,6 +47,9 @@ services:
       DB_HOST_EXTERNAL: ${DB_HOST_EXTERNAL:?set DB_HOST_EXTERNAL to the central Postgres}
       REDIS_HOST: ${REDIS_HOST:-}
       HARVESTER_LOG_DIR: /app/harvester/logs
+      # The primary stack's public URL and build, for the upstream User-Agent.
+      APP_URL: ${APP_URL:-}
+      APP_VERSION: ${SENTRY_RELEASE:-${SOURCE_COMMIT:-}}
       # Remote workers ONLY poll — they must not re-register or re-trigger.
       REGISTER_DEPLOYMENTS: "false"
       RUN_ON_DEPLOY: "false"

@@ -29,6 +29,7 @@ from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
+from cde_harvester.user_agent import HEADERS
 from cioos_metadata_conversion.load_from import obis as obis_conversion
 from cioos_metadata_conversion.load_from.obis import map_obis_to_cioos
 from prefect import task
@@ -603,6 +604,7 @@ class OBISHarvester(BaseHarvester):
             "first_eov_column": None,
             "source_type": "obis",
             "obis_nodes": obis_nodes,
+            "archive_url": metadata.get("archive") or None,
         }])
         return dataset_row
 
@@ -629,7 +631,7 @@ class OBISHarvester(BaseHarvester):
         if not cache_files:
             return
         try:
-            response = requests.head(OBIS_PARQUET_URL.format(dataset_id=dataset_id), timeout=30)
+            response = requests.head(OBIS_PARQUET_URL.format(dataset_id=dataset_id), headers=HEADERS, timeout=30)
             response.raise_for_status()
             published = parsedate_to_datetime(response.headers["Last-Modified"]).timestamp()
         except (requests.RequestException, KeyError, TypeError, ValueError) as e:
@@ -674,7 +676,7 @@ class OBISHarvester(BaseHarvester):
 
         url = f"https://api.obis.org/v3/dataset/{dataset_id}"
         try:
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, headers=HEADERS, timeout=30)
             response.raise_for_status()
             data = response.json()
             results = data.get("results", [])
@@ -802,7 +804,7 @@ class OBISHarvester(BaseHarvester):
         seen = 0
 
         while True:
-            response = requests.get(url, timeout=60)
+            response = requests.get(url, headers=HEADERS, timeout=60)
             response.raise_for_status()
             page_data = response.json()
             results = page_data.get("results", [])

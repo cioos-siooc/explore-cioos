@@ -35,13 +35,7 @@ const HarvestDataset = lazy(
   () => import("./components/Harvest/HarvestDataset.jsx"),
 );
 const HarvestRun = lazy(() => import("./components/Harvest/HarvestRun.jsx"));
-const HarvestDownloads = lazy(
-  () => import("./components/Harvest/HarvestDownloads.jsx"),
-);
 const HarvestDocs = lazy(() => import("./components/Harvest/HarvestDocs.jsx"));
-const HarvestDownloadJob = lazy(
-  () => import("./components/Harvest/HarvestDownloadJob.jsx"),
-);
 
 clearLegacyCookies();
 
@@ -83,16 +77,11 @@ createRoot(domContainer).render(
           element={<HarvestDataset />}
         />
         <Route path="/harvest/run/:runId" element={<HarvestRun />} />
-        <Route path="/harvest/downloads" element={<HarvestDownloads />} />
         <Route
           path="/harvest/docs"
           element={<Navigate to="/harvest/docs/workflow" replace />}
         />
         <Route path="/harvest/docs/:doc" element={<HarvestDocs />} />
-        <Route
-          path="/harvest/downloads/:jobId"
-          element={<HarvestDownloadJob />}
-        />
       </SentryRoutes>
     </BrowserRouter>
   </Suspense>,

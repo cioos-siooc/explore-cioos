@@ -2,13 +2,14 @@ name: Deploy
 
 # The tag name picks the target (anything else is rejected):
 #   beta*          -> beta        any development*/master commit
-#   vX.Y.Z-rc.N    -> staging     master only
+#   vX.Y.Z-rc.N    -> staging     master only (optional -fresh suffix)
 #   vX.Y.Z         -> production  master only, and only a SHA whose staging
 #                                 deployment succeeded
 # beta and staging share one stack on the Juno host cioos-co-dev-explore
-# (explore.dev.cioos.ca, behind Caddy basic_auth), one deploy at a time. Each new
-# tag gets a fresh database volume (docker-compose.staging.yaml). Wait for the release's Integration Tests (including
-# visual regression) before deploying.
+# (beta.explore.cioos.ca, behind Caddy basic_auth), one deploy at a time. They keep
+# the live database unless the tag ends in -fresh or the dispatch ticks
+# fresh_database (docker-compose.staging.yaml). Wait for the release's
+# Integration Tests (including visual regression) before deploying.
 on:
   release:
     types: [published]
@@ -18,6 +19,10 @@ on:
         description: Existing release tag to redeploy
         required: true
         type: string
+      fresh_database:
+        description: Beta/staging only — start on an empty database instead of keeping the live one
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -49,9 +54,9 @@ jobs:
         run: |
           case "$TAG" in
             beta*) target=beta ;;
-            *) if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then target=staging
+            *) if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(-fresh)?$ ]]; then target=staging
                elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then target=production
-               else echo "Tag $TAG is not beta*, vX.Y.Z-rc.N or vX.Y.Z" >&2; exit 1; fi ;;
+               else echo "Tag $TAG is not beta*, vX.Y.Z-rc.N[-fresh] or vX.Y.Z" >&2; exit 1; fi ;;
           esac
           git show-ref --verify --quiet "refs/tags/$TAG"
           sha=$(git rev-parse "$TAG^{commit}")
@@ -109,11 +114,43 @@ jobs:
     runs-on: ubuntu-latest
     # beta and staging deploy the same stack, but stay separate GitHub
     # environments so only a staging deployment satisfies the production gate.
-    environment: ${{ needs.release.outputs.target }}
+    # The URL records the deployment's DATA_TAG; the next deploy reads it back.
+    environment:
+      name: ${{ needs.release.outputs.target }}
+      url: https://beta.explore.cioos.ca/#data=${{ steps.data.outputs.tag }}
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
     steps:
+      - name: Pick database volumes
+        id: data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+          FRESH: ${{ inputs.fresh_database || false }}
+        run: |
+          data_tag=
+          if [[ "$TAG" != *-fresh && "$FRESH" != true ]]; then
+            # The live volumes are the newest successful beta/staging deployment's.
+            data_tag=$(for env in beta staging; do
+                gh api "repos/$GITHUB_REPOSITORY/deployments?environment=$env&per_page=30" \
+                  --jq '.[] | "\(.created_at) \(.statuses_url)"'
+              done | sort -r | while read -r _ statuses; do
+                state=$(gh api "$statuses" --jq '.[0] | "\(.state) \(.environment_url)"')
+                if [[ "$state" == success\ * ]]; then
+                  [[ "$state" == *'#data='* ]] && echo "${state##*#data=}"
+                  break
+                fi
+              done)
+          fi
+          if [ -z "$data_tag" ]; then
+            data_tag=$TAG
+            echo "::notice::Fresh database (volumes suffixed $data_tag)"
+          else
+            echo "::notice::Keeping the database from $data_tag"
+          fi
+          [[ "$data_tag" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]
+          echo "tag=$data_tag" >> "$GITHUB_OUTPUT"
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
           wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
@@ -129,7 +166,7 @@ jobs:
           # The tag doubles as the Sentry release, shared by web-api and the
           # frontend's sourcemap upload.
           env_overrides: |
-            DEPLOY_TAG=${{ needs.release.outputs.tag }}
+            DATA_TAG=${{ steps.data.outputs.tag }}
             SENTRY_RELEASE=${{ needs.release.outputs.tag }}
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}

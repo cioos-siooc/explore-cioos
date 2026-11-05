@@ -49,6 +49,8 @@ import {
   basemapHandoffStartZoom,
   clickHighlightColor,
   colorScale,
+  defaultBathymetryPalette,
+  defaultMapBounds,
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
@@ -65,6 +67,7 @@ import {
   getLabelTextField,
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
+  nonnaColorRamp,
 } from "./basemapStyle.js";
 import {
   buildTileSuffix,
@@ -80,6 +83,7 @@ import {
   griddapHitLayers,
   griddapOutranksHexesIn,
   griddapTitle,
+  idsOutsideDataset,
   isGriddapHit,
   isOnAPointIn,
   loadTurfUnion,
@@ -300,6 +304,14 @@ const MAP_VIEW_DEBOUNCE_MS = 250;
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
 const TRACK_LINE_OPACITY = 0.55;
+// A head last seen before the window's final week (the server's `active`).
+const TRACK_HEAD_INACTIVE_OPACITY = 0.35;
+const trackHeadOpacity = (scale) => [
+  "case",
+  ["to-boolean", ["get", "active"]],
+  scale,
+  TRACK_HEAD_INACTIVE_OPACITY * scale,
+];
 const DATA_STALE_OPACITY = 0.25;
 // direct_select fires draw.update on every drag tick, and setPolygon feeds
 // the /pointQuery fetch.
@@ -462,6 +474,7 @@ export default function CreateMap({
   griddapCoverage,
   dataLayersVisible = true,
   bathymetryVisible = true,
+  bathymetryPalette = defaultBathymetryPalette,
   activeWmsOverlay,
   projection = "mercator",
   zoomTarget,
@@ -752,12 +765,17 @@ export default function CreateMap({
       "line-opacity",
       TRACK_LINE_OPACITY * scale,
     );
-    map.current.setPaintProperty("track-heads", "icon-opacity", scale);
-    map.current.setPaintProperty("track-heads-fixed", "circle-opacity", scale);
+    const headOpacity = trackHeadOpacity(scale);
+    map.current.setPaintProperty("track-heads", "icon-opacity", headOpacity);
+    map.current.setPaintProperty(
+      "track-heads-fixed",
+      "circle-opacity",
+      headOpacity,
+    );
     map.current.setPaintProperty(
       "track-heads-fixed",
       "circle-stroke-opacity",
-      scale,
+      headOpacity,
     );
   }
 
@@ -1223,27 +1241,37 @@ export default function CreateMap({
     if (!map.current || !layersLoaded.current) return;
     applyTrackFocus();
 
-    // queryRenderedFeatures only sees what's on screen now, hence re-running on
-    // sourcedata. Below z7 profiles are merged into 'hexes'.
+    // Every loaded tile, not just drawn ones: re-run as each tile loads, this
+    // greys it before its first frame. Below z7 profiles are merged into
+    // 'hexes'; the geometry type keeps hex and marker pks, which share the
+    // source layer, from dimming each other across the z7 hand-off.
     const pointLevel = map.current.getZoom() >= 7;
     const dimmedLayers = [pointLevel ? "points" : "hexes", "coverage-hexes"];
+    const sourceFilters = {
+      points: ["==", ["geometry-type"], "Point"],
+      hexes: ["==", ["geometry-type"], "Polygon"],
+    };
 
     const dimmed = {};
     let focusedPoints = emptyFeatureCollection;
     dimmedLayers.forEach((layerId) => {
-      if (!pk || !map.current.getLayer(layerId)) {
+      const { source, sourceLayer } = focusTargets[layerId];
+      if (!pk || !map.current.getSource(source)) {
         dimmed[layerId] = [];
         return;
       }
-      const hits = map.current.queryRenderedFeatures({ layers: [layerId] });
-      dimmed[layerId] = hits
-        .filter((feature) => !featureHasDataset(feature, pk))
-        // promoteId puts pk on the id, which setFeatureState addresses.
-        .map((feature) => feature.id);
+      const features = map.current.querySourceFeatures(source, {
+        sourceLayer,
+        filter: sourceFilters[layerId],
+      });
+      // promoteId puts pk on the id, which setFeatureState addresses.
+      dimmed[layerId] = idsOutsideDataset(features, pk);
       // 'points' sort-key can't depend on feature-state, so focused markers
       // were buried under grey ones; they're redrawn on top from a copy, since
       // a filtered tile layer would relayout the whole source per focus change.
-      if (layerId === "points") focusedPoints = focusedPointFeatures(hits, pk);
+      if (layerId === "points") {
+        focusedPoints = focusedPointFeatures(features, pk);
+      }
     });
 
     // Writing state fires sourcedata/idle, which re-run this, so a no-op must
@@ -1433,16 +1461,19 @@ export default function CreateMap({
     if (visible) rampMeasuredFor.current = undefined;
   }
 
-  // Restoring hands each group back to its owner: the picker for hex/point
-  // layers, applyLayerVisibility for the tracks.
+  // Restoring hands each group back to its owner: the switches for hex/point
+  // layers and the depth wash, applyLayerVisibility for the tracks. The depth
+  // wash goes too: its colours would read as the overlay's own.
   function setDataLayersVisibility(visible) {
     setLayersVisibility(griddapLayerIds, visible);
     if (!visible) {
       setLayersVisibility(observationLayerIds, false);
       setLayersVisibility(trackLayerIds, false);
+      setLayersVisibility(bathymetryLayerIds, false);
       return;
     }
     setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current);
+    setLayersVisibility(bathymetryLayerIds, bathymetryVisibleRef.current);
     setLayersVisibility(trackLayerIds, true);
     applyLayerVisibility();
   }
@@ -1612,12 +1643,22 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayersVisible]);
 
-  // Left alone by the WMS overlay: the depth wash reads as basemap.
+  // The ref keeps the choice through a WMS overlay, which hides the depth wash.
   useEffect(() => {
     bathymetryVisibleRef.current = bathymetryVisible;
-    if (!map.current) return;
+    if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(bathymetryLayerIds, bathymetryVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bathymetryVisible]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    map.current.setPaintProperty(
+      "bathymetry-nonna",
+      "color-relief-color",
+      nonnaColorRamp(bathymetryPalette),
+    );
+  }, [bathymetryPalette]);
 
   // No setStyle() calls exist (language uses setLayoutProperty), so the
   // projection persists until toggled here.
@@ -2610,6 +2651,7 @@ export default function CreateMap({
         // When culling, keep the most recent heads deterministically.
         "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
       },
+      paint: { "icon-opacity": trackHeadOpacity(1) },
     });
 
     map.current.addLayer({
@@ -2622,7 +2664,9 @@ export default function CreateMap({
       paint: {
         "circle-color": trackLineColor,
         "circle-radius": 4.5,
+        "circle-opacity": trackHeadOpacity(1),
         "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": trackHeadOpacity(1),
         "circle-stroke-width": 1.5,
       },
     });
@@ -3188,7 +3232,7 @@ export default function CreateMap({
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.
       style: {
-        ...buildBasemapStyle(i18n.language),
+        ...buildBasemapStyle(i18n.language, bathymetryPalette),
         projection: { type: projection === "globe" ? "globe" : "mercator" },
       },
       // The default 'high-performance' wakes the discrete GPU on dual-GPU
@@ -3199,12 +3243,24 @@ export default function CreateMap({
       locale: { "Map.Title": t("mapCanvasLabel") },
       // The legend card builds the attribution control (see LegendFooter.jsx).
       attributionControl: false,
-      center: [initialView.lon, initialView.lat],
-      zoom: initialView.zoom,
+      ...(initialView.lat === undefined
+        ? {}
+        : {
+            center: [initialView.lon, initialView.lat],
+            zoom: initialView.zoom,
+          }),
       // Esri serves a grey "not yet available" tile past its coverage, which is
       // z17 on remote Arctic coasts.
       maxZoom: 17,
     });
+    // Not the constructor's `bounds`: the padding that keeps the box clear of
+    // the sidebar needs the canvas.
+    if (initialView.lat === undefined) {
+      map.current.fitBounds(defaultMapBounds, {
+        padding: mapCoverPadding(map.current),
+        animate: false,
+      });
+    }
     onMapReady(map.current);
 
     map.current.dragRotate.disable();
@@ -3297,19 +3353,21 @@ export default function CreateMap({
     }, DRAW_UPDATE_DEBOUNCE_MS);
     map.current.on("draw.update", commitDrawUpdate);
 
-    // New tiles were never part of the queryRenderedFeatures snapshot the focus
-    // was computed from, so re-apply it as each data source loads.
+    // A tile's 'data' event fires before its first frame, so dimming it here
+    // keeps out-of-focus cells from flashing their colour while panning.
     const dataSourceIds = ["cde-tiles", "cde-cells"];
     map.current.on("sourcedata", (e) => {
       if (!focusedDatasetPk.current) return;
-      if (!e.isSourceLoaded || !dataSourceIds.includes(e.sourceId)) return;
+      if (!e.tile || !dataSourceIds.includes(e.sourceId)) return;
       hoverHighlightPoints(focusedDatasetPk.current);
     });
 
     // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
     // listener stops MapLibre's own console.error, hence the log; the message,
     // since a minified error class logs as its two-letter name.
-    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    // Esri imagery throws the odd transient 502 (logged as a CORS block, since
+    // its error responses carry no Access-Control-Allow-Origin).
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks", "imagery"];
     map.current.on("error", (e) => {
       console.error(e.error?.message ?? e.error);
       if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
@@ -3318,8 +3376,8 @@ export default function CreateMap({
 
     map.current.on("idle", () => {
       layersLoaded.current = true;
-      // 'sourcedata' can land before the new tiles render, and
-      // queryRenderedFeatures only sees rendered ones.
+      // A focus set before the layers settled was skipped, and a zoom across
+      // z7 switches the dimmed band without loading a tile.
       if (focusedDatasetPk.current) {
         hoverHighlightPoints(focusedDatasetPk.current);
       }

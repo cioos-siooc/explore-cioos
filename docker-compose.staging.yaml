@@ -1,13 +1,14 @@
-# Staging/beta OVERLAY — layers on docker-compose.production.yaml. One tag, one
-# dataset: the deploy workflow sets DEPLOY_TAG, so a new tag opens fresh
-# database and harvester volumes (schema + re-harvest) and a redeploy of the
-# same tag keeps them.
+# Staging/beta OVERLAY — layers on docker-compose.production.yaml. The deploy
+# workflow sets DATA_TAG: the tag that last asked for a fresh database (a
+# `-fresh` tag suffix or the dispatch checkbox). Other deploys reuse its
+# database and harvester volumes; a new DATA_TAG opens empty ones (schema +
+# re-harvest).
 volumes:
   postgres18-data:
-    name: explore-cioos-staging_postgres18-data_${DEPLOY_TAG:?set by the deploy workflow}
+    name: explore-cioos-staging_postgres18-data_${DATA_TAG:?set by the deploy workflow}
   harvest_data:
-    name: explore-cioos-staging_harvest_data_${DEPLOY_TAG}
+    name: explore-cioos-staging_harvest_data_${DATA_TAG}
   harvester_cache:
-    name: explore-cioos-staging_harvester_cache_${DEPLOY_TAG}
+    name: explore-cioos-staging_harvester_cache_${DATA_TAG}
   obis_cache:
-    name: explore-cioos-staging_obis_cache_${DEPLOY_TAG}
+    name: explore-cioos-staging_obis_cache_${DATA_TAG}

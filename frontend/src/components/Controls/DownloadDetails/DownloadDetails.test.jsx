@@ -236,7 +236,7 @@ describe("DownloadDetails", () => {
     );
   });
 
-  it("offers direct links without a polygon filter, and only the script with one", async () => {
+  it("keeps the links under a polygon filter, flagged as not applying it", async () => {
     const polygon = [
       [-65, 44],
       [-62, 44],
@@ -251,11 +251,10 @@ describe("DownloadDetails", () => {
         erddap_server_url: "https://data.example.ca/erddap",
       }),
     ];
-    const { user, rerender } = renderDetails({ pointsToReview });
-    const menu = () => screen.getByRole("button", { name: /script or links/i });
-    await user.click(menu());
-    expect(screen.getByRole("button", { name: /curl/i })).toBeVisible();
-    await user.click(menu());
+    const { rerender } = renderDetails({ pointsToReview });
+    const csv = () => screen.getByRole("button", { name: /dataset list/i });
+    expect(csv()).toBeEnabled();
+    expect(screen.queryByText("Unfiltered")).not.toBeInTheDocument();
 
     rerender(
       detailsElement({
@@ -264,33 +263,69 @@ describe("DownloadDetails", () => {
         filterDownloadByPolygon: true,
       }),
     );
-    await user.click(menu());
-    expect(screen.queryByRole("button", { name: /curl/i })).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /python script/i }),
-    ).toBeVisible();
+    expect(csv()).toBeEnabled();
+    expect(screen.getByText("Unfiltered").closest("span")).toHaveAttribute(
+      "title",
+      "This link doesn't apply your polygon filter.",
+    );
+    expect(screen.getByTestId("download-links")).toHaveTextContent(
+      /polygon isn't applied/i,
+    );
   });
 
-  it("links the download script to the package's selection and format", async () => {
-    const clicked = [];
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-      function () {
-        clicked.push(this.getAttribute("href"));
-      },
+  it("links each card to its source download", async () => {
+    renderDetails({
+      pointsToReview: [
+        makePoint({
+          pk: EST_SMALL.pk,
+          dataset_id: "small",
+          source_type: "erddap",
+          erddap_server_url: "https://data.example.ca/erddap",
+        }),
+        makePoint({
+          pk: EST_LARGE.pk,
+          dataset_id: "fish",
+          source_type: "obis",
+          cdm_data_type: "Point",
+          erddap_server_url: "https://obis.org",
+          erddap_url: "https://obis.org/dataset/fish",
+          archive_url: "https://ipt.example.org/archive.do?r=fish",
+        }),
+      ],
+    });
+    expect(screen.getByRole("link", { name: "Data" })).toHaveAttribute(
+      "href",
+      "https://data.example.ca/erddap/tabledap/small.csv?",
     );
-    const { user } = renderDetails();
-    await user.click(screen.getByRole("button", { name: /script or links/i }));
-    await user.click(screen.getByRole("button", { name: /python script/i }));
-    const url = new URL(clicked[0], "http://localhost");
-    expect(url.pathname).toMatch(/\/download\/script$/);
-    expect(url.searchParams.get("datasetPKs")).toBe(
+    expect(screen.getByRole("link", { name: "DwC-A" })).toHaveAttribute(
+      "href",
+      "https://ipt.example.org/archive.do?r=fish",
+    );
+    expect(screen.getByRole("link", { name: "OBIS" })).toHaveAttribute(
+      "href",
+      "https://obis.org/dataset/fish",
+    );
+  });
+
+  it("asks for the citations of every dataset in the selection", async () => {
+    const source = { erddap_server_url: "https://data.example.ca/erddap" };
+    const { user } = renderDetails({
+      pointsToReview: [
+        makePoint({ pk: EST_SMALL.pk, dataset_id: "small", ...source }),
+        makePoint({ pk: EST_LARGE.pk, dataset_id: "large", ...source }),
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: /dataset list/i }));
+    const asked = fetch.mock.calls
+      .map(([url]) => new URL(url, "http://localhost"))
+      .find((url) => url.pathname.endsWith("/datasets/citations"));
+    expect(asked.searchParams.get("datasetPKs")).toBe(
       `${EST_SMALL.pk},${EST_LARGE.pk}`,
     );
-    expect(url.searchParams.get("format")).toBe("csv");
   });
 
-  it("names the OBIS datasets a format without an OBIS version turns into CSV", async () => {
-    const { user } = renderDetails({
+  it("offers each source its own formats, only for the sources selected", async () => {
+    renderDetails({
       pointsToReview: [
         makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
         makePoint({
@@ -301,29 +336,61 @@ describe("DownloadDetails", () => {
         }),
       ],
     });
-    const format = screen.getByLabelText("All downloads");
-    expect(
-      within(screen.getByRole("group", { name: "ERDDAP and OBIS" }))
+    const values = (label) =>
+      within(screen.getByLabelText(label))
         .getAllByRole("option")
-        .map((option) => option.value),
-    ).toEqual(["csv", "parquet"]);
-    expect(
-      within(screen.getByRole("group", { name: "ERDDAP only (OBIS as CSV)" }))
-        .getAllByRole("option")
-        .map((option) => option.value),
-    ).toEqual(["odv", "nccf"]);
-    expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
-    expect(screen.queryByText("As CSV")).not.toBeInTheDocument();
+        .map((option) => option.value);
+    expect(values("ERDDAP™").slice(0, 4)).toEqual([
+      "csv",
+      "parquet",
+      "odv",
+      "nccf",
+    ]);
+    expect(values("ERDDAP™")).toEqual(
+      expect.arrayContaining(["csvp", "json", "nc", "mat", "kml"]),
+    );
+    expect(values("OBIS")).toEqual(["csv", "parquet"]);
+  });
 
-    await user.selectOptions(format, "odv");
-    expect(
-      screen.getByText(
-        "1 OBIS dataset will be delivered as CSV: OBIS has no ODV spreadsheet version. Choose CSV or Parquet to get every dataset in one format.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText("As CSV")).toHaveLength(1);
+  it("splits the ERDDAP formats by whether a polygon can clip them", () => {
+    const groups = () =>
+      within(screen.getByLabelText("ERDDAP™"))
+        .queryAllByRole("group")
+        .map((group) => [
+          group.getAttribute("label"),
+          within(group)
+            .getAllByRole("option")
+            .map((option) => option.value),
+        ]);
+    const pointsToReview = [makePoint({ pk: EST_SMALL.pk })];
+    const { rerender } = renderDetails({ pointsToReview });
+    expect(groups()).toEqual([]);
 
-    await user.selectOptions(format, "parquet");
-    expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
+    rerender(
+      detailsElement({
+        pointsToReview,
+        polygon: [
+          [-65, 44],
+          [-62, 44],
+          [-63, 45],
+          [-65, 44],
+        ],
+        filterDownloadByPolygon: true,
+      }),
+    );
+    const [clipped, box] = groups();
+    expect(clipped).toEqual([
+      "Clipped to the polygon",
+      ["csv", "parquet", "odv", "nccf"],
+    ]);
+    expect(box[0]).toBe("Polygon's bounding box only");
+    expect(box[1]).toEqual(expect.arrayContaining(["json", "mat"]));
+    expect(box[1]).not.toContain("csv");
+  });
+
+  it("hides the OBIS format when no OBIS dataset is selected", () => {
+    renderDetails();
+    expect(screen.getByLabelText("ERDDAP™")).toBeInTheDocument();
+    expect(screen.queryByLabelText("OBIS")).not.toBeInTheDocument();
   });
 });

@@ -77,7 +77,6 @@ export default function UrlSync() {
   } = useMapState();
   const {
     polygon,
-    datasetTitleSearchText,
     onlyInView,
     groupBy,
     highlightedRecord,
@@ -107,7 +106,6 @@ export default function UrlSync() {
       ...Object.fromEntries(filterParams),
       ...Object.fromEntries(selectionParams),
       lang,
-      ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       // Owned by useWideView.
@@ -169,7 +167,6 @@ export default function UrlSync() {
     query,
     mapView,
     polygon,
-    datasetTitleSearchText,
     onlyInView,
     groupBy,
     tracksMode,

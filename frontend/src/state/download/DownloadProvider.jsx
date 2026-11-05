@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
 import { server } from "../../config.js";
+import { ERDDAP_FORMATS } from "../../downloadLinks.js";
 import reportError from "../reportError.js";
 import {
   defaultStartDate,
@@ -25,10 +26,9 @@ import { usePersistentState } from "../usePersistentState.js";
 
 const DownloadContext = createContext();
 
-// The format the packaged download is written in; ODV and NetCDF have no
-// OBIS rendition, so OBIS datasets fall back to CSV (see downloader formats.py).
-export const PACKAGE_FORMATS = ["csv", "parquet", "odv", "nccf"];
-// The downloader's OBIS_FORMATS: other formats reach OBIS datasets as CSV.
+// The formats the packaged download is written in, per source: OBIS
+// occurrences are a flat table, with no ODV or CF-DSG rendition.
+export const PACKAGE_FORMATS = Object.keys(ERDDAP_FORMATS);
 export const OBIS_FORMATS = ["csv", "parquet"];
 
 const FAILURE_TEXT_KEYS = {
@@ -58,6 +58,7 @@ export default function DownloadProvider({ children }) {
   const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false);
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false);
   const [packageFormat, setPackageFormat] = useState("csv");
+  const [obisFormat, setObisFormat] = useState("csv");
 
   const emailValid = validateEmail(email);
   const polygonFilterActive = !isEmpty(polygon);
@@ -129,7 +130,7 @@ export default function DownloadProvider({ children }) {
     submitRequest();
   }
 
-  // The selection as both the package queue and the download script read it.
+  // The selection as the package queue reads it.
   function downloadQuery(pks) {
     const downloadQuery = { ...query };
     if (
@@ -151,15 +152,11 @@ export default function DownloadProvider({ children }) {
     let queryString = `${applyDatasetPKs(
       createDataFilterQueryString(downloadQuery),
       pks,
-    )}&lang=${i18n.language}&format=${packageFormat}`;
+    )}&lang=${i18n.language}&format=${packageFormat}&obisFormat=${obisFormat}`;
     if (polygon && filterDownloadByPolygon) {
       queryString += `&polygon=${JSON.stringify(polygon)}`;
     }
     return queryString;
-  }
-
-  function scriptUrl(pks) {
-    return `${server}/download/script?${downloadQuery(pks)}`;
   }
 
   function submitRequest() {
@@ -206,9 +203,10 @@ export default function DownloadProvider({ children }) {
     polygonFilterActive,
     packageFormat,
     setPackageFormat,
+    obisFormat,
+    setObisFormat,
     handleEmailChange,
     handleSubmission,
-    scriptUrl,
   };
 
   return (

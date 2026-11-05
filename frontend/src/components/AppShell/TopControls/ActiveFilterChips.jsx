@@ -172,12 +172,19 @@ export default function ActiveFilterChips() {
                           {t("filterNotTag")}
                         </span>
                       )}
-                      <span className="activeFilterItemLabel" title={fullLabel}>
+                      <button
+                        type="button"
+                        className="activeFilterItemLabel"
+                        data-testid="filter-chip-item-label"
+                        onClick={f.goToFilter}
+                        // The full value first: the label truncates.
+                        title={`${fullLabel}\n${t("activeFilterGoToFilterTitle", { filter: f.label })}`}
+                      >
                         <span className="sr-only">
                           {item.excluded && `${t("filterNotTag")} `}
                         </span>
                         {item.label}
-                      </span>
+                      </button>
                       <button
                         type="button"
                         className="activeFilterItemRemove"

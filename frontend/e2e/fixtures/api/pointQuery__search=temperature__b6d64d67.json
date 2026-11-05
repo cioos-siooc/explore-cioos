@@ -1,0 +1,78 @@
+[
+  {
+    "pk": 27,
+    "pk_url": 27,
+    "dataset_id": "HakaiSentinelTemperature",
+    "n_profiles": 24,
+    "cdm_data_type": "TimeSeries",
+    "title": "Sentinels of Change Sea Surface Temperature Time Series Data Along the British Columbia Coast",
+    "platform": "land or seafloor",
+    "num_columns": 10,
+    "first_eov_column": "water_temp",
+    "title_translated": {
+      "en": "Sentinels of Change Sea Surface Temperature Time Series Data Along the British Columbia Coast",
+      "fr": "Séries chronologiques de températures de surface de la mer recueillies par Sentinels of Change le long de la côte de la Colombie-Britannique"
+    },
+    "eovs": ["subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
+    "profiles_count": 24,
+    "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiSentinelTemperature.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/0049e274-f23e-448c-b307-14aa3b4e0b4a"
+  },
+  {
+    "pk": 29,
+    "pk_url": 29,
+    "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional",
+    "n_profiles": 393,
+    "cdm_data_type": "TimeSeriesProfile",
+    "title": "Water Property Measurements from Conductivity-Temperature-Depth Profilers, BC, Canada (Provisional)",
+    "platform": "surface vessel",
+    "num_columns": 66,
+    "first_eov_column": "flc",
+    "title_translated": {
+      "en": "Water Property Measurements from Conductivity-Temperature-Depth Profilers, BC, Canada (Provisional)",
+      "fr": "Mesures des propriétés de l'eau à partir de profils de conductivité-température-profondeur, Colombie-Britannique, Canada (provisoire)"
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": ["Hakai Institute"],
+    "profiles_count": 393,
+    "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWaterPropertiesInstrumentProfileProvisional.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/13dc3c6c-9dd4-47a4-92ad-681c653d3565"
+  },
+  {
+    "pk": 30,
+    "pk_url": 30,
+    "dataset_id": "HakaiWaterPropertiesInstrumentProfileResearch",
+    "n_profiles": 157,
+    "cdm_data_type": "TimeSeriesProfile",
+    "title": "Water Property Measurements from Conductivity-Temperature-Depth Profilers, BC, Canada (Research)",
+    "platform": "surface vessel",
+    "num_columns": 40,
+    "first_eov_column": "flc",
+    "title_translated": {
+      "en": "Water Property Measurements from Conductivity-Temperature-Depth Profilers, BC, Canada (Research)",
+      "fr": "Mesures des propriétés de l'eau à partir de profils de conductivité-température-profondeur, Colombie-Britannique, Canada (Recherche)"
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": ["Hakai Institute"],
+    "profiles_count": 157,
+    "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWaterPropertiesInstrumentProfileResearch.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/613ba2f9-b21d-445f-8eaa-f42950c9350b"
+  }
+]

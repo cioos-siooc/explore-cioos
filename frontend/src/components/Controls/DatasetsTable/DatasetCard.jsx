@@ -4,6 +4,8 @@ import {
   CalendarCheck,
   CheckCircleFill,
   CircleFill,
+  Download,
+  ExclamationTriangle,
   PlusCircle,
   Grid3x3Gap,
   HexagonFill,
@@ -36,7 +38,8 @@ export default function DatasetCard({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  obisFallbackFormat,
+  // The source link the download modal built for this row.
+  downloadLink,
   onSelect,
   onInspect,
   // Unlike onSelect (in or out of this batch), takes the row off the order.
@@ -47,6 +50,8 @@ export default function DatasetCard({
   tipHighlight,
   t,
   i18n,
+  // Extra lines under the meta, e.g. the "what's here" card's cell figures.
+  children,
 }) {
   const isGrid = row.cdm_data_type === "Grid";
   const isObis = row.source_type === "obis";
@@ -219,21 +224,12 @@ export default function DatasetCard({
         </div>
 
         <DatasetCardMeta row={row} t={t} i18n={i18n} />
+        {children}
 
         {/* Outside the estimates branch: the dataset the queue refuses is the
             one these links are wanted for. */}
         {isDownloadModal && (
           <div className="datasetCardSources">
-            {isObis && obisFallbackFormat && (
-              <span
-                className="datasetCardFormatTag"
-                title={t("datasetCardObisFallbackTitle", {
-                  format: obisFallbackFormat,
-                })}
-              >
-                {t("datasetCardObisFallbackText")}
-              </span>
-            )}
             {row.erddap_url && (
               <a
                 className="datasetCardSourceLink"
@@ -246,6 +242,34 @@ export default function DatasetCard({
                 <BoxArrowUpRight size={12} aria-hidden="true" />
                 {isObis ? "OBIS" : "ERDDAP™"}
               </a>
+            )}
+            {downloadLink?.url && (
+              <a
+                className="datasetCardSourceLink"
+                href={downloadLink.url}
+                title={downloadLink.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download size={12} aria-hidden="true" />
+                {isObis ? "DwC-A" : t("datasetCardDataLinkText")}
+              </a>
+            )}
+            {downloadLink?.unapplied.length > 0 && (
+              <span
+                className="datasetCardFormatTag datasetCardUnapplied"
+                title={t("datasetCardUnappliedTitle", {
+                  filters: new Intl.ListFormat(i18n.language).format(
+                    downloadLink.unapplied.map((filter) =>
+                      t(`downloadFilterName_${filter}`),
+                    ),
+                  ),
+                })}
+              >
+                <ExclamationTriangle size={11} aria-hidden="true" />
+                {t("datasetCardUnappliedText")}
+              </span>
             )}
             {row.ckan_url && (
               <a
@@ -303,8 +327,7 @@ export function DatasetPlatformIcon({
   );
 }
 
-// Shared with the map's "what's here" card so a dataset reads the same in both.
-export function DatasetCardMeta({ row, t, i18n }) {
+function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
     row.erddap_server_url || row.erddap_url,

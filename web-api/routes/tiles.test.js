@@ -210,7 +210,7 @@ test("GET /tiles/tracks/:z/:x/:y.mvt carries every dataset column the shared fil
   }
 });
 
-test("GET /tiles/tracks/:z/:x/:y.mvt keeps heads only for trajectories live on the selected date", async () => {
+test("GET /tiles/tracks/:z/:x/:y.mvt keeps every head, flagging the ones seen in the window's last week", async () => {
   db.queueRaw([{ st_asmvt: FAKE_TILE }]);
   await agent.get("/tiles/tracks/6/20/20.mvt").query({
     timeMin: "2020-01-01T00:00:00Z",
@@ -221,8 +221,9 @@ test("GET /tiles/tracks/:z/:x/:y.mvt keeps heads only for trajectories live on t
     sql.indexOf("head_mvt AS"),
     sql.indexOf("SELECT coalesce"),
   );
-  assert.match(headMvt, /h\.trajectory_end >= .*- interval '1 day'/);
-  assert.match(headMvt, /make_interval\(secs => h\.gap_secs\)/);
+  const [selectList, where] = headMvt.split(/\bWHERE\b/);
+  assert.match(selectList, /h\.time >= \S+ - interval '7 days' AS active/);
+  assert.doesNotMatch(where, /h\.time/);
 });
 
 test("GET /tiles/tracks/:z/:x/:y.mvt rejects an unrecognized trajectoryTypes entry", async () => {

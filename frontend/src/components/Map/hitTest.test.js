@@ -8,6 +8,7 @@ import {
   dedupeGriddapByPk,
   featureHasDataset,
   griddapCoveredIn,
+  idsOutsideDataset,
   griddapOutranksHexesIn,
   griddapTitle,
   isOnAPointIn,
@@ -546,5 +547,17 @@ describe("featureHasDataset", () => {
       false,
     );
     expect(featureHasDataset(feature("hexes", {}), 3)).toBe(false);
+  });
+});
+
+describe("idsOutsideDataset", () => {
+  it("keeps each feature outside the dataset once", () => {
+    const cell = (id, datasets) => ({ id, properties: { datasets } });
+    expect(
+      idsOutsideDataset(
+        [cell(1, "[3,7]"), cell(2, "[3]"), cell(2, "[3]"), cell(4, "x")],
+        7,
+      ),
+    ).toEqual([2, 4]);
   });
 });

@@ -9,6 +9,7 @@ import FeatureCard from "../Map/FeatureCard/FeatureCard.jsx";
 import ClearMapSelection from "../Map/ClearMapSelection/ClearMapSelection.jsx";
 import ApiErrorBanner from "./ApiErrorBanner.jsx";
 import ActivityIndicator from "./ActivityIndicator.jsx";
+import NoticeToast from "./NoticeToast.jsx";
 import Sidebar from "./Sidebar/Sidebar.jsx";
 import TopControls from "./TopControls/TopControls.jsx";
 import FiltersModal from "./Modals/FiltersModal.jsx";
@@ -28,6 +29,7 @@ import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState, useMapView } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
+import { useNotices } from "../../state/notices/notices.js";
 import "./styles.css";
 
 // The splash and legend follow the camera, so they subscribe to it here rather
@@ -78,6 +80,8 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    bathymetryPalette,
+    setBathymetryPalette,
     depthReading,
     depthToolActive,
     setDepthToolActive,
@@ -87,6 +91,7 @@ export default function AppShell() {
   } = useMapState();
   const { startDate, endDate, timeFilterActive } = useFilters();
   const { showIntroModal, setShowIntroModal } = useUI();
+  const { notices, undismissed, dismiss } = useNotices();
   const { platformsAvailable } = useSelection();
 
   // Each turns off exactly what one legend entry describes, so it rides on
@@ -103,6 +108,8 @@ export default function AppShell() {
       label: t("layersBathymetry"),
       checked: bathymetryVisible,
       onChange: () => setBathymetryVisible(!bathymetryVisible),
+      palette: bathymetryPalette,
+      onPaletteChange: setBathymetryPalette,
     },
     tracks: {
       key: "tracks",
@@ -134,6 +141,13 @@ export default function AppShell() {
       <ClearMapSelection />
       <DatasetMapCorner />
       <ApiErrorBanner />
+      {/* The About window lists every notice, so the toast waits for it. */}
+      {!showIntroModal && (
+        <NoticeToast
+          notice={undismissed[0]}
+          onClose={() => dismiss(undismissed[0].id)}
+        />
+      )}
       <ActivityIndicator />
       <Sidebar />
       <TopControls />
@@ -156,7 +170,11 @@ export default function AppShell() {
       />
       <TimeBar />
       <DepthBar />
-      <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
+      <IntroModal
+        showModal={showIntroModal}
+        setShowModal={setShowIntroModal}
+        notices={notices}
+      />
       {/* After the intro and the download window, both of which link to it. */}
       <PrivacyModal />
       <PreviewHost />

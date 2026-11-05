@@ -1,8 +1,8 @@
 import { Marked } from "marked";
 
-// Abstracts and lineage are written by the data's publishers (CKAN notes are
-// markdown, ERDDAP summaries plain text), so this is untrusted input going into
-// innerHTML: raw HTML is shown as text, and links keep only safe schemes.
+// Untrusted input going into innerHTML (publisher abstracts, where CKAN notes are
+// markdown and ERDDAP summaries plain text; deployment notices): raw HTML is
+// shown as text, and links keep only safe schemes.
 const SAFE_HREF = /^(https?:|mailto:)/i;
 
 function escapeHtml(value) {

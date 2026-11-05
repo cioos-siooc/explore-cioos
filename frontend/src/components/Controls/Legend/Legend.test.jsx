@@ -171,6 +171,46 @@ describe("Legend", () => {
     expect(tool).toBeDisabled();
   });
 
+  it("switches to CHS's depth colours and back from the depth group, and disables the switch with the layer", () => {
+    const onPaletteChange = vi.fn();
+    const bathymetry = (checked, palette) => ({
+      key: "bathymetry",
+      label: "Seafloor depth",
+      checked,
+      onChange: () => {},
+      palette,
+      onPaletteChange,
+    });
+    const { rerender } = renderLegend({
+      zoom: 12,
+      controls: { bathymetry: bathymetry(true, "deep") },
+    });
+    const button = screen.getByRole("button", { name: "CHS depth colours" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    button.click();
+    expect(onPaletteChange).toHaveBeenCalledWith("chs");
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(true, "chs") }}
+      />,
+    );
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    button.click();
+    expect(onPaletteChange).toHaveBeenLastCalledWith("deep");
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(false, "chs") }}
+      />,
+    );
+    expect(button).toBeDisabled();
+  });
+
   it("renders layer switches with no key on the map under their own group", () => {
     const onChange = vi.fn();
     renderLegend({
@@ -181,8 +221,9 @@ describe("Legend", () => {
     expect(screen.getByLabelText("Gridded coverage")).toBeInTheDocument();
   });
 
-  it("says in the seafloor info that NONNA is not for navigation", async () => {
+  it("says in the seafloor info, not on the card, that NONNA is not for navigation", async () => {
     const { user } = renderLegend({ zoom: 12 });
+    expect(screen.queryByText("Not for navigation")).not.toBeInTheDocument();
     await user.click(screen.getByLabelText("About Seafloor depth"));
     const help = await screen.findByTestId("legend-help-modal");
     expect(help).toHaveTextContent("Not for navigation");

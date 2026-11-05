@@ -686,9 +686,20 @@
 }
 
 .activeFilterItemLabel {
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.activeFilterItemLabel:hover {
+  text-decoration: underline;
 }
 
 .activeFilterItemRemove {

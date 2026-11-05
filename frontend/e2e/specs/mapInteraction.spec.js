@@ -33,13 +33,6 @@ const EMPTY = { lon: -105, lat: 60 };
 const openAt = async (page, { lon, lat }, extra = "", zoom = 2.75) => {
   await page.goto(`/?lat=${lat}&lon=${lon}&zoom=${zoom}&lang=en${extra}`);
   await waitForMapReady(page);
-  // The card stands aside while the datasets sidebar is open, and the sidebar
-  // starts open on a wide screen.
-  const sidebar = page.getByTestId("sidebar-datasets");
-  if ((await sidebar.getAttribute("data-expanded")) === "true") {
-    await page.getByTestId("topbar-datasets-button").click();
-    await expect(sidebar).toHaveAttribute("data-expanded", "false");
-  }
 };
 
 const canvasCentre = async (page) => {
@@ -249,7 +242,7 @@ test.describe("pointing at markers and tracks", () => {
     );
     const card = openCard(page);
     await expect(card).toContainText("40 day(s) of data");
-    await expect(card.locator(".featureCardRow")).toHaveCount(2);
+    await expect(card.getByTestId("dataset-card")).toHaveCount(2);
     // A marker is a place, not a neighbourhood: no "nearby" qualifier.
     await expect(card).not.toContainText("nearby");
   });
@@ -297,15 +290,15 @@ test.describe("pointing at markers and tracks", () => {
     );
   });
 
-  test("clicking a marker on a track lists the track first", async ({
+  test("clicking a marker on its own dataset's track lists the dataset once, naming the track", async ({
     page,
   }) => {
     await openScene(page);
     await clickUntil(page, CROSSED_MARKER.at, () =>
       expect(openCard(page)).toBeVisible({ timeout: 1_000 }),
     );
-    const rows = openCard(page).locator(".featureCardRow");
-    await expect(rows).toHaveCount(2);
+    const rows = openCard(page).getByTestId("dataset-card");
+    await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText("glider-7");
   });
 });
@@ -334,14 +327,19 @@ test.describe("pointing at gridded coverage", () => {
     );
   });
 
-  test("clicking stacked grids lists each once", async ({ page }) => {
+  // The card lists what the datasets list does, and these grids are not in
+  // the recorded results.
+  test("clicking grids the results don't list offers nothing to act on", async ({
+    page,
+  }) => {
     await openScene(page, "&griddap=true");
     await clickUntil(page, GRID_OVERLAP, () =>
       expect(openCard(page)).toBeVisible({ timeout: 1_000 }),
     );
-    const rows = openCard(page).locator(".featureCardRow");
-    await expect(rows).toHaveCount(2);
-    await expect(rows.first()).toContainText("Gridded dataset");
+    await expect(openCard(page).getByTestId("dataset-card")).toHaveCount(0);
+    await expect(openCard(page)).toContainText(
+      "Nothing here is in the current results",
+    );
   });
 });
 

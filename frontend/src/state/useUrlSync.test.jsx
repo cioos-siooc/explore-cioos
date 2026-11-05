@@ -78,38 +78,35 @@ describe("UrlSync", () => {
     await waitFor(() => expect(i18n.language).toBe("fr"));
   });
 
-  it("writes the title search into ?search=, and drops it when cleared", async () => {
+  it("writes the search and its scope into the link, and drops both when cleared", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     await waitFor(() =>
       expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
     );
 
-    act(() => hooks.selection.setDatasetTitleSearchText("orca"));
+    act(() => hooks.filters.setSearch("orca"));
     await waitFor(() => expect(params().get("search")).toBe("orca"));
+    expect(params().has("searchIn")).toBe(false);
 
-    act(() => hooks.selection.setDatasetTitleSearchText(""));
+    act(() => hooks.filters.setSearch("sea ice & orca", "all"));
+    await waitFor(() => expect(params().get("searchIn")).toBe("all"));
+    expect(params().get("search")).toBe("sea ice & orca");
+
+    act(() => hooks.filters.setSearch(""));
     await waitFor(() => expect(params().has("search")).toBe(false));
+    expect(params().has("searchIn")).toBe(false);
   });
 
-  it("keeps the search's dataset list out of the link — only the expression", async () => {
-    renderWithProviders(<Probe />, { providers: "app" });
-    // pointsData, not `ready`: it comes from a different request than the
-    // catalogue fetches `ready` reports on.
+  it("seeds the search and its scope from the link", async () => {
+    renderWithProviders(<Probe />, {
+      providers: "app",
+      url: "/?search=sea%20ice&searchIn=all",
+    });
     await waitFor(() =>
-      expect(hooks.selection.pointsData.length).toBeGreaterThan(0),
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
     );
-
-    // The derived datasetPKs are map-only and must never reach the link.
-    const needle = hooks.selection.pointsData[0].title.slice(0, 6);
-    act(() => hooks.selection.setDatasetTitleSearchText(needle));
-    await waitFor(() =>
-      expect(
-        new URLSearchParams(hooks.mapState.mapQueryString).has("datasetPKs"),
-      ).toBe(true),
-    );
-
-    expect(params().get("search")).toBe(needle);
-    expect(params().has("datasetPKs")).toBe(false);
+    expect(hooks.filters.searchText).toBe("sea ice");
+    expect(hooks.filters.searchIn).toBe("all");
   });
 
   it("writes onlyInView only when true (the unfiltered state carries no param)", async () => {

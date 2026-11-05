@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pandas as pd
 import pytest
+from cde_harvester.core.errors import EmptyVariableError
 from cde_harvester.dataset_types import extract_features as get_profiles
 from cde_harvester.dataset_types import timeseries_profile
 from conftest import (
@@ -129,6 +130,22 @@ class TestGetProfilesEmptyAndEdgeCases:
         dropped = {w["code"]: w for w in bad_geometry_dataset.warnings}["FEATURES_DROPPED"]
         assert dropped["count"] == 1
         assert dropped["items"] == ["STATION_001"]
+        assert bad_geometry_dataset.no_features_reason == dropped["message"]
+
+    def test_bad_depth_range_kept_without_depth(self, single_station_dataset):
+        """QC-flagged recovery spikes (amundsen13107_ips5: -24413 m) land in
+        actual_range; the feature stays, only its depth range is dropped."""
+        single_station_dataset.df_variables.loc["depth", "actual_range"] = (
+            "-24413.14,77.05393"
+        )
+        result = get_profiles(single_station_dataset)
+        assert len(result) == 1
+        assert result["depth_min"].isna().all()
+        assert result["depth_max"].isna().all()
+        warning = {w["code"]: w for w in single_station_dataset.warnings}[
+            "DEPTH_RANGE_UNAVAILABLE"
+        ]
+        assert warning["items"] == ["STATION_001"]
 
     def test_unparseable_time_feature_filtered_out(self, single_station_dataset):
         """A time pandas can't represent (year 0019, a typo for 2019) coerces
@@ -225,6 +242,30 @@ def two_station_dataset(single_station_dataset):
     dataset.get_count.side_effect = _get_count
     dataset.eovs = ["oxygen", "subSurfaceTemperature"]
     return dataset
+
+
+class TestNeverFilledVariables:
+    """A declared variable with no values is a provider data problem: an
+    error, not a NO_PROFILES_FOUND skip."""
+
+    def test_never_filled_time_raises(self, two_station_dataset):
+        answer = two_station_dataset.get_max_min.side_effect
+        two_station_dataset.get_max_min.side_effect = (
+            lambda v: pd.DataFrame() if v[-1] == "time" else answer(v)
+        )
+        with pytest.raises(EmptyVariableError, match="time is never filled"):
+            get_profiles(two_station_dataset)
+
+    def test_never_filled_lat_lon_raises(self, two_station_dataset):
+        two_station_dataset.get_profile_ids.return_value = pd.DataFrame(
+            {"station_id": ["STATION_001", "STATION_002"]}
+        )
+        answer = two_station_dataset.get_max_min.side_effect
+        two_station_dataset.get_max_min.side_effect = (
+            lambda v: pd.DataFrame() if v[-1] == "latitude" else answer(v)
+        )
+        with pytest.raises(EmptyVariableError, match="No latitude/longitude"):
+            get_profiles(two_station_dataset)
 
 
 class TestPerFeatureEovs:

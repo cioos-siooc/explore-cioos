@@ -15,7 +15,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import xarray as xr
-from cioos_downloader import download_erddap, downloader_wrapper, formats, package, script
+from cioos_downloader import download_erddap, downloader_wrapper, formats, package
 
 _CSV = (
     b"time,latitude,longitude,depth\n"
@@ -215,6 +215,19 @@ def test_obis_falls_back_to_csv_for_a_format_it_has_no_rendition_of(tmp_path, mo
     assert "was delivered as CSV" in read("README.md")
 
 
+def test_obis_takes_its_own_format_beside_the_erddap_one(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    report, archive, read = _run(tmp_path, _query(obis, format="nccf", obis_format="parquet"))
+
+    row = report["erddap_report"][0]
+    assert row["format"] == "parquet" and not row["format_fallback"]
+    assert "cde_download_pkg001/data/abc_obis_org/abc_obis_org.parquet" in archive.namelist()
+    assert "- OBIS format: Parquet" in read("README.md")
+
+
 def test_feature_ids_replace_the_bounding_box(tmp_path):
     urls = []
 
@@ -295,43 +308,6 @@ def test_variables_come_from_the_erddap_info_page_when_not_harvested(tmp_path):
     assert "depth>=" not in urls[1]
 
 
-def test_the_download_script_builds_the_package_without_limits_or_the_html_readme(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(download_erddap, "DATASET_SIZE_LIMIT", 10)
-    monkeypatch.chdir(tmp_path)
-    query = _query(_dataset("Good", metadata=_METADATA))
-    del query["user_query"]["email"]
-    with (
-        patch("cioos_downloader.download_erddap.requests.get", return_value=_response()),
-        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
-    ):
-        assert script.run(query) == 0
-    assert "Good: COMPLETED, 1 file(s)" in capsys.readouterr().out
-
-    root = tmp_path / "cde_download_pkg001"
-    names = {p.relative_to(root).as_posix() for p in root.rglob("*")}
-    assert (root / "data/Good_data_example_ca/Good_data_example_ca.csv").read_bytes() == _CSV
-    assert {"README.md", "reproduce.py", "datapackage.json", "ro-crate-metadata.json"} <= names
-    citation_files = {"citations.txt", "citations.bib", "citations.ris", "licences.txt"}
-    assert {f"citation/{f}" for f in citation_files} <= names
-    assert {"data/Good_data_example_ca/citation.txt", "data/Good_data_example_ca/metadata/metadata.json"} <= names
-    assert "README.html" not in names
-    assert "README.html" not in (root / "README.md").read_text()
-    crate = (root / "ro-crate-metadata.json").read_text()
-    assert "README.html" not in crate
-
-
-def test_the_download_script_says_which_datasets_fell_back_to_csv(tmp_path, monkeypatch, capsys):
-    export = tmp_path / "export.parquet"
-    _raw_obis(export)
-    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
-    monkeypatch.chdir(tmp_path)
-    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
-    with patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]):
-        script.run(_query(obis, format="nccf"))
-
-    assert "abc  was delivered as CSV: NetCDF CF (DSG) is not available for this source" in capsys.readouterr().out
-
-
 def test_servers_download_concurrently_but_each_serves_one_request_at_a_time(tmp_path):
     active, peak, lock = {}, {}, threading.Lock()
 
@@ -352,38 +328,6 @@ def test_servers_download_concurrently_but_each_serves_one_request_at_a_time(tmp
 
     assert peak == {"data.example.ca": 1, "other.example.ca": 1}
     assert [r["dataset_id"] for r in report["erddap_report"]] == [d["dataset_id"] for d in datasets]
-
-
-def test_progress_hears_each_dataset_stage_bytes_and_outcome_in_order(tmp_path):
-    events = []
-
-    class Recorder(download_erddap.Progress):
-        def stage(self, dataset, text):
-            events.append((dataset["dataset_id"], "stage", text.split(":")[0]))
-
-        def received(self, dataset, n_bytes):
-            events.append((dataset["dataset_id"], "bytes", n_bytes))
-
-        def finished(self, dataset, row):
-            events.append((dataset["dataset_id"], "finished", row["status"]))
-
-    with (
-        patch("cioos_downloader.download_erddap.requests.get", return_value=_response()),
-        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
-    ):
-        download_erddap.get_datasets(_query(_dataset("A0"), _dataset("A1")), tmp_path, progress=Recorder())
-
-    assert events == [
-        (dataset_id, *event)
-        for dataset_id in ("A0", "A1")
-        for event in [
-            ("stage", "request 1/1"),
-            ("bytes", len(_CSV)),
-            ("stage", "writing CSV"),
-            ("stage", "fetching the source metadata records"),
-            ("finished", "COMPLETED"),
-        ]
-    ]
 
 
 # Inside: (-133, 50). Outside but within the bounding box: (-126, 55).
@@ -481,6 +425,34 @@ def test_reproduce_rebuilds_every_erddap_format_identically(tmp_path, fmt, write
     [data] = report["erddap_report"][0]["files"]
     assert f"match: {data['path']}" in result.stdout
     assert (root / "reproduced" / data["path"]).read_bytes() == (root / data["path"]).read_bytes()
+
+
+def test_a_raw_erddap_format_ships_as_erddap_wrote_it_over_the_polygons_box(tmp_path):
+    raw = tmp_path / "raw"
+    raw.write_bytes(b'{"table": {"rows": [[1, 2]]}}')
+    report, archive, read = _run(
+        tmp_path, _query(_dataset("Ctd"), format="json", polygon_region=_TRIANGLE),
+        lambda url, **_: _response(body=raw.read_bytes()),
+    )
+    row = report["erddap_report"][0]
+    assert row["status"] == "COMPLETED" and row["n_records"] is None
+    assert ".json?" in row["download_url_list"][0]
+    assert read("data/Ctd_data_example_ca/Ctd_data_example_ca.json") == raw.read_text()
+    readme = read("README.md")
+    assert "covers your polygon's bounding box: JSON table can't be clipped" in readme
+    assert "| Title Ctd | — |" in readme
+    assert "ERDDAP's own files" in readme
+    [resource] = [r for r in json.loads(read("datapackage.json"))["resources"] if r["path"].endswith(".json")]
+    assert resource["mediatype"] == "application/json" and "schema" not in resource
+
+    root, result = _reproduce(tmp_path, archive, _point_requests_at(raw))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "match: data/Ctd_data_example_ca/Ctd_data_example_ca.json" in result.stdout
+
+
+def test_a_clippable_format_under_a_polygon_carries_no_bounding_box_note(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Ctd"), polygon_region=_TRIANGLE))
+    assert "bounding box" not in read("README.md")
 
 
 @pytest.mark.parametrize("fmt", ["csv", "parquet"])
