@@ -196,8 +196,8 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
             )
         if ckan_links.empty:
             ckan_links = pd.DataFrame(columns=["erddap_url", "dataset_id", "ckan_id",
-                                               "ckan_organizations", "ckan_title", "title_fr",
-                                               "ckan_metadata"])
+                                               "ckan_organizations", "ckan_owner", "ckan_title",
+                                               "title_fr", "ckan_metadata"])
         ckan_by_key = ckan_links.assign(
             _erddap_key=ckan_links["erddap_url"].map(erddap_join_key)
         ).drop(columns="erddap_url")

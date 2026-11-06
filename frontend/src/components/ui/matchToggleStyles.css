@@ -1,0 +1,61 @@
+/* Combine ticked options: Any (OR) | All (AND). A tinted bar at the top of a
+   filter section so the choice is seen before the options are ticked. */
+.matchToggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-teal-light);
+}
+
+.matchToggleLabel {
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-ink);
+}
+
+.matchToggleOptions {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+}
+
+.matchToggleOption {
+  padding: 4px 14px;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.matchToggleOption:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.matchToggleOption.selected {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.matchToggleOption:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.matchToggleHint {
+  flex-basis: 100%;
+  font-size: var(--cioos-font-size-xs, 0.8125rem);
+  color: var(--cioos-ink-80);
+}

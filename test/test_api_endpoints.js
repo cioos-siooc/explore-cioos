@@ -56,6 +56,14 @@ const obisNodes = await cdeRequest("/obisNodes");
 assert.equal(Array.isArray(obisNodes), true, "/obisNodes must return an array");
 assert.ok(obisNodes.every((node) => typeof node.name === "string"));
 
+const catalogues = await cdeRequest("/catalogues");
+assert.equal(
+  Array.isArray(catalogues),
+  true,
+  "/catalogues must return an array",
+);
+assert.ok(catalogues.every((owner) => typeof owner.name === "string"));
+
 const scientificNames = await cdeRequest("/scientificNames?q=orca");
 assert.equal(
   Array.isArray(scientificNames),
