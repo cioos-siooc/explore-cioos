@@ -219,6 +219,16 @@ class Dataset:
             )
             return []
 
+        if profile_variables.get("timeseries_id") == "time":
+            # distinct() of it lists every timestamp; on salishsea's 1-minute
+            # ubcONCTWDP1mV18-01 that ran 24 min, then ERDDAP kept computing it
+            # and 408'd every later request for 1.7 h.
+            self.no_features_reason = (
+                "cf_role=timeseries_id is on time, which makes every record its "
+                "own station; set it on a station id variable"
+            )
+            return pd.DataFrame()
+
         if (
             len(profile_variable_list) == 1
             and df_variables.loc[profile_variable_list[0], "type"] == "byte"

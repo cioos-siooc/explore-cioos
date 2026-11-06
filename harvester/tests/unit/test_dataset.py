@@ -379,6 +379,29 @@ class TestGetProfileIds:
         assert list(profile_ids.columns) == ["station_id"]
         assert len(profile_ids) == 1
 
+    def test_timeseries_id_on_time_is_refused_without_a_query(self, mock_erddap_server):
+        """distinct() of a timeseries_id on time enumerates every record."""
+        from io import StringIO
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "attribute,station_id,cf_role,,timeseries_id",
+            "attribute,time,cf_role,,timeseries_id",
+        )
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            queries.append(url)
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        dataset = Dataset(mock_erddap_server, DATASET_ID)
+
+        assert len(dataset.get_profile_ids()) == 0
+        assert queries == []
+        assert "timeseries_id is on time" in dataset.no_features_reason
+
     def test_no_cf_role_explains_the_empty_result(self, mock_erddap_server):
         from io import StringIO
         info_csv = "\n".join(

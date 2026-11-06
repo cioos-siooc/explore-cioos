@@ -48,7 +48,7 @@ CACHE_TTL_SECONDS = 12 * 3600
 
 # Mixed into every Croissant hash: bump it when a harvester or schema change must
 # reach every dataset, so the next run re-harvests instead of skipping as unchanged.
-HARVEST_VERSION = 3
+HARVEST_VERSION = 4
 
 
 class _SpooledBody(tempfile.SpooledTemporaryFile):
