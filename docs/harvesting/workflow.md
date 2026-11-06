@@ -145,7 +145,7 @@ describes the data still stored.
 
 | | ERDDAP | OBIS |
 | --- | --- | --- |
-| Change signal | Croissant document hash (ERDDAP 2.28+, file-backed datasets) | None |
+| Change signal | Croissant document hash (ERDDAP 2.28+: file-backed datasets, and database-backed ones with a closed time coverage) | None |
 | Unchanged dataset | Skipped after 1 request, rows kept | Re-harvested every run |
 | Upstream data cache | Off by default. With `cache: true`, data responses are kept 12 h on the `harvester_cache` volume (never the `allDatasets` listing, the Croissant change check or errors), so a re-run after an interrupted harvest is fast | `obis_cache` volume, refetched when OBIS republishes the dataset's parquet (newer `Last-Modified` than the cache) |
 | New or removed datasets | From the server's `allDatasets` listing | From [discovery](obis.md#choosing-datasets) |

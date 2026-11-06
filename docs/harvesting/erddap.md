@@ -84,8 +84,13 @@ flowchart TD
    (`/{tabledap|griddap}/{id}.croissant`, ERDDAP 2.28+; older servers are not
    asked) is hashed when it lists source files. On an incremental run an
    unchanged hash ends the dataset here: one request, status `UNCHANGED`.
-   Database-backed datasets (no file list) are always re-harvested; federated
-   datasets are followed to their origin server (up to 3 hops). When no hash
+   Database-backed datasets (no file list) are hashed only when their
+   Croissant `temporalCoverage` is closed (`start/end`): a finished
+   deployment, whose coverage would move if data were added. That hash also
+   rolls over every 30 days (`DB_REFRESH_DAYS`), offset per dataset so the
+   refreshes spread across runs, to catch reprocessed values the metadata
+   can't show. Ongoing ones publish no coverage and are always re-harvested. Federated datasets are
+   followed to their origin server (up to 3 hops). When no hash
    is produced, the reason (`HASH_NO_FILE_LIST`, `HASH_CROISSANT_HTTP_ERROR`,
    `HASH_CROISSANT_UNREADABLE`, `HASH_CROISSANT_UNSUPPORTED`,
    `HASH_FEDERATED_UNRESOLVED`, or `HASH_CKAN_UNAVAILABLE` after a CKAN

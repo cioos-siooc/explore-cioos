@@ -7,6 +7,7 @@ import logging
 import re
 import tempfile
 import time
+import zlib
 from urllib.parse import unquote, urlparse
 
 import diskcache as dc
@@ -82,6 +83,23 @@ _ERDDAP_SOURCE_RE = re.compile(
 CROISSANT_MIN_VERSION = (2, 28)
 
 _ERDDAP_VERSION_RE = re.compile(r"ERDDAP_version=(\d+)\.(\d+)")
+
+
+def _croissant_digest(doc, salt=""):
+    canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(f"{HARVEST_VERSION}{salt}:{canonical}".encode()).hexdigest()
+
+
+# A finished database-backed dataset's Croissant can't reveal reprocessed values,
+# so its hash also rolls over every DB_REFRESH_DAYS. The per-dataset offset
+# spreads those refreshes across runs instead of re-harvesting a whole server
+# (ONC: ~5 h) at once.
+DB_REFRESH_DAYS = 30
+
+
+def _refresh_period(dataset_id):
+    days = int(time.time() // 86400) + zlib.crc32(dataset_id.encode()) % DB_REFRESH_DAYS
+    return days // DB_REFRESH_DAYS
 
 
 def _croissant_source_url(doc):
@@ -325,12 +343,13 @@ class ERDDAP:
 
     def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0,
                                   dap="tabledap"):
-        """Return (content_hash, has_files, reason) from the dataset's Croissant.
+        """Return (content_hash, reliable, reason) from the dataset's Croissant.
 
-        The hash is a reliable change signal only when source files are listed,
-        so database-backed datasets are never skipped. Federated datasets are
-        followed to their origin (max 3 hops). Fail-open: (None, False, <HASH_*
-        reason>) on any error.
+        The hash is a reliable change signal when source files are listed, or
+        for a database-backed dataset with a closed temporalCoverage: a
+        finished deployment, whose coverage would move if data were added.
+        Federated datasets are followed to their origin (max 3 hops).
+        Fail-open: (None, False, <HASH_* reason>) on any error.
         """
         erddap_base = erddap_base.rstrip("/")
         if not self._supports_croissant(erddap_base):
@@ -354,9 +373,7 @@ class ERDDAP:
             distribution = [distribution]
         if any(isinstance(d, dict) and d.get("@type") == "cr:FileObject"
                for d in distribution):
-            canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
-            digest = hashlib.sha256(f"{HARVEST_VERSION}:{canonical}".encode()).hexdigest()
-            return digest, True, None
+            return _croissant_digest(doc), True, None
 
         if _hops < 3:
             origin = _parse_erddap_source(_croissant_source_url(doc))
@@ -364,6 +381,11 @@ class ERDDAP:
                 return self.get_croissant_fingerprint(
                     origin[0], origin[2], _hops + 1, dap=origin[1]
                 )
+            # An ongoing database-backed dataset publishes no temporalCoverage
+            # (ONC: 109 of 1773), and its metadata need not move with its data.
+            start, _, end = str(doc.get("temporalCoverage") or "").partition("/")
+            if start and end and end != "..":
+                return _croissant_digest(doc, f":{_refresh_period(dataset_id)}"), True, None
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED
