@@ -264,4 +264,5 @@ files) are loaded into PostgreSQL by `cde_harvester.loading`.
 With `flush_redis` on, the redis tile/API cache is flushed and its top
 requests re-warmed when the load re-harvested or pruned at least one dataset
 (or was a full reload). A run where every dataset was unchanged keeps the
-cache warm. OBIS has no change signal, so every OBIS run flushes.
+cache warm. OBIS has no change signal, so every OBIS run flushes. The flush
+keeps the proxied basemap tiles (EMODnet, NONNA), which no harvest changes.
