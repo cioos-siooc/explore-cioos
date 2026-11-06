@@ -1,3 +1,5 @@
+// Held apart for colour-blind readers, not only by eye: platformColors.test.js
+// pins the minimum ΔE2000 under simulated deuteranopia and protanopia.
 const platformColors = [
   {
     platform: "mooring",
@@ -19,15 +21,15 @@ const platformColors = [
   },
   {
     platform: "organism",
-    color: "#ff8d99",
+    color: "#e8a1ae",
   },
   {
     platform: "amphibious vehicle",
-    color: "#9d7660",
+    color: "#a5ae77",
   },
   {
     platform: "spacecraft",
-    color: "#967cff",
+    color: "#c6c2ff",
   },
   {
     platform: "float",
@@ -39,15 +41,16 @@ const platformColors = [
   },
   {
     platform: "buoyant aircraft",
-    color: "#4ef0b3",
+    color: "#51ffb5",
   },
   {
     platform: "non-buoyant aircraft",
-    color: "#f971d6",
+    color: "#ff3fd5",
   },
   {
     platform: "unknown",
-    color: "#575757",
+    // Navy-tinted, like every neutral in the theme.
+    color: "#414355",
   },
 ];
 
