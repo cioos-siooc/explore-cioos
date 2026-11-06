@@ -914,7 +914,13 @@ button.datasetCardTitle:focus-visible {
   font-size: var(--cioos-font-size-xs);
 }
 
+.datasetsCardList.compact .datasetCardMeta {
+  mask-image: linear-gradient(to left, transparent, #000 24px);
+}
+
+/* Shrinking a nowrap item would spill its text over the next item's icon. */
 .datasetsCardList.compact .datasetCardMetaItem {
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 

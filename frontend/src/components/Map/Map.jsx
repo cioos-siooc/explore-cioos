@@ -934,12 +934,8 @@ export default function CreateMap({
 
   const hexFillColor = () => rampExpression(colorStops.current, "count");
 
-  // The interpolation variable is `total`, not `count`: i18next treats a
-  // numeric `count` as a plural trigger and looks for _one/_other variants.
   const metricCountLabel = (value) =>
-    t("mapHexCountDays", {
-      total: Number(value || 0).toLocaleString(i18n.language),
-    });
+    t("mapHexCountDays", { count: Number(value || 0) });
 
   // MapLibre cannot interpolate to or from a data-driven value: the transition
   // just holds the old value then snaps, which read as a glitch after the map

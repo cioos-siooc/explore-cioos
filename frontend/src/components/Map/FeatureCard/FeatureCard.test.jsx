@@ -309,10 +309,10 @@ describe("FeatureCard", () => {
 
     // Fixture: pk 7 -> 1115, pk 8 -> 5, pk 9 -> 1.
     await waitFor(() =>
-      expect(cardFor(a)).toHaveTextContent("1,115 day(s) of data"),
+      expect(cardFor(a)).toHaveTextContent("1,115 days of data"),
     );
-    expect(cardFor(b)).toHaveTextContent("5 day(s) of data");
-    expect(cardFor(c)).toHaveTextContent("1 day(s) of data");
+    expect(cardFor(b)).toHaveTextContent("5 days of data");
+    expect(cardFor(c)).toHaveTextContent("1 day of data");
   });
 
   // A coverage hex at marker zoom lists the stations inside it too. Those are
@@ -344,9 +344,9 @@ describe("FeatureCard", () => {
     });
 
     await waitFor(() =>
-      expect(cardFor(markerRow)).toHaveTextContent("4 day(s) of data"),
+      expect(cardFor(markerRow)).toHaveTextContent("4 days of data"),
     );
-    expect(cardFor(hexRow)).toHaveTextContent("30 day(s) of data");
+    expect(cardFor(hexRow)).toHaveTextContent("30 days of data");
     const asked = globalThis.fetch.mock.calls
       .map(([input]) => new URL(input).searchParams)
       .filter((params) => params.has("source"));
@@ -365,7 +365,7 @@ describe("FeatureCard", () => {
       // No buckets: nothing to ask about, so no figure is claimed.
       buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
     });
-    expect(cardFor(row)).not.toHaveTextContent("day(s) of data");
+    expect(cardFor(row)).not.toHaveTextContent(/days? of data/);
   });
 
   describe("tips", () => {

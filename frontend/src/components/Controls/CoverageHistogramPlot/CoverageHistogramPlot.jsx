@@ -34,6 +34,7 @@ const OTHER_COLOR = "#a7b8bc";
 // edges outweigh the fill. Judged per bar, as the figure's width and bin count
 // both vary.
 const MIN_OUTLINED_BAR_PX = 6;
+const STACKED_LEGEND_MAX_PX = 560;
 
 const DAY_MS = 24 * 3600 * 1000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -191,6 +192,9 @@ export default function CoverageHistogramPlot({ histogram }) {
   }, [histogram, locale, i18n.language, t, countLabel, seasonal]);
 
   const outlined = plotWidth / binCenters.length >= MIN_OUTLINED_BAR_PX;
+  // A narrow plot has no empty third to float the legend over: it would hide
+  // the bars, so it rides above them as a row instead.
+  const stackedLegend = plotWidth > 0 && plotWidth < STACKED_LEGEND_MAX_PX;
 
   return (
     <div className="coverageHistogramPlot" ref={plotRef}>
@@ -235,13 +239,24 @@ export default function CoverageHistogramPlot({ histogram }) {
             rangemode: "tozero",
           },
           legend: {
-            x: legendSide === "left" ? 0.02 : 0.98,
-            xanchor: legendSide === "left" ? "left" : "right",
-            y: 0.98,
-            yanchor: "top",
+            ...(stackedLegend
+              ? {
+                  orientation: "h",
+                  x: 0,
+                  xanchor: "left",
+                  y: 1.02,
+                  yanchor: "bottom",
+                  borderwidth: 0,
+                }
+              : {
+                  x: legendSide === "left" ? 0.02 : 0.98,
+                  xanchor: legendSide === "left" ? "left" : "right",
+                  y: 0.98,
+                  yanchor: "top",
+                  borderwidth: 1,
+                }),
             bgcolor: "#ffffff",
             bordercolor: "#DCE8E5",
-            borderwidth: 1,
             font: { size: 11 },
             title: { text: "" },
           },

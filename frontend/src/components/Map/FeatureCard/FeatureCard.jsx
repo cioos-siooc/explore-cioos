@@ -126,9 +126,7 @@ export default function FeatureCard() {
   };
 
   const countLabel = (value) =>
-    t("mapHexCountDays", {
-      total: Number(value || 0).toLocaleString(i18n.language),
-    });
+    t("mapHexCountDays", { count: Number(value || 0) });
 
   // What the click found of this dataset, beside its catalogue-wide meta.
   const hereLine = (row) => {

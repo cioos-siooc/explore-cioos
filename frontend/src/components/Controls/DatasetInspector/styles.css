@@ -125,7 +125,10 @@
   font-size: var(--cioos-font-size-md);
   font-weight: 600;
   line-height: 1.3;
-  letter-spacing: -0.01em;
+
+  /* Sora's word space is narrow; across a wrapped multi-line title it read
+     as missing. */
+  word-spacing: 0.08em;
   color: var(--cioos-ink);
 }
 
