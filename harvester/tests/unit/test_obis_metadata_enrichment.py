@@ -59,7 +59,7 @@ def _enrich(h):
     datasets = pd.DataFrame(
         [{"dataset_id": d, "title": f"OBIS {d}", "eovs": []} for d in (MATCHED, UNMATCHED)]
     )
-    return h._enrich_with_conversion(h._enrich_with_ckan(datasets)).set_index("dataset_id")
+    return h._enrich_metadata(datasets).set_index("dataset_id")
 
 
 def test_ckan_lookup_gets_each_datasets_ipt_url(harvester, mocker):
@@ -100,6 +100,16 @@ def test_unmatched_dataset_takes_converted_eovs_and_abstract(harvester, mocker):
     }
 
 
+def test_declared_eovs_are_ckan_eovs_else_converted_ones(harvester, mocker):
+    # obis_derive_eovs() rebuilds `eovs` from declared_eovs, so both sources
+    # must land there.
+    mocker.patch.object(obis_harvester, "get_ckan_obis_records", return_value=_ckan(MATCHED))
+    mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
+    df = _enrich(harvester)
+    assert df.loc[MATCHED, "declared_eovs"] == ["fishAbundanceAndDistribution"]
+    assert df.loc[UNMATCHED, "declared_eovs"] == ["phytoplanktonBiomassAndDiversity"]
+
+
 def test_no_ckan_match_converts_every_dataset(harvester, mocker):
     mocker.patch.object(obis_harvester, "get_ckan_obis_records", return_value=_ckan())
     convert = mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
@@ -114,6 +124,7 @@ def test_conversion_error_leaves_dataset_unenriched(harvester, mocker, tmp_path)
     mocker.patch.object(obis_harvester, "map_obis_to_cioos", side_effect=RuntimeError("parquet down"))
     df = _enrich(harvester)
     assert df["eovs"].tolist() == [[], []]
+    assert df["declared_eovs"].tolist() == [[], []]
     assert df["summary"].isna().all()
     assert df["metadata"].isna().all()
     assert not any(name.endswith("_cioos.json.gz") for name in os.listdir(tmp_path))

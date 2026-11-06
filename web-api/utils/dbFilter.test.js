@@ -35,11 +35,12 @@ test("time and depth bounds are emitted as bounded, cast predicates", async () =
   assert.equal(f.hasShared, true);
 });
 
-test("eovs is applied at BOTH dataset and feature level", async () => {
-  // Dropping either half is a silent behaviour change.
+test("eovs is applied at dataset, feature and OBIS cell level", async () => {
+  // Dropping any level is a silent behaviour change.
   const f = await createDBFilter({ eovs: "temperature,salinity" });
   assert.match(f.shared.toString(), /eovs && /);
   assert.match(f.profileOnly.toString(), /eovs && /);
+  assert.match(f.obisOnly.toString(), /eovs && /);
 });
 
 test("comma-separated keys bind as arrays, not as the raw string", async () => {
