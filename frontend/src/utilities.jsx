@@ -351,22 +351,24 @@ export function generateColorStops(colorScale, range) {
       .domain([0, colors.length - 1])
       .range([lo, hi]);
   }
-  const colorStops = colors.map((color, index) => {
-    return {
-      // Not floored: log invert() lands a hair under the max (499.999... for 500).
-      stop: index === colors.length - 1 ? hi : Math.floor(scale(index)),
-      color,
-    };
+  // Counts are whole, so stops are floored; flooring the bottom of a log ramp
+  // lands two stops on the same integer (1, 1.9 -> 1, 1), so each stop is held
+  // one above the last rather than dropping a colour. Both branches leave room:
+  // log needs hi >= 100 * lo, and linear only fills every colour when the
+  // range has at least that many integers.
+  let previous = -Infinity;
+  return colors.map((color, index) => {
+    // The ends are taken as given: log invert() lands a hair under each
+    // (2.999... for 3, 499.999... for 500), which floors a whole step short.
+    const stop =
+      index === colors.length - 1
+        ? hi
+        : index === 0
+          ? Math.floor(lo)
+          : Math.max(Math.floor(scale(index)), previous + 1);
+    previous = stop;
+    return { stop, color };
   });
-  const result = [];
-  const map = new Map();
-  colorStops.forEach((colorStop) => {
-    if (!map.has(colorStop.stop)) {
-      map.set(colorStop.stop, true);
-      result.push(colorStop);
-    }
-  });
-  return result;
 }
 
 export function formatDatasetCount(filtered, total, locale) {
