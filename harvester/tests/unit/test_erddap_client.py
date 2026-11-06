@@ -242,6 +242,25 @@ class TestDatabaseBackedFingerprint:
         )
         assert digest and reliable and reason is None
 
+    def _on_day(self, monkeypatch, day):
+        monkeypatch.setattr(client.time, "time", lambda: day * 86400)
+
+    def test_hash_rolls_over_once_per_refresh_period(self, monkeypatch):
+        croissant = '{"temporalCoverage": "2021-05-28T21:45:00Z/2022-11-25T19:45:00Z"}'
+        hashes = set()
+        for day in range(1_000, 1_000 + client.DB_REFRESH_DAYS):
+            self._on_day(monkeypatch, day)
+            hashes.add(self._fingerprint(croissant)[0])
+        assert len(hashes) == 2
+
+    def test_a_day_refreshes_only_some_datasets(self, monkeypatch):
+        ids = [f"profile_{i}" for i in range(300)]
+        self._on_day(monkeypatch, 1_000)
+        before = [client._refresh_period(i) for i in ids]
+        self._on_day(monkeypatch, 1_001)
+        rolled = sum(a != client._refresh_period(i) for a, i in zip(before, ids, strict=True))
+        assert 0 < rolled < len(ids) / 5
+
     @pytest.mark.parametrize("croissant", [
         "{}",
         '{"temporalCoverage": "2021-05-28T21:45:00Z/.."}',

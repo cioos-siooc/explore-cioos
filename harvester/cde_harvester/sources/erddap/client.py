@@ -7,6 +7,7 @@ import logging
 import re
 import tempfile
 import time
+import zlib
 from urllib.parse import unquote, urlparse
 
 import diskcache as dc
@@ -84,9 +85,21 @@ CROISSANT_MIN_VERSION = (2, 28)
 _ERDDAP_VERSION_RE = re.compile(r"ERDDAP_version=(\d+)\.(\d+)")
 
 
-def _croissant_digest(doc):
+def _croissant_digest(doc, salt=""):
     canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(f"{HARVEST_VERSION}:{canonical}".encode()).hexdigest()
+    return hashlib.sha256(f"{HARVEST_VERSION}{salt}:{canonical}".encode()).hexdigest()
+
+
+# A finished database-backed dataset's Croissant can't reveal reprocessed values,
+# so its hash also rolls over every DB_REFRESH_DAYS. The per-dataset offset
+# spreads those refreshes across runs instead of re-harvesting a whole server
+# (ONC: ~5 h) at once.
+DB_REFRESH_DAYS = 30
+
+
+def _refresh_period(dataset_id):
+    days = int(time.time() // 86400) + zlib.crc32(dataset_id.encode()) % DB_REFRESH_DAYS
+    return days // DB_REFRESH_DAYS
 
 
 def _croissant_source_url(doc):
@@ -372,7 +385,7 @@ class ERDDAP:
             # (ONC: 109 of 1773), and its metadata need not move with its data.
             start, _, end = str(doc.get("temporalCoverage") or "").partition("/")
             if start and end and end != "..":
-                return _croissant_digest(doc), True, None
+                return _croissant_digest(doc, f":{_refresh_period(dataset_id)}"), True, None
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED
