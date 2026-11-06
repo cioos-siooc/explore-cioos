@@ -525,10 +525,27 @@ export function quantizeCountRange(range) {
   return [Math.min(lo, hi), hi];
 }
 
+// Same rule as RAMP_MAX_PERCENTILE in web-api/routes/legend.js: one outlier
+// hex in view would otherwise hand it the whole dark end of the ramp.
+const VIEWPORT_RAMP_MAX_PERCENTILE = 0.99;
+
+// [min, rampMax] or, when the percentile clipped the top, [min, rampMax,
+// trueMax] like a /legend tier, so the legend marks its top tick with "+".
+export function viewportCountRange(counts) {
+  if (!counts.length) return undefined;
+  const sorted = [...counts].sort((a, b) => a - b);
+  const rampMax =
+    sorted[Math.ceil(VIEWPORT_RAMP_MAX_PERCENTILE * sorted.length) - 1];
+  const range = quantizeCountRange([sorted[0], rampMax]);
+  if (!range) return undefined;
+  const trueMax = sorted[sorted.length - 1];
+  return trueMax > range[1] ? [...range, trueMax] : range;
+}
+
 export function rangesEqual(a, b) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  return a[0] === b[0] && a[1] === b[1];
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
 // The API answers a query that matched nothing with [null, null].
