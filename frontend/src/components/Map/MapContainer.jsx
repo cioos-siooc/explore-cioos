@@ -145,6 +145,7 @@ export default function MapContainer() {
         mappedRecord={mappedRecord}
         dataLayers={dataLayers}
         griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
+        griddapExtents={griddapCoverage}
         dataLayersVisible={dataLayersVisible}
         bathymetryVisible={bathymetryVisible}
         bathymetryPalette={bathymetryPalette}

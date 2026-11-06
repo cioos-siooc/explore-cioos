@@ -455,11 +455,11 @@ describe("DatasetInspector", () => {
       expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
     });
 
-    it("asks for no passes without a selected area", async () => {
+    it("asks for no passes without an area", async () => {
       await renderReady({ dataset: TRAJECTORY_DATASET });
       await screen.findByText("cruise-a");
       expect(passesUrls).toHaveLength(0);
-      expect(screen.queryByText("In selected area")).not.toBeInTheDocument();
+      expect(screen.queryByText("In the area")).not.toBeInTheDocument();
     });
 
     it("lists when each trajectory was in the clicked area, pinned first", async () => {
@@ -481,7 +481,7 @@ describe("DatasetInspector", () => {
       expect(ids).toEqual(["cruise-a", "cruise-b"]);
       expect(
         screen.getByText(
-          "1 trajectory passed through the selected area. Click a period on its card to plot that period's data.",
+          "1 trajectory passed through the area. Click a period on its card to plot that period's data.",
         ),
       ).toBeInTheDocument();
 

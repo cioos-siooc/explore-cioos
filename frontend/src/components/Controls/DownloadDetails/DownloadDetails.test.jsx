@@ -402,11 +402,29 @@ describe("DownloadDetails", () => {
       polygonFilterActive: true,
       filterDownloadByPolygon: true,
     });
-    const area = await screen.findByRole("button", { name: "Drawn area" });
+    const area = await screen.findByRole("button", { name: "Area" });
     expect(area).toHaveAttribute(
       "title",
       expect.stringContaining("[-65.0, 44.0]"),
     );
+  });
+
+  it("restates the area and dates the files are cut to in its summary", async () => {
+    renderDetails({
+      polygon: [
+        [-65, 44],
+        [-62, 44],
+        [-63, 45],
+        [-65, 44],
+      ],
+      polygonFilterActive: true,
+      filterDownloadByPolygon: true,
+      timeFilterActive: true,
+      filterDownloadByTime: true,
+    });
+    const summary = await screen.findByTestId("download-summary");
+    expect(summary).toHaveTextContent("in your area");
+    expect(summary).toHaveTextContent(`${QUERY.startDate} to ${QUERY.endDate}`);
   });
 
   it("says the files carry every variable, whatever the variable filters", () => {

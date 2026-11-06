@@ -4,6 +4,7 @@ import {
   GRIDDAP_PRIORITY_ZOOM,
   POINT_HIT_GRACE_PX,
   buildFeatureQuery,
+  gridsCovering,
   datasetPksOf,
   dedupeGriddapByPk,
   featureHasDataset,
@@ -505,6 +506,33 @@ describe("buildFeatureQuery", () => {
     ]);
   });
 
+  it("lists the grids over a hex while their layer is off, without outlining them", () => {
+    const covering = feature(
+      GRID,
+      { pk: 9, title_translated: { en: "SST grid" } },
+      square(-70, 40, -60, 50),
+    );
+    const hex = feature(
+      "hexes",
+      { pk: 1, count: 4, datasets: "[2]" },
+      square(-64, 44, -63, 45),
+    );
+    const query = buildFeatureQuery(
+      lngLat,
+      [hex],
+      context({ gridsAt: () => [covering, covering] }),
+    );
+    expect(query.items.filter((item) => item.kind === "grid")).toEqual([
+      { kind: "grid", pk: 9, title: "SST grid" },
+    ]);
+    expect(query.datasetPks).toEqual([2, 9]);
+    expect(query.highlight.features).toHaveLength(1);
+
+    expect(
+      buildFeatureQuery(lngLat, [], context({ gridsAt: () => [covering] })),
+    ).toBeNull();
+  });
+
   it("puts tracks first, then observations, then grids", () => {
     const query = buildFeatureQuery(
       lngLat,
@@ -529,6 +557,24 @@ describe("buildFeatureQuery", () => {
       "grid",
     ]);
     expect(query.datasetPks).toEqual([1, 2, 3]);
+  });
+});
+
+describe("gridsCovering", () => {
+  const coverage = {
+    features: [
+      feature(GRID, { pk: 1 }, square(-70, 40, -60, 50)),
+      feature(GRID, { pk: 2 }, square(0, 0, 10, 10)),
+      feature(GRID, { pk: 3 }, pointAt(-63.5, 44.6)),
+    ],
+  };
+  it("keeps the boxes holding the point, never a single-point grid", () => {
+    expect(
+      gridsCovering(coverage, { lng: -63.5, lat: 44.6 }).map(
+        (f) => f.properties.pk,
+      ),
+    ).toEqual([1]);
+    expect(gridsCovering(undefined, { lng: 0, lat: 0 })).toEqual([]);
   });
 });
 

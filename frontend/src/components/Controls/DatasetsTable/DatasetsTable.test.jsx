@@ -55,7 +55,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     installMockFetch();
   });
 
-  it("renders one card per dataset, sorted by title ascending by default", async () => {
+  it("renders one card per dataset, sorted by title ascending by default, grids folded first", async () => {
     renderWithProviders(
       <DatasetsTable
         datasets={ROWS}
@@ -68,10 +68,18 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     const cards = await screen.findAllByTestId("dataset-card");
     expect(
       cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
-    ).toEqual(["Alpha station", "Beta station", "Gamma grid"]);
+    ).toEqual(["Alpha station", "Beta station"]);
+    const gridGroup = document.querySelector(".datasetsCardGroupHeader");
+    expect(gridGroup).toHaveTextContent("Gridded products1");
+    await userEvent.click(within(gridGroup).getByRole("button"));
+    expect(
+      screen
+        .getAllByTestId("dataset-card")
+        .map((c) => c.querySelector(".datasetCardTitle").textContent),
+    ).toEqual(["Gamma grid", "Alpha station", "Beta station"]);
   });
 
-  it("sorts by days of data, grids included", async () => {
+  it("sorts by days of data, grids sorted within their own group", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <DatasetsTable
@@ -97,11 +105,16 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       "Days of data",
     );
     await user.click(screen.getByTitle("Sorted ascending (tap to reverse)"));
+    await user.click(
+      within(document.querySelector(".datasetsCardGroupHeader")).getByRole(
+        "button",
+      ),
+    );
     const cards = screen.getAllByTestId("dataset-card");
     expect(
       cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
-    ).toEqual(["Long", "Grid", "Short"]);
-    expect(cards[0]).toHaveTextContent("3,650");
+    ).toEqual(["Grid", "Long", "Short"]);
+    expect(cards[1]).toHaveTextContent("3,650");
   });
 
   it("lists the most days of data first while a filter narrows the results, and A to Z again once cleared", async () => {
@@ -793,15 +806,10 @@ describe("DatasetsTable (download modal)", () => {
         { providers: "app" },
       );
 
-    it("lists grids first, each block in the chosen sort", async () => {
+    it("opens the leading gridded group, each block in the chosen sort", async () => {
       renderTable();
       await screen.findAllByTestId("dataset-card");
-      expect(titles()).toEqual([
-        "Alpha station",
-        "Beta station",
-        "Delta grid",
-        "Gamma grid",
-      ]);
+      expect(titles()).toEqual(["Alpha station", "Beta station"]);
 
       act(() => map.setGriddapCoverageVisible(true));
 
@@ -813,7 +821,7 @@ describe("DatasetsTable (download modal)", () => {
       ]);
     });
 
-    it("still puts a map click's datasets above the grids", async () => {
+    it("puts a map click's datasets first after the grids", async () => {
       renderTable();
       await screen.findAllByTestId("dataset-card");
       act(() => {
@@ -822,11 +830,23 @@ describe("DatasetsTable (download modal)", () => {
       });
 
       expect(titles()).toEqual([
-        "Beta station",
         "Delta grid",
         "Gamma grid",
+        "Beta station",
         "Alpha station",
       ]);
+    });
+
+    it("counts the map click's grids on the folded gridded row", async () => {
+      renderTable();
+      await screen.findAllByTestId("dataset-card");
+      act(() =>
+        map.setFeatureQuery({ nonce: 1, lngLat: [0, 0], datasetPks: [1, 4] }),
+      );
+      const header = screen.getByTestId("grid-group-header");
+      expect(header).toHaveTextContent("1 here");
+      expect(header).toHaveTextContent("2");
+      expect(titles()).toEqual(["Beta station", "Alpha station"]);
     });
 
     it("leads with the gridded group when grouped by type", async () => {
@@ -846,16 +866,16 @@ describe("DatasetsTable (download modal)", () => {
       );
     });
 
-    it("leaves the download modal's order alone", async () => {
+    it("doesn't fold the grids in the download modal", async () => {
       renderTable({ isDownloadModal: true });
       await screen.findAllByTestId("dataset-card");
       act(() => map.setGriddapCoverageVisible(true));
 
       expect(titles()).toEqual([
-        "Alpha station",
-        "Beta station",
         "Delta grid",
         "Gamma grid",
+        "Alpha station",
+        "Beta station",
       ]);
     });
   });

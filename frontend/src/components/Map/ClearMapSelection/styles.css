@@ -4,7 +4,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 16px 7px 7px;
+  padding: 8px 16px 8px 8px;
   border: 1px solid var(--cioos-map-click);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);

@@ -77,6 +77,7 @@ import {
 import {
   buildFeatureQuery,
   datasetPksOf,
+  gridsCovering,
   dedupeGriddapByPk,
   featureHasDataset,
   griddapCoveredIn,
@@ -207,12 +208,8 @@ const drawControlOptions = {
       type: "fill",
       filter: ["all", ["==", "$type", "Polygon"]],
       paint: {
-        "fill-color": [
-          "case",
-          ["==", ["get", "active"], "true"],
-          "#fbb03b",
-          "#3bb2d0",
-        ],
+        // One colour selected or not: a searched place rests unselected.
+        "fill-color": "#fbb03b",
         "fill-opacity": 0.1,
       },
     },
@@ -226,12 +223,7 @@ const drawControlOptions = {
       ],
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-color": [
-          "case",
-          ["==", ["get", "active"], "true"],
-          "#fbb03b",
-          "#3bb2d0",
-        ],
+        "line-color": "#fbb03b",
         "line-dasharray": ["literal", [0.2, 2]],
         "line-width": 2,
       },
@@ -472,6 +464,8 @@ export default function CreateMap({
   mappedRecord,
   dataLayers,
   griddapCoverage,
+  // Every matching grid's box, drawn or not: a click lists the grids over it.
+  griddapExtents,
   dataLayersVisible = true,
   bathymetryVisible = true,
   bathymetryPalette = defaultBathymetryPalette,
@@ -1304,6 +1298,7 @@ export default function CreateMap({
   }
 
   const griddapCoverageRef = useRef(null);
+  const griddapExtentsRef = useRef(griddapExtents);
   const wmsMoveHandler = useRef(null);
   // Bumped on every overlay change so stale in-flight GetMap loads are dropped.
   const wmsRenderToken = useRef(0);
@@ -1629,6 +1624,10 @@ export default function CreateMap({
   }, [hoveredDataset, inspectDataset, activeWmsOverlay]);
 
   useEffect(() => {
+    griddapExtentsRef.current = griddapExtents;
+  }, [griddapExtents]);
+
+  useEffect(() => {
     griddapCoverageRef.current = griddapCoverage;
     const source = map.current?.getSource("griddap-coverage");
     if (source) source.setData(griddapCoverage || emptyFeatureCollection);
@@ -1702,11 +1701,12 @@ export default function CreateMap({
     }
     if (drawRequest.mode === "shape") {
       endDrawing();
-      const [featureId] = drawPolygon.current.add({
+      // A place's outline or a pasted area rests as an outline: its many
+      // vertices show as handles only once the shape is clicked to edit.
+      drawPolygon.current.add({
         type: "Feature",
         geometry: { type: "Polygon", coordinates: [drawRequest.ring] },
       });
-      drawPolygon.current.changeMode("direct_select", { featureId });
       highlightPoints(drawRequest.ring);
       setPolygon(drawRequest.ring);
       return;
@@ -2762,9 +2762,10 @@ export default function CreateMap({
     queryRendered: (options) => map.current.queryRenderedFeatures(options),
     language: i18n.language,
     gridGeometry: (pk) =>
-      griddapCoverageRef.current?.features?.find(
+      griddapExtentsRef.current?.features?.find(
         (feature) => Number(feature.properties.pk) === pk,
       )?.geometry,
+    gridsAt: (lngLat) => gridsCovering(griddapExtentsRef.current, lngLat),
   });
 
   // One handler, one hit-test: report what's under the click and let the card
@@ -3309,15 +3310,14 @@ export default function CreateMap({
     map.current.once("load", () => {
       loadTurfUnion();
       // Puts a share link's spatial selection back into the draw control so it
-      // is drawn, editable, and survives the next filter change (which
-      // re-derives the selection from the control).
+      // is drawn, editable (click it), and survives the next filter change
+      // (which re-derives the selection from the control).
       const sharedSelection = polygon;
       if (sharedSelection) {
-        const [featureId] = drawPolygon.current.add({
+        drawPolygon.current.add({
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [sharedSelection] },
         });
-        drawPolygon.current.changeMode("direct_select", { featureId });
         highlightPoints(sharedSelection);
       }
     });

@@ -460,9 +460,9 @@ export default function MapStateProvider({ children }) {
     loadLegend(mapQueryString);
   }, [mapQueryString, loadLegend]);
 
-  // Data is kept when toggled off so re-showing it is instant.
+  // Fetched with the layer off too: a map click lists the grids over it, and
+  // re-showing the layer is instant. Tens of boxes, so it costs little.
   useEffect(() => {
-    if (!griddapCoverageVisible) return;
     const controller = new AbortController();
     fetch(`${server}/griddapCoverage?${mapQueryString}`, {
       signal: controller.signal,
@@ -475,7 +475,7 @@ export default function MapStateProvider({ children }) {
         reportError("griddap coverage fetch failed", error);
       });
     return () => controller.abort();
-  }, [mapQueryString, griddapCoverageVisible]);
+  }, [mapQueryString]);
 
   const value = {
     rangeLevels,

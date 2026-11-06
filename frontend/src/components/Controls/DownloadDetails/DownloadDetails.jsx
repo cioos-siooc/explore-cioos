@@ -10,6 +10,7 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useDownload } from "../../../state/download/DownloadProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
 import {
   applyDatasetPKs,
@@ -52,6 +53,7 @@ export default function DownloadDetails({
   children,
 }) {
   const { t } = useTranslation();
+  const { areaPlace } = useSelection();
   const { packageFormat } = useDownload();
   const [selectAll, setSelectAll] = useState(true);
   const [pointsData, setPointsData] = useState(
@@ -283,6 +285,18 @@ export default function DownloadDetails({
     [linkableDatasets, linkByPk],
   );
 
+  // Restates where and when the files are cut to, so the order can be checked
+  // against what was meant before it is sent.
+  const summaryLimits = [
+    polygonFiltered &&
+      t("downloadSummaryPlace", {
+        place: areaPlace?.name ?? t("downloadSummaryAreaUnnamed"),
+      }),
+    timeFilterActive &&
+      filterDownloadByTime &&
+      t("downloadSummaryDates", { start: query.startDate, end: query.endDate }),
+  ].filter(Boolean);
+
   const sizeFiltered =
     dataTotal.filteredSize !== dataTotal.unfilteredSize &&
     Number.isFinite(dataTotal.unfilteredSize);
@@ -330,6 +344,12 @@ export default function DownloadDetails({
             {t("downloadSizeUnavailableTitle")}
           </span>
         )}
+        {summaryLimits.map((limit) => (
+          <React.Fragment key={limit}>
+            <span aria-hidden="true">{" · "}</span>
+            {limit}
+          </React.Fragment>
+        ))}
       </p>
       <div className="downloadBandRow">
         <FilterDownloadToggles

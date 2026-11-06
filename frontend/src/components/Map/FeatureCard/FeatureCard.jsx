@@ -15,6 +15,7 @@ import useCellDatasetDays from "./useCellDatasetDays.js";
 import useListSort from "../../../state/useListSort.js";
 import { pinnedPksOf, sortDatasets } from "../../../state/datasetSort.js";
 import DatasetCard from "../../Controls/DatasetsTable/DatasetCard.jsx";
+import GridGroupHeader from "../../Controls/DatasetsTable/GridGroupHeader.jsx";
 import "../../Controls/DatasetsTable/styles.css";
 import "./styles.css";
 
@@ -26,8 +27,7 @@ const VISIBLE_ROWS = 5;
 
 export default function FeatureCard() {
   const { t, i18n } = useTranslation();
-  const { featureQuery, setFeatureQuery, dataLayers, griddapCoverageVisible } =
-    useMapState();
+  const { featureQuery, setFeatureQuery, dataLayers } = useMapState();
   const {
     filteredDatasets,
     inspectDataset,
@@ -42,6 +42,7 @@ export default function FeatureCard() {
   const { offerTip, tipHighlight } = useTips();
 
   const [expanded, setExpanded] = useState(false);
+  const [gridsOpen, setGridsOpen] = useState(false);
 
   // The card slides off screen, but dismissing clears `featureQuery` at once;
   // this holds the last answer so the card doesn't blank halfway out.
@@ -56,7 +57,10 @@ export default function FeatureCard() {
 
   // A fresh query is a fresh card: collapse any "show all" the last one was
   // left in.
-  if (useChanged(query?.nonce)) setExpanded(false);
+  if (useChanged(query?.nonce)) {
+    setExpanded(false);
+    setGridsOpen(false);
+  }
 
   useEffect(() => {
     if (!featureQuery) return undefined;
@@ -91,15 +95,22 @@ export default function FeatureCard() {
   const rows = sortDatasets(
     filteredDatasets.filter((row) => pinnedPks.has(Number(row.pk))),
     listSort,
-    { gridFirst: griddapCoverageVisible, t, language: i18n.language },
+    { t, language: i18n.language },
   );
   const itemsByPk = groupBy(query.items || [], "pk");
   const tracksOf = (row) =>
     (itemsByPk[row.pk] || []).filter((item) => item.kind === "track");
 
   const empty = rows.length === 0;
-  const shown = expanded ? rows : rows.slice(0, VISIBLE_ROWS);
-  const hidden = rows.length - shown.length;
+  // As in the datasets list, the grids over the click fold into one row ahead
+  // of the rest, unless they are all the click found.
+  const gridRows = rows.filter((row) => row.cdm_data_type === "Grid");
+  const otherRows = rows.slice(gridRows.length);
+  const foldGrids = gridRows.length > 0 && otherRows.length > 0;
+  const listed = foldGrids ? otherRows : rows;
+  const shownListed = expanded ? listed : listed.slice(0, VISIBLE_ROWS);
+  const hidden = listed.length - shownListed.length;
+  const shown = [...(foldGrids && gridsOpen ? gridRows : []), ...shownListed];
   const tipTarget = shown.find((row) => row.cdm_data_type !== "Grid");
 
   // A single track under the click opens on that track; otherwise the
@@ -185,6 +196,13 @@ export default function FeatureCard() {
               compact: compactList,
             })}
           >
+            {foldGrids && (
+              <GridGroupHeader
+                count={gridRows.length}
+                open={gridsOpen}
+                onToggle={() => setGridsOpen((value) => !value)}
+              />
+            )}
             {shown.map((row) => {
               const here = hereLine(row);
               return (

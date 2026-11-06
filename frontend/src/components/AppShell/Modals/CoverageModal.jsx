@@ -245,9 +245,9 @@ export default function CoverageModal() {
               <BarChartLine size={20} />
             </span>
             <span className="downloadModalTitleText">
-              <span className="downloadModalTitleHeading">
+              <h2 className="downloadModalTitleHeading">
                 {t("coverageModalTitleText")}
-              </span>
+              </h2>
               <span className="downloadModalTitleSubtitle">
                 {t("coverageModalSubtitleText")}
               </span>

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { screen, waitFor, act, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -403,5 +404,57 @@ describe("FeatureCard", () => {
       openOn(pointQueryFixture[0]);
       await waitFor(() => expect(seenTips()).toEqual(["speciesName"]));
     });
+  });
+});
+
+describe("FeatureCard with grids under the click", () => {
+  const GRID_ROW = {
+    ...pointQueryFixture[0],
+    pk: 99001,
+    dataset_id: "sst_grid",
+    title: "SST grid",
+    title_translated: { en: "SST grid", fr: "SST grid" },
+    cdm_data_type: "Grid",
+    grid_dimensions: [],
+  };
+  beforeEach(() => {
+    installMockFetch();
+    const mocked = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (!url.includes("/pointQuery")) return mocked(input);
+        const response = await mocked(input);
+        const rows = await response.json();
+        return new Response(JSON.stringify([...rows, GRID_ROW]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+  });
+
+  it("folds them into one row ahead of the stations, opened on demand", async () => {
+    await renderReady();
+    await waitFor(() =>
+      expect(
+        latestSelection.filteredDatasets.some((row) => row.pk === GRID_ROW.pk),
+      ).toBe(true),
+    );
+    const station = pointQueryFixture[0];
+    click({
+      items: [
+        { kind: "observation", pk: station.pk },
+        { kind: "grid", pk: GRID_ROW.pk, title: "SST grid" },
+      ],
+    });
+    const header = await screen.findByTestId("grid-group-header");
+    expect(header).toHaveTextContent("1");
+    expect(cardRows()).toHaveLength(1);
+
+    await userEvent.click(within(header).getByRole("button"));
+    expect(cardRows()[0]).toHaveTextContent("SST grid");
+    expect(cardRows()).toHaveLength(2);
   });
 });

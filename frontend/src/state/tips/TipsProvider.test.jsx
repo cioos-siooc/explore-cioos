@@ -272,13 +272,14 @@ describe("contextual tips", () => {
       expect(card()).toHaveTextContent(counter("timeCoverage", -1));
     });
 
-    it("starts from an offered tip", async () => {
+    it("starts from an offered tip, numbered only once touring", async () => {
       returningVisitor();
       const { user } = renderProbe();
       await user.click(screen.getByText("offer exclude"));
-      expect(card()).toHaveTextContent(counter("exclude"));
+      expect(card()).not.toHaveTextContent(/Tip \d+ of/);
       await user.click(screen.getByRole("button", { name: "Next tip" }));
       expect(card()).toHaveTextContent(/Includes all selected/);
+      expect(card()).toHaveTextContent(counter("matchAll"));
       expect(card()).not.toHaveTextContent("Don't show tips");
     });
 

@@ -282,6 +282,28 @@
   color: var(--cioos-primary);
 }
 
+.sidebarFooterAddAll {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sidebarFooterAddAll:hover {
+  color: var(--cioos-navy);
+}
+
+.sidebarFooterAddAll:focus-visible {
+  outline: 2px solid var(--cioos-primary-700);
+  outline-offset: 2px;
+  border-radius: var(--cioos-radius-sm);
+}
+
 .sidebarFooterHintMore {
   display: inline-flex;
   vertical-align: -2px;

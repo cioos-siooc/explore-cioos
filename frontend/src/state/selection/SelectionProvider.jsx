@@ -103,12 +103,20 @@ export default function SelectionProvider({ children }) {
   const [polygon, setPolygon] = useState(() =>
     selectionFromSearchParams(initialParams),
   );
-  // The place an area filter was picked from ({name, cgndbid, ring}). It names
-  // the filter only while the filter is that very ring: any edit or new
-  // drawing sets a new array, and the name goes with it.
-  const [areaPlaceShape, setAreaPlace] = useState();
+  // The place an area filter was picked from ({name, cgndbid, ring}), seeded
+  // from a link's ?place=. It names the filter only while the filter is still
+  // that ring: compared by value, since the draw control hands back copies.
+  const [areaPlaceShape, setAreaPlace] = useState(() => {
+    const name = initialParams.get("place");
+    const ring = name && selectionFromSearchParams(initialParams);
+    return ring
+      ? { name, cgndbid: initialParams.get("placeId") || undefined, ring }
+      : undefined;
+  });
   const areaPlace =
-    polygon && areaPlaceShape?.ring === polygon ? areaPlaceShape : undefined;
+    polygon && String(areaPlaceShape?.ring) === String(polygon)
+      ? areaPlaceShape
+      : undefined;
   const [pointsToDownload, setPointsToDownload] = useState();
   // Debounced so sweeping the cursor across the list doesn't repaint the map
   // highlight per card crossed (and flash "all datasets" in the gaps).
@@ -193,22 +201,6 @@ export default function SelectionProvider({ children }) {
     [pointsData],
   );
 
-  // Platform types the map can draw a platform-coloured marker for under the
-  // active filters; the legend keys off this so it never advertises a colour
-  // that isn't on the map (e.g. 'spacecraft', which only grids carry).
-  const platformsAvailable = useMemo(
-    () =>
-      [
-        ...new Set(
-          pointsData
-            .filter((row) => !isPlatformlessDataset(row))
-            .map((row) => row.platform)
-            .filter(Boolean),
-        ),
-      ].sort(),
-    [pointsData],
-  );
-
   const viewportBounds = useDebounce(useViewportBounds(), 300);
 
   // The instant answer, used until the server's exact one for this view lands
@@ -228,6 +220,25 @@ export default function SelectionProvider({ children }) {
     enabled: catalogLoaded,
   });
   const datasetsInViewPks = exactInViewPks ?? bboxInViewPks;
+
+  // Platform types the map draws a platform-coloured marker for in this view
+  // under the active filters; the legend keys off this so it never advertises
+  // a colour that isn't on screen (e.g. 'spacecraft', which only grids carry).
+  const platformsAvailable = useMemo(
+    () =>
+      [
+        ...new Set(
+          pointsData
+            .filter(
+              (row) =>
+                !isPlatformlessDataset(row) && datasetsInViewPks.has(row.pk),
+            )
+            .map((row) => row.platform)
+            .filter(Boolean),
+        ),
+      ].sort(),
+    [pointsData, datasetsInViewPks],
+  );
 
   // Derived here rather than in DatasetsTable so the counters reflect it too.
   // The data-layer switches narrow it as well, so the list never offers

@@ -11,6 +11,7 @@ import {
   CheckSquare,
   ChevronRight,
   Filter,
+  Grid3x3Gap,
   SlashCircle,
   Square,
   ViewList,
@@ -47,6 +48,7 @@ import {
 } from "../../../state/datasetSort.js";
 import { useChanged } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
+import GridGroupHeader from "./GridGroupHeader.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
@@ -93,8 +95,6 @@ export default function DatasetsTable({
     () => pinnedPksOf(isDownloadModal ? null : featureQuery),
     [featureQuery, isDownloadModal],
   );
-  // With the gridded coverage layer on, the reader is looking for grids.
-  const gridFirst = griddapCoverageVisible && !isDownloadModal;
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
@@ -181,11 +181,10 @@ export default function DatasetsTable({
     () =>
       sortDatasets(datasets, sort, {
         pinnedPks,
-        gridFirst,
         t,
         language: i18n.language,
       }),
-    [datasets, sort, pinnedPks, gridFirst, t, i18n.language],
+    [datasets, sort, pinnedPks, t, i18n.language],
   );
 
   const byGroup = useMemo(() => {
@@ -206,11 +205,17 @@ export default function DatasetsTable({
   const fitsOnePage =
     [...byGroup.values()].reduce((n, rows) => n + rows.length, 0) <= pageSize;
   if (useChanged(groupBy, fitsOnePage)) setToggledGroups(new Set());
+  // Ungrouped, the grids lead the in-situ rows as one group of their own,
+  // closed unless they are all there is or their coverage layer is on.
+  const gridGroupOpen =
+    griddapCoverageVisible ||
+    visibleRows.every((row) => row.cdm_data_type === "Grid");
   const isExpanded = useCallback(
     (key) =>
-      (fitsOnePage || parentGroupKeys(groupBy).includes(key)) !==
-      toggledGroups.has(key),
-    [fitsOnePage, groupBy, toggledGroups],
+      (grouped
+        ? fitsOnePage || parentGroupKeys(groupBy).includes(key)
+        : gridGroupOpen) !== toggledGroups.has(key),
+    [grouped, fitsOnePage, gridGroupOpen, groupBy, toggledGroups],
   );
 
   // Groups seen while the dimension's own filter was not narrowing it, so the
@@ -244,7 +249,30 @@ export default function DatasetsTable({
   // dataset under each of its values, so row entries can exceed the unique
   // dataset count; a parent header's count is its unique datasets.
   const renderItems = useMemo(() => {
-    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
+    if (!isGroupDimension(groupBy)) {
+      // Grids sort first (see sortDatasets), folded into a single row.
+      const gridCount = visibleRows.filter(
+        (row) => row.cdm_data_type === "Grid",
+      ).length;
+      if (isDownloadModal || gridCount === 0) {
+        return visibleRows.map((row) => ({ row }));
+      }
+      const grids = visibleRows.slice(0, gridCount);
+      return [
+        {
+          header: true,
+          group: GRID_KEY,
+          count: gridCount,
+          here: grids.filter((row) => pinnedPks.has(Number(row.pk))).length,
+          depth: 0,
+          expandable: true,
+        },
+        ...(isExpanded(GRID_KEY)
+          ? grids.map((row) => ({ row, group: GRID_KEY }))
+          : []),
+        ...visibleRows.slice(gridCount).map((row) => ({ row })),
+      ];
+    }
     const rowsOf = (key) => byGroup.get(key) ?? [];
     const sortKeys = (keys, sizeOf) => {
       const sorted = sortGroupKeys(keys, groupBy, t, i18n.language);
@@ -252,7 +280,7 @@ export default function DatasetsTable({
         const factor = sort.dir === "asc" ? 1 : -1;
         sorted.sort((a, b) => (sizeOf(a) - sizeOf(b)) * factor);
       }
-      if (gridFirst && sorted.includes(GRID_KEY)) {
+      if (sorted.includes(GRID_KEY)) {
         sorted.splice(sorted.indexOf(GRID_KEY), 1);
         sorted.unshift(GRID_KEY);
       }
@@ -337,7 +365,8 @@ export default function DatasetsTable({
     emptyKeys,
     isExpanded,
     sort,
-    gridFirst,
+    pinnedPks,
+    isDownloadModal,
     i18n.language,
     t,
   ]);
@@ -432,15 +461,7 @@ export default function DatasetsTable({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
     scrollListToTop();
-  }, [
-    datasetsKey,
-    sort,
-    isDownloadModal,
-    groupBy,
-    pageSize,
-    pinnedPks,
-    gridFirst,
-  ]);
+  }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks]);
 
   const goToPage = (next) => {
     setPage(Math.min(Math.max(next, 1), pageCount));
@@ -619,6 +640,17 @@ export default function DatasetsTable({
                 />
               );
             }
+            if (!grouped) {
+              return (
+                <GridGroupHeader
+                  key="group:grid"
+                  count={item.count}
+                  here={item.here}
+                  open={isExpanded(GRID_KEY)}
+                  onToggle={() => toggleGroupExpanded(GRID_KEY)}
+                />
+              );
+            }
             const collapsed = !isExpanded(item.group);
             const filter = filterFor(item.group);
             const label = groupLabel(item.group, groupBy, t, i18n.language);
@@ -646,6 +678,13 @@ export default function DatasetsTable({
                     size={11}
                     aria-hidden="true"
                   />
+                  {item.group === GRID_KEY && (
+                    <Grid3x3Gap
+                      className="datasetsCardGroupIcon"
+                      size={13}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="datasetsCardGroupTitle" title={label}>
                     {label}
                   </span>

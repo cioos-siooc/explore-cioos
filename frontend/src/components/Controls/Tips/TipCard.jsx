@@ -107,12 +107,15 @@ export default function TipCard({ inModal }) {
       <div className="tipCardHeader">
         <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />
         <span className="tipCardHeading">
-          {t("tipCounter", {
-            // Numbered over every tip, not the tour's: that one shifts with
-            // the catalogue in view.
-            n: TIPS.indexOf(activeTip) + 1,
-            total: TIPS.length,
-          })}
+          {/* Numbered only while touring: an offered tip numbered 13 of 13
+              reads as twelve missed. Over every tip, not the tour's, which
+              shifts with the catalogue in view. */}
+          {touring
+            ? t("tipCounter", {
+                n: TIPS.indexOf(activeTip) + 1,
+                total: TIPS.length,
+              })
+            : t("tipHeading")}
         </span>
         <button
           type="button"

@@ -34,13 +34,20 @@ import useMediaQuery, {
 import "./styles.css";
 import "../../ui/sheetHandleStyles.css";
 
+const ADD_ALL_MAX = 50;
+
 // A dataset page swaps the header for a banner so the two surfaces the card
 // hosts can be told apart. Map minimizes the page to a card (DatasetMapCard),
 // keeping the map keyed to it; the X leaves the dataset.
 export default function Sidebar() {
   const { t } = useTranslation();
-  const { pointsToReview, inspectDataset, returnToDatasetList } =
-    useSelection();
+  const {
+    pointsToReview,
+    inspectDataset,
+    returnToDatasetList,
+    filteredDatasets,
+    addDatasetsToSelection,
+  } = useSelection();
   const {
     sidebarOpen,
     setSidebarOpen,
@@ -86,6 +93,12 @@ export default function Sidebar() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [wide, setWide]);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
+  // A short result list can go into the download in one tap; a long one is
+  // built from the cards, so a broad search isn't queued whole by accident.
+  const addable =
+    selectedCount === 0
+      ? (filteredDatasets || []).filter((row) => row.cdm_data_type !== "Grid")
+      : [];
   // Adding to the selection is when download tips start to matter.
   const lastSelectedCount = useRef(selectedCount);
   useEffect(() => {
@@ -227,7 +240,21 @@ export default function Sidebar() {
                 size={13}
                 aria-hidden="true"
               />
-              <span>{t("sidebarSelectionHintText")}</span>
+              {addable.length > 0 && addable.length <= ADD_ALL_MAX ? (
+                <button
+                  type="button"
+                  className="sidebarFooterAddAll"
+                  data-testid="sidebar-add-all"
+                  onClick={() =>
+                    addDatasetsToSelection(addable.map((row) => row.pk))
+                  }
+                  title={t("sidebarAddAllTitle")}
+                >
+                  {t("sidebarAddAllText", { count: addable.length })}
+                </button>
+              ) : (
+                <span>{t("sidebarSelectionHintText")}</span>
+              )}
               <button
                 type="button"
                 className="sidebarFooterHintMore"
