@@ -356,6 +356,29 @@ class TestGetProfileIds:
         assert profile_ids.loc[0, "time_min"] == "2020-01-01T00:00:00Z"
         assert profile_ids.loc[0, "time_max"] == "2021-01-01T00:00:00Z"
 
+    def test_byte_container_cf_role_is_one_feature_without_a_query(self, mock_erddap_server):
+        """seagull-erddap's IOOS `platform` container is a dataless byte: one
+        feature per dataset, no full-dataset scan to discover it."""
+        from io import StringIO
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "variable,station_id,,String,", "variable,station_id,,byte,"
+        )
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            queries.append(url)
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
+
+        assert queries == []
+        assert list(profile_ids.columns) == ["station_id"]
+        assert len(profile_ids) == 1
+
     def test_no_cf_role_explains_the_empty_result(self, mock_erddap_server):
         from io import StringIO
         info_csv = "\n".join(

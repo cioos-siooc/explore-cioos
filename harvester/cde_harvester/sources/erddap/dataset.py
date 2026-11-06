@@ -219,6 +219,18 @@ class Dataset:
             )
             return []
 
+        if (
+            len(profile_variable_list) == 1
+            and df_variables.loc[profile_variable_list[0], "type"] == "byte"
+        ):
+            # The IOOS/NCEI templates' scalar `platform` container: it holds no
+            # data, the dataset IS that one platform. Its distinct() and the
+            # orderByMinMax fallback below each scan the whole dataset to learn
+            # nothing (seagull-erddap: ~80s apiece); tabledap_features takes the
+            # single feature's time and lat/lon ranges from metadata instead.
+            self.profile_ids = pd.DataFrame({profile_variable_list[0]: [float("nan")]})
+            return self.profile_ids
+
         # distinct() of the ids alone measured ~0.2s on every ONC and
         # cioospacific dataset tried; an orderByMinMax over time scans every
         # record and 504s on dap.oceannetworks.ca's long sensor streams.
