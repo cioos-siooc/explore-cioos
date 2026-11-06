@@ -7,6 +7,7 @@ import {
   Download,
   ExclamationTriangle,
   PlusCircle,
+  Grid3x3,
   Grid3x3Gap,
   HexagonFill,
   Check2Circle,
@@ -57,6 +58,13 @@ export default function DatasetCard({
   const isObis = row.source_type === "obis";
   const erddapUrl = localizedErddapUrl(row, row.erddap_url, i18n.language);
   const ckanUrl = localizedCkanUrl(row.ckan_url, i18n.language);
+  const unappliedFilters = downloadLink?.unapplied.length
+    ? new Intl.ListFormat(i18n.language).format(
+        downloadLink.unapplied.map((filter) =>
+          t(`downloadFilterName_${filter}`),
+        ),
+      )
+    : "";
   // griddap is metadata-only, and in the modal a dataset is only selectable
   // when the CDE can deliver it (internalDownload).
   const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
@@ -260,15 +268,11 @@ export default function DatasetCard({
               <span
                 className="datasetCardFormatTag datasetCardUnapplied"
                 title={t("datasetCardUnappliedTitle", {
-                  filters: new Intl.ListFormat(i18n.language).format(
-                    downloadLink.unapplied.map((filter) =>
-                      t(`downloadFilterName_${filter}`),
-                    ),
-                  ),
+                  filters: unappliedFilters,
                 })}
               >
                 <ExclamationTriangle size={11} aria-hidden="true" />
-                {t("datasetCardUnappliedText")}
+                {t("datasetCardUnappliedText", { filters: unappliedFilters })}
               </span>
             )}
             {row.ckan_url && (
@@ -337,11 +341,9 @@ function DatasetCardMeta({ row, t, i18n }) {
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
     : cdmDataTypeLabel(row.cdm_data_type, t) || "";
-  const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || "—"
-    : row.profiles_count !== row.n_profiles
-      ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count;
+  const gridSize = isGrid && formatGridSize(row.grid_dimensions);
+  const partial =
+    row.n_profiles != null && row.profiles_count !== row.n_profiles;
 
   return (
     <span className="datasetCardMeta">
@@ -356,24 +358,36 @@ function DatasetCardMeta({ row, t, i18n }) {
         <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
         {typeLabel}
       </span>
-      <span
-        className="datasetCardMetaItem"
-        title={
-          isGrid
-            ? t("griddapGridSizeTooltip")
-            : t("datasetsTableHeaderLocationsText")
-        }
-      >
-        <PinMapFill size={13} aria-hidden="true" />
-        {locationsLabel}
-      </span>
+      {gridSize && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("griddapGridSizeTooltip")}
+        >
+          <Grid3x3 size={13} aria-hidden="true" />
+          {t("datasetCardGridSize", { size: gridSize })}
+        </span>
+      )}
+      {!isGrid && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("datasetsTableHeaderLocationsText")}
+        >
+          <PinMapFill size={13} aria-hidden="true" />
+          {partial
+            ? t("datasetCardLocationsPartial", {
+                shown: Number(row.profiles_count),
+                count: Number(row.n_profiles),
+              })
+            : t("datasetCardLocations", { count: Number(row.profiles_count) })}
+        </span>
+      )}
       {row.days != null && (
         <span
           className="datasetCardMetaItem"
           title={t("datasetsCardSortDaysText")}
         >
           <CalendarCheck size={13} aria-hidden="true" />
-          {Number(row.days).toLocaleString(i18n.language)}
+          {t("datasetCardDays", { count: Number(row.days) })}
         </span>
       )}
 

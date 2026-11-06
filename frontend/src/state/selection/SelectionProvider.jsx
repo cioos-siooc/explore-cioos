@@ -28,7 +28,7 @@ import {
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
-import { DEFAULT_SORT, GROUP_SIZE_SORT } from "../datasetSort.js";
+import { GROUP_SIZE_SORT } from "../datasetSort.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
   COLOR_LAYOUT,
@@ -175,13 +175,11 @@ export default function SelectionProvider({ children }) {
     const initialGroupBy = initialParams.get("groupBy");
     return isGroupDimension(initialGroupBy) ? initialGroupBy : GROUP_NONE;
   });
-  // Here too so the "what's here" card can follow the list's order.
+  // Here too so the "what's here" card can follow the list's order. Null
+  // until picked: useListSort supplies the filter-aware default.
   const grouped = isGroupDimension(groupBy);
-  const [listSort, setListSort] = useState(
-    grouped ? GROUP_SIZE_SORT : DEFAULT_SORT,
-  );
-  if (useChanged(grouped))
-    setListSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  const [listSort, setListSort] = useState(grouped ? GROUP_SIZE_SORT : null);
+  if (useChanged(grouped)) setListSort(grouped ? GROUP_SIZE_SORT : null);
 
   // Falls back to the coverage bbox, the only one grids carry.
   const datasetBounds = useMemo(

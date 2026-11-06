@@ -3,6 +3,7 @@ import { cdmDataTypeLabel } from "./dataLayers.js";
 // Offered only while the list is grouped, and its default then.
 export const GROUP_SIZE = "groupSize";
 export const DEFAULT_SORT = { field: "title", dir: "asc" };
+export const DAYS_SORT = { field: "days", dir: "desc" };
 export const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
 
 const NUMERIC_FIELDS = new Set([

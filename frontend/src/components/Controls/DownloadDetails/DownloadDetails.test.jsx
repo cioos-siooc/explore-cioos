@@ -89,7 +89,9 @@ describe("DownloadDetails", () => {
   it("shows the no-filters-active message when nothing is filtering the download", async () => {
     renderDetails();
     expect(
-      screen.getByText("No Time, Depth, or Space filters currently active"),
+      screen.getByText(
+        "No time, depth or area limits: each dataset comes whole.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -114,8 +116,8 @@ describe("DownloadDetails", () => {
     });
     // Both datasets are well under the 1GB CDE limit.
     await waitFor(() => {
-      expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
-        "2 / 2",
+      expect(screen.getByTestId("download-summary")).toHaveTextContent(
+        "2 datasets · about 1.06 MB",
       );
     });
   });
@@ -153,8 +155,8 @@ describe("DownloadDetails", () => {
       setPointsToDownload,
     });
     await waitFor(() =>
-      expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
-        "2 / 2",
+      expect(screen.getByTestId("download-summary")).toHaveTextContent(
+        "2 datasets · about",
       ),
     );
     const estimateRequests = () =>
@@ -168,8 +170,8 @@ describe("DownloadDetails", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("dataset-card")).toHaveLength(1),
     );
-    expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
-      "1 / 1",
+    expect(screen.getByTestId("download-summary")).toHaveTextContent(
+      "1 dataset · about",
     );
     expect(
       screen.queryByRole("button", {
@@ -194,15 +196,10 @@ describe("DownloadDetails", () => {
     };
     renderDetails();
     await waitFor(() => {
-      expect(
-        document.querySelector(".datasetSizeTotalSpinner"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("download-summary")).toHaveTextContent(
+        "Size estimate unavailable",
+      );
     });
-    // Every card without an estimate carries the same title, so scope to the
-    // order summary's own figure rather than asserting a single match.
-    expect(
-      document.querySelector(".downloadSummaryValue[title]"),
-    ).toHaveAttribute("title", "Size estimate unavailable");
   });
 
   it("asks /downloadEstimate for the basket once, with no empty parameter, even under a Datasets filter", async () => {
@@ -254,7 +251,7 @@ describe("DownloadDetails", () => {
     const { rerender } = renderDetails({ pointsToReview });
     const csv = () => screen.getByRole("button", { name: /dataset list/i });
     expect(csv()).toBeEnabled();
-    expect(screen.queryByText("Unfiltered")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Ignores/)).not.toBeInTheDocument();
 
     rerender(
       detailsElement({
@@ -264,7 +261,7 @@ describe("DownloadDetails", () => {
       }),
     );
     expect(csv()).toBeEnabled();
-    expect(screen.getByText("Unfiltered").closest("span")).toHaveAttribute(
+    expect(screen.getByText("Ignores polygon").closest("span")).toHaveAttribute(
       "title",
       "This link doesn't apply your polygon filter.",
     );
@@ -392,5 +389,38 @@ describe("DownloadDetails", () => {
     renderDetails();
     expect(screen.getByLabelText("ERDDAP™")).toBeInTheDocument();
     expect(screen.queryByLabelText("OBIS")).not.toBeInTheDocument();
+  });
+
+  it("names a searched place in the download's limits, with the outline in its title", async () => {
+    renderDetails({
+      polygon: [
+        [-65, 44],
+        [-62, 44],
+        [-63, 45],
+        [-65, 44],
+      ],
+      polygonFilterActive: true,
+      filterDownloadByPolygon: true,
+    });
+    const area = await screen.findByRole("button", { name: "Drawn area" });
+    expect(area).toHaveAttribute(
+      "title",
+      expect.stringContaining("[-65.0, 44.0]"),
+    );
+  });
+
+  it("says the files carry every variable, whatever the variable filters", () => {
+    renderDetails();
+    expect(
+      screen.getByText(/Files hold every variable in each dataset/),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the dataset list beside the email request, not folded away", () => {
+    renderDetails({ children: <div data-testid="email-request" /> });
+    const footer = screen.getByTestId("download-links").parentElement;
+    expect(footer).toContainElement(screen.getByTestId("email-request"));
+    expect(screen.getByTestId("download-links").closest("details")).toBeNull();
+    expect(screen.getByText("Query the sources myself")).toBeVisible();
   });
 });

@@ -104,6 +104,57 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     expect(cards[0]).toHaveTextContent("3,650");
   });
 
+  it("lists the most days of data first while a filter narrows the results, and A to Z again once cleared", async () => {
+    const rows = [
+      makeRow({ pk: 1, title: "Alpha", days: 12 }),
+      makeRow({ pk: 2, title: "Beta", days: 3650 }),
+    ];
+    renderWithProviders(
+      <>
+        <FiltersProbe />
+        <DatasetsTable
+          datasets={rows}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+      </>,
+      { providers: "app", url: "/?search=station" },
+    );
+    const titles = () =>
+      screen
+        .getAllByTestId("dataset-card")
+        .map((c) => c.querySelector(".datasetCardTitle").textContent);
+    await screen.findAllByTestId("dataset-card");
+    expect(screen.getByLabelText("Sort")).toHaveValue("days");
+    expect(titles()).toEqual(["Beta", "Alpha"]);
+
+    act(() => filters.setSearch(""));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Sort")).toHaveValue("title"),
+    );
+    expect(titles()).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("keeps a sort the reader picked when a filter is applied", async () => {
+    const { user } = renderWithProviders(
+      <>
+        <FiltersProbe />
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+      </>,
+      { providers: "app" },
+    );
+    await user.selectOptions(await screen.findByLabelText("Sort"), "Type");
+    act(() => filters.setSearch("station"));
+    await waitFor(() => expect(filters.query.searchText).toBe("station"));
+    expect(screen.getByLabelText("Sort")).toHaveValue("type");
+  });
+
   it("labels and sorts types in the reader's language", async () => {
     const { i18n, user } = renderWithProviders(
       <DatasetsTable

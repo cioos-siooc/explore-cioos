@@ -82,7 +82,7 @@ const card = () => screen.queryByTestId("tip-card");
 // The tips this catalogue's tour pages through, once it has loaded.
 const tour = () => screen.getByTestId("tour-tips").textContent.split(",");
 const counter = (key, offset = 0) =>
-  `Tip ${tour().indexOf(key) + 1 + offset} of ${tour().length}`;
+  `Tip ${tour().indexOf(key) + 1 + offset} of ${TIPS.length}`;
 
 describe("contextual tips", () => {
   beforeEach(() => {
@@ -313,6 +313,26 @@ describe("contextual tips", () => {
       expect(tour()).not.toContain("speciesName");
     });
 
+    it("numbers each tip over all of them, so a skipped step can't shift the count", async () => {
+      returningVisitor();
+      const fixtures = window.fetch;
+      vi.stubGlobal("fetch", (input, ...rest) =>
+        String(input.url ?? input).endsWith("/obisNodes")
+          ? Promise.resolve(Response.json([]))
+          : fixtures(input, ...rest),
+      );
+      const { user } = renderProbe();
+      await waitFor(() => expect(tour()).not.toContain("speciesName"));
+      await user.click(screen.getByText("start tour"));
+      expect(card()).toHaveTextContent(
+        `Tip ${TIPS.indexOf("timeCoverage") + 1} of ${TIPS.length}`,
+      );
+      await user.click(screen.getByRole("button", { name: "Next tip" }));
+      expect(card()).toHaveTextContent(
+        `Tip ${TIPS.indexOf("exclude") + 1} of ${TIPS.length}`,
+      );
+    });
+
     it("holds back offered tips while it runs", async () => {
       returningVisitor();
       const { user } = renderProbe();
@@ -417,7 +437,7 @@ describe("contextual tips", () => {
       ).not.toBeNull();
     });
 
-    it("hangs the tip by its control inside the window", async () => {
+    it("keeps the tip in its place in the window, pointing at the control", async () => {
       returningVisitor();
       const rect = vi
         .spyOn(Element.prototype, "getBoundingClientRect")
@@ -437,9 +457,10 @@ describe("contextual tips", () => {
         providers: "app",
       });
       await user.click(screen.getByText("tour from exclude"));
+      await screen.findByTestId("tip-pointer");
       const tip = within(modal()).getByTestId("tip-card");
-      await vi.waitFor(() => expect(tip).toHaveClass("tipCardAnchored"));
-      expect(tip).toHaveClass("tipCardAbove");
+      expect(tip).not.toHaveClass("tipCardAnchored");
+      expect(tip).not.toHaveAttribute("style");
       rect.mockRestore();
     });
 

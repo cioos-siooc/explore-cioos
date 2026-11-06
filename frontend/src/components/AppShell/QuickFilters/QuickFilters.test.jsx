@@ -340,4 +340,38 @@ describe("QuickFilters", () => {
       "false",
     );
   });
+
+  it("captions the area button with the searched place it applied", async () => {
+    const ring = [
+      [-67, 44],
+      [-66, 44],
+      [-66, 45],
+      [-67, 44],
+    ];
+    let selection;
+    function Apply() {
+      selection = useSelection();
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <QuickFilters />
+        <Apply />
+      </>,
+      { providers: "app" },
+    );
+    const button = screen.getByTestId("quick-filter-area");
+    expect(button.querySelector(".quickFilterCaption")).toHaveTextContent(
+      "Draw area",
+    );
+    React.act(() => {
+      selection.setPolygon(ring);
+      selection.setAreaPlace({ name: "Bay of Fundy", cgndbid: "X", ring });
+    });
+    await waitFor(() =>
+      expect(button.querySelector(".quickFilterCaption")).toHaveTextContent(
+        "Bay of Fundy",
+      ),
+    );
+  });
 });

@@ -38,6 +38,10 @@ export const toggleOptionExcluded = (option) => ({
 
 // Sizes come from /downloadEstimate, never a measured file, so every figure
 // carries its own tilde. A null size (no estimate, e.g. OBIS) is a dash, not 0.
+export function formatSize(size) {
+  return bytes(size, { unitSeparator: " " });
+}
+
 export function formatSizeEstimate(size) {
   return Number.isFinite(size) ? `~${bytes(size)}` : "—";
 }

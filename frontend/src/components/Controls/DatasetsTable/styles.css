@@ -18,9 +18,18 @@
 
 .datasetsCardToolbar {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+/* Wraps to a second row rather than truncating its value to "Ti…". */
+.datasetsCardToolbar .selectPill {
+  flex: 0 0 auto;
+}
+
+.datasetsCardToolbar .selectPillLabel {
+  font-size: var(--cioos-font-size-xs);
 }
 
 /* Keeps its label at every width: it is the one control here that commits
@@ -195,7 +204,7 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
   padding: 0;
   border: none;
   background: transparent;
@@ -606,7 +615,7 @@ button.datasetCardTitle:focus-visible {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
 }
 
 .datasetCardTitle {
@@ -616,7 +625,7 @@ button.datasetCardTitle:focus-visible {
   font-family: var(--cioos-font-display);
   font-weight: 600;
   font-size: var(--cioos-font-size-base);
-  line-height: 1.25;
+  line-height: 1.35;
   color: var(--cioos-ink);
   overflow-wrap: anywhere;
 }
@@ -661,7 +670,7 @@ button.datasetCardTitle:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
   white-space: nowrap;
@@ -671,7 +680,7 @@ button.datasetCardTitle:focus-visible {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
   padding: 0;
   border: none;
   background: transparent;
@@ -932,11 +941,6 @@ button.datasetCardTitle:focus-visible {
 
   .sidebar .datasetsCardList:not(.compact) .datasetCard {
     padding: 8px 10px;
-  }
-
-  .sidebar .datasetCardMeta {
-    flex-wrap: nowrap;
-    overflow: hidden;
   }
 
   .sidebar .datasetCardMetaItem {

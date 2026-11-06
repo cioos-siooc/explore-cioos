@@ -12,6 +12,7 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import useCellDatasetDays from "./useCellDatasetDays.js";
+import useListSort from "../../../state/useListSort.js";
 import { pinnedPksOf, sortDatasets } from "../../../state/datasetSort.js";
 import DatasetCard from "../../Controls/DatasetsTable/DatasetCard.jsx";
 import "../../Controls/DatasetsTable/styles.css";
@@ -29,7 +30,6 @@ export default function FeatureCard() {
     useMapState();
   const {
     filteredDatasets,
-    listSort,
     inspectDataset,
     setInspectDataset,
     selectTrajectoryFromMap,
@@ -37,6 +37,7 @@ export default function FeatureCard() {
     selectedPks,
     combinedQueries,
   } = useSelection();
+  const [listSort] = useListSort();
   const { sidebarOpen, compactList } = useUI();
   const { offerTip, tipHighlight } = useTips();
 

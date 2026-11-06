@@ -1,8 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
+import { ChevronDown, ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 
-import { tracksMinDate, trailingWindowOptions } from "../../config.js";
+import {
+  defaultTrailingDays,
+  tracksMinDate,
+  trailingWindowOptions,
+} from "../../config.js";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
@@ -23,11 +27,25 @@ export default function TrajectoryDate() {
   const { t } = useTranslation();
   const { scrubTime, setScrubTime, trailingDays, setTrailingDays } =
     useMapState();
-  const { tipHighlight } = useTips();
+  const { activeTip, tipHighlight } = useTips();
+  const controlsId = useId();
 
   const maxIso = todayIso();
   const axis = useMemo(() => createTimeAxis(tracksMinDate, maxIso), [maxIso]);
   const value = clampIso(scrubTime, tracksMinDate, maxIso);
+
+  // Folded at rest, but never over a date or window already set (say by a
+  // link), nor while the trajectory tip points at it.
+  const mustShow =
+    value !== maxIso ||
+    trailingDays !== defaultTrailingDays ||
+    activeTip === "trajectory";
+  const [open, setOpen] = useState(mustShow);
+  const [shownFor, setShownFor] = useState(mustShow);
+  if (mustShow !== shownFor) {
+    setShownFor(mustShow);
+    if (mustShow) setOpen(true);
+  }
 
   function commit(iso) {
     setScrubTime(clampIso(iso, tracksMinDate, maxIso));
@@ -39,76 +57,94 @@ export default function TrajectoryDate() {
 
   return (
     <div className="trajectoryDate">
-      <div className="legendItem trajectoryDateRow">
-        <label className="legendItemLabel" htmlFor="trajectoryTrailSelect">
-          {t("trajectoryTrailLabel")}
-        </label>
-        <select
-          id="trajectoryTrailSelect"
-          className="trajectoryTrailSelect"
-          value={trailingDays}
-          onChange={(event) => setTrailingDays(Number(event.target.value))}
-        >
-          {trailingWindowOptions.map((days) => (
-            <option key={days} value={days}>
-              {days === 365
-                ? t("trajectoryTrailOneYear")
-                : `${days} ${t("trajectoryTrailDays")}`}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div
-        className="legendItem trajectoryDateRow"
-        title={t("legendTrackHead")}
-        data-tip-highlight={tipHighlight("trajectory")}
+      <button
+        type="button"
+        className="trajectoryDateToggle"
+        aria-expanded={open}
+        aria-controls={controlsId}
+        onClick={() => setOpen(!open)}
       >
-        <TrackHeadIcon className="legendSwatch" />
-        <DateField
-          className="railValueInput timeRailDateInput trajectoryDateInput"
-          label={t("trajectoryDateLabel")}
-          value={value}
-          min={tracksMinDate}
-          max={maxIso}
-          onCommit={commit}
+        <ChevronDown
+          className="trajectoryDateToggleIcon"
+          size={10}
+          aria-hidden="true"
         />
-        {/* Chevrons, not filled carets: a filled triangle is the heading
-            swatch on this same row. */}
-        <button
-          type="button"
-          className="railStep"
-          title={t("trajectoryDatePrevDay")}
-          aria-label={t("trajectoryDatePrevDay")}
-          disabled={value <= tracksMinDate}
-          onClick={() => stepDay(-1)}
-        >
-          <ChevronLeft size={10} />
-        </button>
-        <button
-          type="button"
-          className="railStep"
-          title={t("trajectoryDateNextDay")}
-          aria-label={t("trajectoryDateNextDay")}
-          disabled={value >= maxIso}
-          onClick={() => stepDay(1)}
-        >
-          <ChevronRight size={10} />
-        </button>
-      </div>
+        {t("trajectoryControlsToggle")}
+      </button>
+      {open && (
+        <div id={controlsId}>
+          <div className="legendItem trajectoryDateRow">
+            <label className="legendItemLabel" htmlFor="trajectoryTrailSelect">
+              {t("trajectoryTrailLabel")}
+            </label>
+            <select
+              id="trajectoryTrailSelect"
+              className="trajectoryTrailSelect"
+              value={trailingDays}
+              onChange={(event) => setTrailingDays(Number(event.target.value))}
+            >
+              {trailingWindowOptions.map((days) => (
+                <option key={days} value={days}>
+                  {days === 365
+                    ? t("trajectoryTrailOneYear")
+                    : `${days} ${t("trajectoryTrailDays")}`}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      <TimeRail
-        className="trajectoryDateRail"
-        axis={axis}
-        scrub={{
-          value,
-          trailStartMs: Math.max(
-            isoToMs(value) - trailingDays * MS_PER_DAY,
-            axis.minMs,
-          ),
-        }}
-        onCommit={(handle, iso) => commit(iso)}
-      />
+          <div
+            className="legendItem trajectoryDateRow"
+            title={t("legendTrackHead")}
+            data-tip-highlight={tipHighlight("trajectory")}
+          >
+            <TrackHeadIcon className="legendSwatch" />
+            <DateField
+              className="railValueInput timeRailDateInput trajectoryDateInput"
+              label={t("trajectoryDateLabel")}
+              value={value}
+              min={tracksMinDate}
+              max={maxIso}
+              onCommit={commit}
+            />
+            {/* Chevrons, not filled carets: a filled triangle is the heading
+            swatch on this same row. */}
+            <button
+              type="button"
+              className="railStep"
+              title={t("trajectoryDatePrevDay")}
+              aria-label={t("trajectoryDatePrevDay")}
+              disabled={value <= tracksMinDate}
+              onClick={() => stepDay(-1)}
+            >
+              <ChevronLeft size={10} />
+            </button>
+            <button
+              type="button"
+              className="railStep"
+              title={t("trajectoryDateNextDay")}
+              aria-label={t("trajectoryDateNextDay")}
+              disabled={value >= maxIso}
+              onClick={() => stepDay(1)}
+            >
+              <ChevronRight size={10} />
+            </button>
+          </div>
+
+          <TimeRail
+            className="trajectoryDateRail"
+            axis={axis}
+            scrub={{
+              value,
+              trailStartMs: Math.max(
+                isoToMs(value) - trailingDays * MS_PER_DAY,
+                axis.minMs,
+              ),
+            }}
+            onCommit={(handle, iso) => commit(iso)}
+          />
+        </div>
+      )}
     </div>
   );
 }

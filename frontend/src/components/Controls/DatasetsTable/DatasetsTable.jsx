@@ -27,6 +27,7 @@ import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
+import useListSort from "../../../state/useListSort.js";
 import {
   GRID_KEY,
   GROUP_NONE,
@@ -64,8 +65,6 @@ export default function DatasetsTable({
   estimatesLoading,
   downloadLinkByPk,
   // The format OBIS rows fall back to when the chosen one has no OBIS version.
-  // Beside the pager's range: the download modal's selection totals.
-  pagerExtra,
   // Kept mounted under an open dataset page, so coming back finds the same
   // page and scroll position (see DatasetsPanel).
   hidden = false,
@@ -81,9 +80,8 @@ export default function DatasetsTable({
     // dataset within this batch.
     handleSelectDataset: removeFromSelection,
     pointsError,
-    listSort,
-    setListSort,
   } = useSelection();
+  const [listSort, setListSort] = useListSort();
   const { openFilters, showFiltersModal, compactList, setListDensity } =
     useUI();
   const activeFilterCount = useActiveFilters().length;
@@ -703,9 +701,7 @@ export default function DatasetsTable({
         onPageSizeChange={setPageSize}
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
-      >
-        {pagerExtra}
-      </Pager>
+      />
     </div>
   );
 }
