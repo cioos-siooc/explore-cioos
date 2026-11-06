@@ -22,8 +22,14 @@ colors:
   info-blue: "#0f6d8e"
   realtime-orange: "#c2410c"
   track-violet: "#6749ac"
+  track-violet-deep: "#543a90"
+  track-violet-surface: "#efeaf8"
   grid-amber: "#fbb03b"
+  grid-amber-deep: "#c77f14"
+  grid-amber-surface: "#fdf1dc"
   click-goldenrod: "#daa520"
+  click-goldenrod-surface: "#fbf1d9"
+  backdrop: "rgb(21 47 55 / 45%)"
   globe-space: "#050f14"
 typography:
   display:
@@ -109,6 +115,25 @@ components:
     padding: "10px 12px"
   card-dataset-hover:
     backgroundColor: "{colors.surface-wash}"
+  card-dataset-compact:
+    backgroundColor: "{colors.white}"
+    rounded: "{rounded.md}"
+    padding: "5px 10px"
+  group-row:
+    backgroundColor: "{colors.white}"
+    textColor: "{colors.deep-water-navy}"
+    rounded: "{rounded.md}"
+    height: "32px"
+  group-row-open:
+    backgroundColor: "{colors.shallows}"
+    textColor: "{colors.coastal-teal-deeper}"
+  pill-clear-selection:
+    backgroundColor: "{colors.white}"
+    textColor: "{colors.deep-water-navy}"
+    rounded: "{rounded.pill}"
+  pill-clear-selection-hover:
+    backgroundColor: "{colors.coral-error-bg}"
+    textColor: "{colors.coral-error-deep}"
   input-text:
     backgroundColor: "{colors.white}"
     textColor: "{colors.deep-water-navy}"
@@ -160,6 +185,7 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 - **White** (`white`): every floating instrument's face, cards, modals, inputs.
 - **Hairline** (`hairline`): the 1px border between everything; sits between sand and shallows in tone.
 - **Surface Wash** (`surface-wash`): hover wash on white, row stripes, disabled primary fill; at 82% alpha it is the scrim over replaced content, and at 55% it is the softer scrim over the loading splash.
+- **Backdrop** (`backdrop`): navy at 45%, under a dialog and under the datasets card when it is widened over the map.
 - **Globe Space** (`globe-space`): the navy-black the globe projection hangs in.
 
 ### Status
@@ -170,7 +196,8 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 ### Data keys
 - **Track Violet** (`track-violet`): trajectory track lines, their scrub control and legend swatch. The map paints it from `trackLineColor` in `components/config.js`; keep the two in step.
 - **Grid Amber** (`grid-amber`): gridded (griddap) coverage highlight and its markers on the time and depth bars.
-- **Click Goldenrod** (`click-goldenrod`): the ring on whatever the last map click found, and the matching accents on the "what's here" card, pinned list rows and inspector rows. It pairs with `clickHighlightColor` in `components/config.js`.
+- **Click Goldenrod** (`click-goldenrod`): the ring on whatever the last map click found, and the matching accents on the "what's here" card, pinned list rows, inspector rows and the floating Clear selection pill. It pairs with `clickHighlightColor` in `components/config.js`.
+- **Deep and surface shades**: each data key has a `-deep` shade for hover, pressed and label text on white (grid amber deep also tints the grid glyph on the "Gridded products" row), and an opaque `-surface` tint for pills and cards that sit over the map, where a translucent wash would let the map show through.
 - **Hex ramp**: twelve opaque stops from Shallows through Coastal Teal to Deep Water Navy, at even L* steps (`colorScale` in `components/config.js`). It is the only ramp for coverage density.
 - **Platform palette**: twelve hues for point markers (`platformColors.js`), kept apart by lightness for red-green colour blindness.
 
@@ -208,15 +235,20 @@ The scale is a token ladder (`--cioos-font-size-3xs` 10px through `-xl` 26px). A
 
 ## Layout
 
-The map fills the viewport edge to edge; every other surface floats over it. The brand card (490px, capped to the viewport) is centred at the top with the Datasets / Time coverage / Filters tab strip welded to its base. Quick filters and active-filter chips flow under it. The datasets sidebar owns the left column (`--cioos-sidebar-width` 420px). It overlays the map below 1400px and sits beside it at 1400px and above, where it opens by default. The legend sits in the bottom-right corner, and the time bar along the bottom edge.
+The map fills the viewport edge to edge; every other surface floats over it. The brand card (490px, capped to the viewport) is centred at the top with the Datasets / Time coverage / Filters tab strip welded to its base and a chevron segment that folds the strip away. Quick filters (Draw area, In view, Real-time, Clear) and active-filter chips flow under it. The legend sits in the bottom-right corner, and the time bar along the bottom edge.
+
+The datasets sidebar owns the left column (`--cioos-sidebar-width` 420px, inset 12px). It is closed on first load at every size, so the map arrives uncovered. Opened, it runs the full height of the left edge. From 1000px the brand card slides right to sit beside it rather than over it, and from 1400px drawing an area opens it on its own. The same card shows a dataset's page, and can be widened (the window icon) into a centred card up to 1280px over the navy backdrop, where the metadata and the data sit side by side. The "what's here" card stands in the same corner at the same width. On short screens (701px wide and up, 860px tall or less) the sidebar's padding and gaps tighten.
 
 Surfaces publish their live footprint as custom properties (`--cioos-top-bar-space`, `--cioos-time-bar-space`, `--cioos-depth-bar-space`, `--cioos-api-error-space`) so neighbours hold clearance without hard-coded heights.
 
 Spacing is a 4px-based ladder (4 / 8 / 12 / 16 / 24 / 32). At 700px and below it tightens (12 → 10, 16 → 12, 24 → 16, 32 → 20) while type grows.
 
-Breakpoints are a fixed convention: 600 (narrow phone), **700 (the mobile rung**: brand bar goes edge-to-edge, sidebar and modals go full-screen, legend collapses, filter chips collapse; mirrored as `MOBILE_QUERY` in JS), 900 (legend relocates), 992 (modal/intro only), 1200 (compact WMS legend, tip card moves), 1400 (sidebar beside the map). Prefer an existing rung over a new one.
+Breakpoints are a fixed convention: 600 (narrow phone), **700 (the mobile rung**: brand bar goes edge-to-edge, sidebar and modals go full-screen sheets with a drag handle, legend collapses, filter chips collapse; written `(max-width: 700px), (max-height: 500px)` so a landscape phone counts, and mirrored as `MOBILE_QUERY` in JS), 900 (legend relocates), 992 (modal/intro only), 1000 (brand card beside the open sidebar), 1200 (compact WMS legend, tip card moves), 1400 (drawing an area opens the sidebar; `WIDE_SCREEN_QUERY`), 1944 (the time bar no longer reaches the sidebar). Prefer an existing rung over a new one.
 
 The brand card has a fixed width so switching language never resizes it, and it is sized for the longer French labels.
+
+### Named Rules
+**The Open-Water Rule.** First load shows the map uncovered at every size: the sidebar, tips and cards wait to be asked for (or for an action that needs them, such as drawing an area on a wide screen).
 
 ## Elevation & Depth
 
@@ -226,7 +258,7 @@ Depth separates what touches the map from what lives inside a panel. Surfaces th
 - **Raised 3D** (`--cioos-shadow-3d`): the brand card, the datasets sidebar, the legend; surfaces resting on the map.
 - **Raised 3D small** (`--cioos-shadow-3d-sm`): the active tab segment and pills over the map.
 - **Card** (`--cioos-shadow-card`, `0 2px 8px` navy 8%): dataset cards inside the sidebar.
-- **Float** (`--cioos-shadow-float`, `0 4px 16px` navy 16%): modals.
+- **Float** (`--cioos-shadow-float`, `0 4px 16px` navy 16%): modals, over the navy backdrop. The widened datasets card keeps its raised 3D shadow and takes the same backdrop.
 - **Menu** (`--cioos-shadow-md`): dropdowns and small menus.
 - **Focus** (`--cioos-focus`, 3px teal at 55%): the keyboard focus ring, drawn as a shadow.
 - **Click glow** (2px + 10px goldenrod at 35%): the card or row the last map click found; a shadow rather than a border so rows never shift.
@@ -245,7 +277,7 @@ Softly rounded, never sharp and never bubbly. Floating panels, modals and the br
 ### Buttons
 Calm at rest, solid only when it matters.
 - **Shape:** gently rounded (8px).
-- **Primary:** coastal teal fill, white 700-weight text, 1px coastal-teal-deep border. The sidebar's Download stacks its label over the selection count, which pulses when it changes.
+- **Primary:** coastal teal fill, white 700-weight text, 1px coastal-teal-deep border. The sidebar's Download stacks its label over the selection count, which pulses when it changes. With nothing selected and a short result list, a teal "Add all N datasets" link sits beside it on the sand footer.
 - **Hover / Focus:** fill deepens to coastal teal deep (0.15s ease-out); focus is the teal shadow ring, never the browser outline.
 - **Disabled:** surface-wash fill, hairline border, ink-60 text, instead of fading the teal (faded teal left white text unreadable).
 - **Secondary:** white pill with hairline border and teal-deep text (e.g. "Clear all").
@@ -268,13 +300,26 @@ The Datasets / Time coverage / Filters segments welded to the brand card's base.
 - **Hover:** border turns teal and the face takes the surface wash.
 - **Selected:** teal border. **From map click:** goldenrod glow plus goldenrod border when not selected.
 - **Focus:** the title button takes focus; the ring draws on the whole card.
+- **Add (+):** a teal outlined circle before the title adds the dataset to the download; it is the way in, so it stays teal, never faint grey.
+- **Compact density:** a toolbar toggle drops each card to two lines (title, then meta in body-small at the xs rung) with 5px 10px padding. The meta line never wraps; it fades out at the right edge instead.
+
+### Group rows
+- **Gridded products:** grids fold into one sticky 32px row ahead of the in-situ cards: white with a hairline, an amber-deep grid glyph, the title, and a count pill. Hover borders it teal; open, it takes the shallows fill with coastal-teal-deeper text. When the last map click found some of them, a goldenrod swatch and "N here" ride beside the count. Grouping the list by a dimension uses the same row.
+
+### "What's here" card
+- The left-corner card a map click opens: a pin icon, the Display title, a goldenrod swatch tying it to the ring on the map, a navy count pill, and the cell's days of data beneath. It lists the same dataset cards as the sidebar, each with a "here" line (days of data at this spot, "nearby" for clustered markers), and folds grids the same way.
+
+### Clear selection pill
+- A white pill with a goldenrod border and a goldenrod disc holding the ×, floating bottom-centre over the map while a click or dataset selection is active. Hover turns it coral (error-bg fill, coral border, coral-deep text). It hides while the datasets list, which has its own clear, is open.
 
 ### Inputs / Fields
 - **Style:** white, 1px hairline, 6px corners, 8px 12px padding, inherited type; placeholder in ink-60.
 - **Focus:** border turns coastal teal plus the teal focus ring.
 
 ### Modals
-- White, 16px corners, float shadow, over a navy backdrop at 45%. The header is a Sora title with a subtitle and a hairline beneath it. Footers sit on a light wash. At 700px and below they go full-screen.
+- White, 16px corners, float shadow, over the navy backdrop. The header is an icon, a Sora `h2` title and a subtitle that wraps rather than truncates, with a hairline beneath. Footers sit on a light wash. At 700px and below they go full-screen with a drag handle.
+- **Filters:** a left rail of filter pages under small uppercase group labels (What / From / When & where / Biodiversity); the open page is a coastal-teal-deeper row with white text. The footer holds the live dataset count and a primary "Show results".
+- **Download:** a summary of what the files are cut to, the format choice, then the dataset cards with their source links. Each card carries a size pill: shallows with a check for "Under 1 GB" (emailed as a package), coral-error-bg with a × for "Over 1 GB" (get it from the source).
 
 ### Legend
 - A raised white panel in the bottom-right with uppercase letter-spaced section labels, teal toggles per layer, and the hex ramp drawn as a continuous bar with count ticks.
@@ -288,7 +333,7 @@ The Datasets / Time coverage / Filters segments welded to the brand card's base.
 - **Do** use the raised 3D shadow only on surfaces resting on the map, and hairlines inside them.
 - **Do** draw focus and state emphasis as box-shadow rings (`--cioos-focus`) so nothing reflows.
 - **Do** size every surface for the French strings first; fixed widths must hold "Jeux de données" and "EXPLORATEUR".
-- **Do** use an existing breakpoint rung (600 / 700 / 900 / 992 / 1200 / 1400).
+- **Do** use an existing breakpoint rung (600 / 700 / 900 / 992 / 1000 / 1200 / 1400 / 1944).
 
 ### Don't:
 - **Don't** drift toward a generic Bootstrap admin look: grey cards, blue buttons, stock form chrome, default outlines.
