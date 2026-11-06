@@ -307,7 +307,7 @@ The Datasets / Time coverage / Filters segments welded to the brand card's base.
 - **Gridded products:** grids fold into one sticky 32px row ahead of the in-situ cards: white with a hairline, an amber-deep grid glyph, the title, and a count pill. Hover borders it teal; open, it takes the shallows fill with coastal-teal-deeper text. When the last map click found some of them, a goldenrod swatch and "N here" ride beside the count. Grouping the list by a dimension uses the same row.
 
 ### "What's here" card
-- The left-corner card a map click opens: a pin icon, the Display title, a goldenrod swatch tying it to the ring on the map, a navy count pill, and the cell's days of data beneath. It lists the same dataset cards as the sidebar, each with a "here" line (days of data at this spot, "nearby" for clustered markers), and folds grids the same way.
+- The left-corner card a map click opens: a pin icon, the Display title, a goldenrod swatch tying it to the ring on the map, a navy count pill, and the cell's days of data beneath. It lists the same dataset cards as the sidebar, each with a "here" line led by a small goldenrod hex (days of data at this spot, "nearby" for clustered markers), and folds grids the same way.
 
 ### Clear selection pill
 - A white pill with a goldenrod border and a goldenrod disc holding the ×, floating bottom-centre over the map while a click or dataset selection is active. Hover turns it coral (error-bg fill, coral border, coral-deep text). It hides while the datasets list, which has its own clear, is open.

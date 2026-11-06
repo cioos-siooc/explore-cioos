@@ -3,8 +3,9 @@
 .mapClickClear {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px 8px 8px;
+  gap: var(--cioos-space-sm);
+  padding: var(--cioos-space-sm) var(--cioos-space-lg) var(--cioos-space-sm)
+    var(--cioos-space-sm);
   border: 1px solid var(--cioos-map-click);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
@@ -80,5 +81,5 @@
   box-shadow:
     0 0 0 2px var(--cioos-map-click-glow),
     0 0 10px 1px var(--cioos-map-click-glow),
-    var(--cioos-shadow-float);
+    var(--cioos-shadow-3d-sm);
 }
