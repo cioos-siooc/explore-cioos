@@ -15,8 +15,13 @@ const liveQueries = new Set();
 // `false` would hide it. Height stays tall unless a test sets it.
 function evaluate(query) {
   if (query.includes(",")) return query.split(",").some(evaluate);
-  const maxHeight = /^\(\s*max-height:\s*(\d+)px\s*\)$/.exec(query.trim());
-  if (maxHeight) return currentHeight <= Number(maxHeight[1]);
+  if (query.includes(" and ")) return query.split(" and ").every(evaluate);
+  const height = /^\(\s*(min|max)-height:\s*(\d+)px\s*\)$/.exec(query.trim());
+  if (height) {
+    return height[1] === "min"
+      ? currentHeight >= Number(height[2])
+      : currentHeight <= Number(height[2]);
+  }
   if (query.trim() === REDUCED_MOTION_QUERY) return false;
   if (query.trim() === TOUCH_QUERY) return touchScreen;
   if (query.trim() === DARK_SCHEME_QUERY) return false;
@@ -24,7 +29,7 @@ function evaluate(query) {
   if (!match) {
     throw new Error(
       `Unsupported media query in test: "${query}". ` +
-        "Only (min-width: Npx), (max-width: Npx), (max-height: Npx), comma lists of those, (hover: none), reduced motion and a dark colour scheme are handled — see src/test/viewport.js.",
+        "Only (min-width: Npx), (max-width: Npx), (min-height: Npx), (max-height: Npx), comma and `and` lists of those, (hover: none), reduced motion and a dark colour scheme are handled — see src/test/viewport.js.",
     );
   }
   const [, bound, px] = match;

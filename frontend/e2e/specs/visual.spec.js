@@ -36,6 +36,20 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
       await expect(page).toHaveScreenshot(`${name}-sidebar.png`);
     });
 
+    // Beside the list where there's room (the rail), in its place on a phone.
+    test("a dataset page", async ({ page }) => {
+      await openApp(page);
+      const panel = page.getByTestId("sidebar-datasets");
+      if ((await panel.getAttribute("data-expanded")) !== "true") {
+        await page.getByTestId("topbar-datasets-button").click();
+      }
+      await page.getByTestId("dataset-card").nth(2).click();
+      await expect(page.getByTestId("sidebar-close-dataset")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
+      await settle(page);
+      await expect(page).toHaveScreenshot(`${name}-dataset.png`);
+    });
+
     test("the filters modal", async ({ page }) => {
       await openApp(page);
       await page.getByTestId("topbar-filters-button").click();
