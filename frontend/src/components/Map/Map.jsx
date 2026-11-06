@@ -58,10 +58,12 @@ import {
   hexOutlineColor,
   mapInkColor,
   MARKER_MIN_ZOOM,
+  MARKER_FADE_END_ZOOM,
+  HEX_FILL_OPACITY_STOPS,
   trackLineColor,
 } from "../config";
 import platforms from "../../platforms.json";
-import { platformColor } from "../../platformVocab.js";
+import { platformColor, platformLabel } from "../../platformVocab.js";
 import DepthProbe from "./DepthProbe.jsx";
 import {
   TRAJECTORY_TYPE_KEYS,
@@ -328,7 +330,28 @@ const PAN_RESCALE_FACTOR = 2;
 // Only one is ever on screen, and queryRenderedFeatures returns nothing for a
 // layer outside its zoom range, so asking for both needs no zoom test.
 const HEX_LAYER_IDS = ["hexes", "coverage-hexes"];
+const POINT_LAYER_IDS = ["points"];
+const NO_HEX_HOVERED = ["==", ["get", "pk"], -1];
+const HEX_HOVER_LAYERS = [
+  {
+    id: "hexes-hover",
+    of: "hexes",
+    source: "cde-tiles",
+    sourceLayer: "internal-layer-name",
+    minzoom: 0,
+    maxzoom: MARKER_MIN_ZOOM,
+  },
+  {
+    id: "coverage-hexes-hover",
+    of: "coverage-hexes",
+    source: "cde-cells",
+    sourceLayer: "coverage-hexes-layer",
+    minzoom: MARKER_MIN_ZOOM,
+    maxzoom: 24,
+  },
+];
 const HEX_SOURCE_IDS = ["cde-tiles", "cde-cells"];
+const DATA_SOURCE_IDS = [...HEX_SOURCE_IDS, "tracks"];
 
 // The coverage cell is a fixed 20 km across (web-api/routes/tiles.js), so
 // past the basemap hand-off a full fill would bury the imagery; the fill
@@ -467,6 +490,7 @@ export default function CreateMap({
   coverageRangeLevels,
   // undefined when there is nothing to measure and the global tier takes over.
   onViewportHexRange = () => {},
+  onViewportPointRange = () => {},
   hoveredDataset,
   setHoveredDataset,
   inspectDataset,
@@ -486,6 +510,9 @@ export default function CreateMap({
   projection = "mercator",
   zoomTarget,
   drawRequest,
+  // (failed: boolean): whether any data tile is a hole the retries gave up on.
+  onTilesFailed = () => {},
+  tileRetryRequest,
   featureQueryRequest,
   onMapReady = () => {},
   // See reportFirstPaint.
@@ -501,8 +528,6 @@ export default function CreateMap({
   // Opaque: overlapping translucent markers mixed into hues no platform has.
   // The white halo is what separates neighbours.
   const circleOpacity = 1;
-  // Count is carried by colour alone; opacity varies with zoom alone.
-  const hexOpacity = 0.85;
   const hexMinZoom = 0;
   // Shared with the Legend: the hex band and the marker tier must not drift.
   const hexMaxZoom = MARKER_MIN_ZOOM;
@@ -511,24 +536,10 @@ export default function CreateMap({
   const COVERAGE_HEX_OUTLINE_OPACITY = 0.6;
   const COVERAGE_HEX_OUTLINE_WIDTH = 1;
 
-  // Markers and the cells' white edges cross-fade in over this band rather
-  // than switching on at hexMaxZoom. Kept narrow: a map left inside it would
-  // show half-transparent markers blending into hues no platform has.
-  const MARKER_FADE_END_ZOOM = hexMaxZoom + 0.15;
-
-  // Below the marker tier the floor is kept high so a one-day cell reads as
-  // data, not as the basemap's water tint. At the marker tier the white edges
-  // mark each cell, so the fill steps back and the markers own the colour (the
-  // darker stops otherwise swallowed the darker platform hues). Across the
-  // basemap hand-over the fill thins to a tint and the border takes over
-  // (HEX_FILL_FADE_*_ZOOM).
-  const COVERAGE_HEX_OPACITY_STOPS = [
-    [hexMaxZoom, 0.7],
-    [MARKER_FADE_END_ZOOM, 0.45],
-    [HEX_FILL_FADE_START_ZOOM, 0.4],
-    [HEX_FILL_FADE_END_ZOOM, 0.2],
-  ];
-
+  // Markers and the cells' white edges cross-fade in over hexMaxZoom to
+  // MARKER_FADE_END_ZOOM rather than switching on. Kept narrow: a map left
+  // inside it would show half-transparent markers blending into hues no
+  // platform has.
   const MARKER_FADE_START_FRACTION = 0.2;
   const markerFadeIn = (opacityAt) => [
     "interpolate",
@@ -542,23 +553,31 @@ export default function CreateMap({
   const pointsOpacity = (scale = 1) =>
     markerFadeIn((fraction) => circleOpacity * scale * fraction);
 
-  // Continuous with COVERAGE_HEX_OPACITY_STOPS: ends at hexMaxZoom on the value
-  // that one starts with.
-  const HEX_OPACITY_STOPS = [
-    [hexMinZoom, hexOpacity],
-    [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
-  ];
+  // Count is carried by colour alone; opacity varies with zoom alone. The two
+  // layers split HEX_FILL_OPACITY_STOPS at hexMaxZoom.
+  const HEX_OPACITY_STOPS = HEX_FILL_OPACITY_STOPS.filter(
+    ([zoom]) => zoom <= hexMaxZoom,
+  );
+  const COVERAGE_HEX_OPACITY_STOPS = HEX_FILL_OPACITY_STOPS.filter(
+    ([zoom]) => zoom >= hexMaxZoom,
+  );
   const [draw] = useState(() => new MapboxDraw(drawControlOptions));
+  const onTilesFailedRef = useRef(onTilesFailed);
   // refreshTiles is the one public call that reloads an errored tile.
-  const [tileRetry] = useState(() =>
-    createTileRetry({
+  const [tileRetry] = useState(() => {
+    const retry = createTileRetry({
       refresh: (sourceId, tile) => {
         if (map.current?.getSource(sourceId)) {
           map.current.refreshTiles(sourceId, [tile]);
         }
       },
-    }),
-  );
+      // The basemap's holes are its own; only data holes would pass for
+      // "nothing here".
+      onChange: () =>
+        onTilesFailedRef.current(retry.hasExhausted(DATA_SOURCE_IDS)),
+    });
+    return retry;
+  });
   const drawPolygon = useRef(draw);
   const doFinalCheck = useRef(false);
   const layersLoaded = useRef(false);
@@ -567,6 +586,7 @@ export default function CreateMap({
   // A ref, not state: a re-render isn't what it should cause; the legend hears
   // via onViewportHexRange.
   const viewportHexRange = useRef(undefined);
+  const viewportPointRange = useRef(undefined);
   // For the map handlers registered once on mount.
   const setColorStopsRef = useRef(undefined);
   // Bumped when a count stops meaning what it meant (new filters or geometry);
@@ -603,6 +623,7 @@ export default function CreateMap({
   const trailingDaysRef = useRef(trailingDays);
   const dataLayersRef = useRef(dataLayers);
   const onViewportHexRangeRef = useRef(onViewportHexRange);
+  const onViewportPointRangeRef = useRef(onViewportPointRange);
   const selectedTrajectoryRef = useRef(selectedTrajectory);
 
   const rawTrackRef = useRef(null);
@@ -1083,10 +1104,9 @@ export default function CreateMap({
       generateColorStops(colorScale, coverageDomain),
     );
 
-    pointRadiusRange.current = getCurrentRangeLevel(
-      effectiveRangeLevels,
-      hexMaxZoom,
-    );
+    pointRadiusRange.current =
+      viewportPointRange.current ||
+      getCurrentRangeLevel(effectiveRangeLevels, hexMaxZoom);
 
     // The grey is a feature-state branch inside the ramp expressions (see
     // dimmable), so a ramp refresh carries the focus through.
@@ -1172,8 +1192,8 @@ export default function CreateMap({
   // Read from rendered features, so a viewport-scaled ramp costs no request.
   // A pass that gives up keeps the last good threshold: blanking it un-faded
   // the map on every unmeasurable moment.
-  function measureVisibleHexRange(focusPk) {
-    const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id));
+  function measureVisibleHexRange(focusPk, layerIds = HEX_LAYER_IDS) {
+    const layers = layerIds.filter((id) => map.current.getLayer(id));
     if (!layers.length) return undefined;
     // Only with the whole globe in view, where the catalogue-wide tier is the
     // honest domain anyway.
@@ -1221,11 +1241,32 @@ export default function CreateMap({
     onViewportHexRangeRef.current(range);
   }
 
+  // Marker size follows the view like the hex shades: the catalogue's point
+  // range is set by single-day casts, so every long-running mooring in view
+  // drew at full size.
+  function applyViewportPointRange(range) {
+    if (rangesEqual(viewportPointRange.current, range)) return;
+    viewportPointRange.current = range;
+    setColorStopsRef.current();
+    onViewportPointRangeRef.current(range);
+  }
+
+  function rescalePointsIfPannedOut() {
+    const painted = viewportPointRange.current;
+    const range = measureVisibleHexRange(rampFocusPk.current, POINT_LAYER_IDS);
+    if (!range) return;
+    const ratio = painted ? range[1] / painted[1] : Infinity;
+    if (ratio > PAN_RESCALE_FACTOR || ratio < 1 / PAN_RESCALE_FACTOR) {
+      applyViewportPointRange(range);
+    }
+  }
+
   // Once per settled pan. An absent measurement (nothing on screen) keeps the
   // painted ramp: the global tier would re-shade empty water for nothing.
   function rescaleIfPannedOut() {
     if (!hexSourcesLoaded()) return;
     panSettlePending.current = false;
+    rescalePointsIfPannedOut();
     const painted = viewportHexRange.current;
     if (!painted) return;
     const range = measureVisibleHexRange(rampFocusPk.current);
@@ -1251,6 +1292,9 @@ export default function CreateMap({
     // slowed the very tiles being waited on.
     if (!hexSourcesLoaded()) return;
     const range = measureVisibleHexRange(rampFocusPk.current);
+    applyViewportPointRange(
+      measureVisibleHexRange(rampFocusPk.current, POINT_LAYER_IDS),
+    );
     // Pinned, holding colours through a drag.
     if (range !== undefined) rampMeasuredFor.current = key;
     // Loaded and empty IS an answer, so the global tier takes over. Not pinned:
@@ -1807,6 +1851,10 @@ export default function CreateMap({
   }, [drawRequest]);
 
   useEffect(() => {
+    if (tileRetryRequest) tileRetry.retryExhausted();
+  }, [tileRetryRequest, tileRetry]);
+
+  useEffect(() => {
     if (!map.current) return;
     polygonRef.current = polygon;
     activeWmsOverlayRef.current = activeWmsOverlay;
@@ -1884,6 +1932,8 @@ export default function CreateMap({
   useLayoutEffect(() => {
     rangeLevelsRef.current = rangeLevels;
     onViewportHexRangeRef.current = onViewportHexRange;
+    onViewportPointRangeRef.current = onViewportPointRange;
+    onTilesFailedRef.current = onTilesFailed;
     selectedTrajectoryRef.current = selectedTrajectory;
     setColorStopsRef.current = setColorStops;
     mapQueryRef.current = mapQueryString;
@@ -2540,6 +2590,31 @@ export default function CreateMap({
     );
   }
 
+  // The hex under the cursor, outlined so the chip's figure has a visible
+  // owner: at hex zoom a cell can be a few pixels across. One layer per source,
+  // each filtered to a single pk (setHexHover).
+  function addHexHoverLayers() {
+    HEX_HOVER_LAYERS.forEach(({ id, source, sourceLayer, minzoom, maxzoom }) =>
+      map.current.addLayer(
+        {
+          id,
+          type: "line",
+          source,
+          "source-layer": sourceLayer,
+          minzoom,
+          maxzoom,
+          filter: NO_HEX_HOVERED,
+          paint: {
+            "line-color": mapInkColor,
+            "line-width": 1.5,
+            "line-opacity": 0.9,
+          },
+        },
+        FIRST_LABEL_LAYER_ID,
+      ),
+    );
+  }
+
   function addClickHighlightLayers() {
     // No beforeId, so it draws over every data layer: a highlight the markers
     // cover is no highlight.
@@ -2890,6 +2965,21 @@ export default function CreateMap({
       : hits;
   };
 
+  // Re-filtered only when the hovered cell changes.
+  const hexHovered = useRef("");
+  function setHexHover(layerId, pk) {
+    const key = layerId ? `${layerId}:${pk}` : "";
+    if (hexHovered.current === key || !map.current) return;
+    hexHovered.current = key;
+    HEX_HOVER_LAYERS.forEach(({ id, of }) => {
+      if (!map.current.getLayer(id)) return;
+      map.current.setFilter(
+        id,
+        of === layerId ? ["==", ["get", "pk"], pk] : NO_HEX_HOVERED,
+      );
+    });
+  }
+
   function installHover() {
     // Hover only names what's under the cursor; detail is one click away in the
     // card. Lines are truncated rather than wrapped. Sized to the longest line
@@ -3031,12 +3121,20 @@ export default function CreateMap({
       {
         id: "points",
         layers: ["points"],
-        show: (e, features) =>
+        // Named as well as coloured: the hue alone is the platform otherwise.
+        show: (e, features) => {
+          const { platform, count } = features[0].properties;
           showChip(
             // the circle's centre, not the cursor
             features[0].geometry.coordinates.slice(),
-            metricCountLabel(features[0].properties.count),
-          ),
+            [
+              !platform || platform === "unknown"
+                ? t("mapChipPlatformUnknown")
+                : platformLabel(platform, i18n.language),
+              metricCountLabel(count),
+            ],
+          );
+        },
       },
       {
         id: "coverage-hexes",
@@ -3091,6 +3189,14 @@ export default function CreateMap({
         setGriddapHovered([]);
       }
 
+      const hexWinner = HEX_LAYER_IDS.includes(winner?.id);
+      setHexHover(
+        hexWinner ? winner.id : null,
+        hexWinner
+          ? hits.find((feature) => feature.layer.id === winner.id).properties.pk
+          : null,
+      );
+
       if (!winner) {
         map.current.getCanvas().style.cursor = "grab";
         popup.remove();
@@ -3128,6 +3234,7 @@ export default function CreateMap({
       pendingHover = null;
       showGriddapTooltip.cancel();
       setGriddapHovered([]);
+      setHexHover(null);
       if (!draw.getMode().includes("draw") && !depthToolActiveRef.current) {
         map.current.getCanvas().style.cursor = "grab";
         popup.remove();
@@ -3366,6 +3473,7 @@ export default function CreateMap({
       setColorStopsRef.current();
       addObservationLayers();
       addGriddapLayers();
+      addHexHoverLayers();
       addClickHighlightLayers();
       addTrackLayers();
       addSelectedTrackLayers();
@@ -3459,11 +3567,15 @@ export default function CreateMap({
     // since a minified error class logs as its two-letter name.
     // Esri imagery throws the odd transient 502 (logged as a CORS block, since
     // its error responses carry no Access-Control-Allow-Origin).
-    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks", "imagery"];
+    const retriedSourceIds = [...DATA_SOURCE_IDS, "imagery"];
     map.current.on("error", (e) => {
       console.error(e.error?.message ?? e.error);
       if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
       tileRetry.onError(e.sourceId, e.tile.tileID.canonical);
+    });
+    map.current.on("sourcedata", (e) => {
+      if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
+      tileRetry.onLoad(e.sourceId, e.tile.tileID.canonical);
     });
 
     map.current.on("idle", () => {

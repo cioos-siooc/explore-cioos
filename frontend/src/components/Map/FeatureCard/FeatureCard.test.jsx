@@ -315,6 +315,30 @@ describe("FeatureCard", () => {
     expect(cardFor(c)).toHaveTextContent("1 day of data");
   });
 
+  // Listed under the cell means records there; zero days means undated ones.
+  it("says a dataset's records here are undated rather than '0 days'", async () => {
+    await renderReady();
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input, init) => {
+      const url = new URL(typeof input === "string" ? input : input.url);
+      if (url.pathname.endsWith("/tiles/datasets")) {
+        return Promise.resolve(Response.json([{ pk: 7, count: 0 }]));
+      }
+      return realFetch(input, init);
+    });
+    const row = pointQueryFixture[0];
+    click({
+      nonce: 15,
+      items: [{ kind: "observation", pk: row.pk, aggregate: true }],
+      buckets: { hexPks: [970], pointPks: [], source: "main", z: 6 },
+    });
+
+    await waitFor(() =>
+      expect(cardFor(row)).toHaveTextContent("records without dates"),
+    );
+    expect(cardFor(row)).not.toHaveTextContent("0 days");
+  });
+
   // A coverage hex at marker zoom lists the stations inside it too. Those are
   // profiles, which /tiles/datasets only has under source=main, so the hex and
   // its markers are asked of their own sources and the answers merged.

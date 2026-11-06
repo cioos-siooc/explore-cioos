@@ -26,6 +26,8 @@ export default function MapContainer() {
     projection,
     zoomTarget,
     drawRequest,
+    setTilesFailed,
+    tileRetryRequest,
     featureQueryRequest,
     mapInstance,
     setMapInstance,
@@ -50,6 +52,7 @@ export default function MapContainer() {
     firstPaintPending,
     setMapView,
     setViewportHexRange,
+    setViewportPointRange,
   } = useMapView();
   const {
     polygon,
@@ -126,6 +129,7 @@ export default function MapContainer() {
         rangeLevels={rangeLevels}
         coverageRangeLevels={coverageRangeLevels}
         onViewportHexRange={setViewportHexRange}
+        onViewportPointRange={setViewportPointRange}
         onFeatureQuery={handleFeatureQuery}
         featureQuery={featureQuery}
         sharedFeatureQueryAt={sharedFeatureQueryAt}
@@ -153,6 +157,8 @@ export default function MapContainer() {
         projection={projection}
         zoomTarget={zoomTarget}
         drawRequest={drawRequest}
+        onTilesFailed={setTilesFailed}
+        tileRetryRequest={tileRetryRequest}
         featureQueryRequest={featureQueryRequest}
         onMapReady={setMapInstance}
         onFirstPaint={reportFirstPaint}

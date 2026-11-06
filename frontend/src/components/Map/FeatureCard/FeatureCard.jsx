@@ -132,11 +132,17 @@ export default function FeatureCard() {
   const hereLine = (row) => {
     const items = itemsByPk[row.pk] || [];
     const count = datasetDays.get(Number(row.pk));
+    let days = null;
+    // No figure yet (or the request failed): show none rather than a number
+    // that isn't this dataset's.
+    if (count !== undefined) {
+      // The cell lists the dataset, so it has records here; 0 days means
+      // none of them carry a date (e.g. OBIS occurrences without eventDate).
+      days = Number(count) > 0 ? countLabel(count) : t("featureCardUndated");
+    }
     return [
       ...tracksOf(row).map((item) => item.trajectoryId),
-      // No figure yet (or the request failed): show none rather than a number
-      // that isn't this dataset's.
-      count === undefined ? null : countLabel(count),
+      days,
       items.some((item) => item.aggregate) ? t("featureCardNearby") : null,
     ]
       .filter(Boolean)
