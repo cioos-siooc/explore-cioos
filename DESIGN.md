@@ -195,11 +195,11 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 
 ### Data keys
 - **Track Violet** (`track-violet`): trajectory track lines, their scrub control and legend swatch. The map paints it from `trackLineColor` in `components/config.js`; keep the two in step.
-- **Grid Amber** (`grid-amber`): gridded (griddap) coverage highlight and its markers on the time and depth bars.
+- **Grid Amber** (`grid-amber`): gridded (griddap) coverage footprints on the map (dashed outline over a faint fill, `-deep` when hovered or picked), the legend glyph, and its markers on the time and depth bars. Paired with `gridCoverageColor` in `components/config.js`.
 - **Click Goldenrod** (`click-goldenrod`): the ring on whatever the last map click found, and the matching accents on the "what's here" card, pinned list rows, inspector rows and the floating Clear selection pill. It pairs with `clickHighlightColor` in `components/config.js`.
 - **Deep and surface shades**: each data key has a `-deep` shade for hover, pressed and label text on white (grid amber deep also tints the grid glyph on the "Gridded products" row), and an opaque `-surface` tint for pills and cards that sit over the map, where a translucent wash would let the map show through.
 - **Hex ramp**: twelve opaque stops from Shallows through Coastal Teal to Deep Water Navy, at even L* steps (`colorScale` in `components/config.js`). It is the only ramp for coverage density.
-- **Platform palette**: twelve hues for point markers (`platformColors.js`), kept apart by lightness for red-green colour blindness.
+- **Platform palette**: twelve hues for point markers (`platformColors.js`), drawn opaque on a white halo and kept at least ΔE2000 20 apart, and 10 apart under simulated deuteranopia and protanopia (Machado 2009); `platformColors.test.js` enforces both. Dimmed (out-of-focus) features take the navy-tinted `dimmedFeatureColor`, never a platform hue.
 
 ### Named Rules
 **The One Voice Rule.** Coastal teal is the only colour the chrome uses to say "interactive, selected or open". A second accent in the chrome is a bug.

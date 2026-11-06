@@ -65,8 +65,9 @@
   --cioos-track-bg: rgb(103 73 172 / 14%); /* trailing-window wash */
   --cioos-track-surface: #efeaf8; /* opaque sibling of -bg, for cards over the map */
 
-  /* Paired the same way with griddap-highlight in Map.jsx. */
-  --cioos-grid: #fbb03b; /* griddap coverage highlight + its markers */
+  /* Paired the same way with `gridCoverageColor` / `gridCoverageDeepColor` in
+     components/config.js. */
+  --cioos-grid: #fbb03b; /* griddap coverage footprints + their markers */
   --cioos-grid-700: #c77f14; /* hover/pressed, and label text on white */
   --cioos-grid-surface: #fdf1dc; /* opaque tint, for pills over the map */
 

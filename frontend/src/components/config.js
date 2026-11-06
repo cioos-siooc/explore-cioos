@@ -62,6 +62,19 @@ export const hexOutlineColor = "#FFFFFF";
 // Must stay in step with --cioos-map-click in components/theme.css.
 export const clickHighlightColor = "#DAA520";
 
+// Griddap footprints at rest (base) and hovered (deep). Must stay in step with
+// --cioos-grid and --cioos-grid-700 in components/theme.css.
+export const gridCoverageColor = "#FBB03B";
+export const gridCoverageDeepColor = "#C77F14";
+
+// Features outside the focused dataset. Navy-tinted like every neutral, and
+// paler than the "unknown" platform's slate so a dimmed marker can't pass for
+// one.
+export const dimmedFeatureColor = "#C9D4D6";
+
+// The ramp's navy end: rings that must read over pale cells and pale markers.
+export const mapInkColor = "#152F37";
+
 // Days is the only count that means one thing across all sources. Must match
 // web-api/utils/hexMetric.js; the API defaults to 'records' when ?metric= is
 // absent, so this is written into every tile and /legend URL explicitly.

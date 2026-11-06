@@ -318,6 +318,19 @@
   transform: translateX(-100%);
 }
 
+.legendScaleNote {
+  margin-top: 2px;
+  font-size: var(--cioos-font-size-2xs);
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--cioos-ink-80);
+}
+
+/* Separates the two size/value pairs of the marker key. */
+.legendSizeKey .legendItemLabel + .legendSwatch {
+  margin-left: 6px;
+}
+
 /* These stand in their group's label row (see renderGroup), so they shrink to
    their words like a group label does. */
 .legendLayerItems {

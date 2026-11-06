@@ -132,9 +132,9 @@ const GRIDDAP_ICON = (
       width="9"
       height="8"
       style={{
-        fill: "var(--cioos-primary)",
+        fill: "var(--cioos-grid)",
         fillOpacity: 0.15,
-        stroke: "var(--cioos-primary)",
+        stroke: "var(--cioos-grid)",
       }}
       strokeWidth="1.5"
       strokeDasharray="2 1.5"
@@ -146,7 +146,8 @@ const GRIDDAP_ICON = (
 const LAYER_ICONS = { griddap: GRIDDAP_ICON };
 
 // Evenly spaced subset, always keeping first and last, so labels don't overlap.
-function pickTickIndices(n, maxTicks = 5) {
+// Four by default: five collided ("396 1.5k") once the top value went compact.
+function pickTickIndices(n, maxTicks = 4) {
   if (maxTicks < 2) return [0];
   if (n <= maxTicks) return Array.from({ length: n }, (_, i) => i);
   const step = (n - 1) / (maxTicks - 1);
@@ -299,10 +300,7 @@ export default function Legend({
     // web-api/routes/legend.js), so a clamped top tick isn't the real maximum.
     const clamped = rangeLevel?.[2] > rangeLevel?.[1];
     return (
-      <div
-        className={classNames({ legendDimmed: dimmed })}
-        title={hexRangeScaledToView ? t("legendScaledToView") : undefined}
-      >
+      <div className={classNames({ legendDimmed: dimmed })}>
         <div
           className="legendColorBar"
           style={{ background: gradient }}
@@ -331,6 +329,13 @@ export default function Legend({
             );
           })}
         </div>
+        {/* Said, not only in a tooltip: the same shade means another count
+            after a zoom. */}
+        {hexRangeScaledToView && (
+          <div className="legendScaleNote" title={t("legendScaledToView")}>
+            {t("legendScaledToViewShort")}
+          </div>
+        )}
       </div>
     );
   }
@@ -473,9 +478,11 @@ export default function Legend({
             </span>
             {ramped && (
               <>
-                <span className="legendItemLabel">&lt;</span>
                 <span className="legendSwatch">
                   <span className="legendPointCircle large" />
+                </span>
+                <span className="legendItemLabel">
+                  {`≥ ${formatCount(hi, true)}`}
                 </span>
               </>
             )}

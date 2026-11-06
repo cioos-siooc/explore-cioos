@@ -37,6 +37,7 @@ import {
   zoomToDatasetCamera,
   splitTrackRuns,
   initialBearing,
+  withAlpha,
 } from "../../utilities";
 import {
   buildWmsGetMapUrl,
@@ -51,7 +52,11 @@ import {
   colorScale,
   defaultBathymetryPalette,
   defaultMapBounds,
+  dimmedFeatureColor,
+  gridCoverageColor,
+  gridCoverageDeepColor,
   hexOutlineColor,
+  mapInkColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
 } from "../config";
@@ -298,6 +303,10 @@ const MAP_VIEW_DEBOUNCE_MS = 250;
 const TRACK_LINE_OPACITY = 0.55;
 // A head last seen before the window's final week (the server's `active`).
 const TRACK_HEAD_INACTIVE_OPACITY = 0.35;
+// The white rim is all that separates a marker from the cell under it: at
+// 1.25px and 0.9 the darker platform hues sank into the darker ramp stops.
+const HALO_PADDING = 1.75;
+const HALO_OPACITY = 1;
 const trackHeadOpacity = (scale) => [
   "case",
   ["to-boolean", ["get", "active"]],
@@ -312,14 +321,18 @@ const DRAW_UPDATE_DEBOUNCE_MS = 300;
 // catalogue-wide domain painted them pale. generateColorStops gives a
 // one-value range a mid shade.
 const MIN_VIEWPORT_HEXES = 1;
+// How far the visible maximum may drift from the painted one before a pan
+// re-shades. Counts snap to nice steps (quantizeCountRange), so within 2x the
+// re-shade would mostly just flicker.
+const PAN_RESCALE_FACTOR = 2;
 // Only one is ever on screen, and queryRenderedFeatures returns nothing for a
 // layer outside its zoom range, so asking for both needs no zoom test.
 const HEX_LAYER_IDS = ["hexes", "coverage-hexes"];
 const HEX_SOURCE_IDS = ["cde-tiles", "cde-cells"];
 
 // The coverage cell is a fixed 20 km across (web-api/routes/tiles.js), so
-// past the basemap hand-off it would just tint the imagery; the fill fades
-// over the same window and the ramp moves to the border
+// past the basemap hand-off a full fill would bury the imagery; the fill
+// thins to a tint over the same window and a thin border takes over
 // ('coverage-hex-outlines').
 const HEX_FILL_FADE_START_ZOOM = basemapHandoffStartZoom;
 const HEX_FILL_FADE_END_ZOOM = basemapHandoffEndZoom;
@@ -485,24 +498,49 @@ export default function CreateMap({
   const creatingPolygon = useRef(false);
   const shiftBoxCreate = useRef(false);
 
-  const circleOpacity = 0.7;
+  // Opaque: overlapping translucent markers mixed into hues no platform has.
+  // The white halo is what separates neighbours.
+  const circleOpacity = 1;
   // Count is carried by colour alone; opacity varies with zoom alone.
-  const hexOpacity = 0.8;
+  const hexOpacity = 0.85;
   const hexMinZoom = 0;
   // Shared with the Legend: the hex band and the marker tier must not drift.
   const hexMaxZoom = MARKER_MIN_ZOOM;
-  // Nearly solid: a hairline stands in for a whole hexagon of fill.
-  const COVERAGE_HEX_OUTLINE_OPACITY = 0.9;
+  // Thin and translucent over the imagery: at full strength the 20 km cells
+  // read as a coordinate grid rather than as coverage.
+  const COVERAGE_HEX_OUTLINE_OPACITY = 0.6;
+  const COVERAGE_HEX_OUTLINE_WIDTH = 1;
 
-  // Doesn't bottom out at a wash: at 0.15 the cells stopped reading as a shade
-  // of anything. Across the basemap hand-over the fill goes to nothing and the
-  // border carries the ramp (HEX_FILL_FADE_*_ZOOM).
+  // Markers and the cells' white edges cross-fade in over this band rather
+  // than switching on at hexMaxZoom. Kept narrow: a map left inside it would
+  // show half-transparent markers blending into hues no platform has.
+  const MARKER_FADE_END_ZOOM = hexMaxZoom + 0.15;
+
+  // Below the marker tier the floor is kept high so a one-day cell reads as
+  // data, not as the basemap's water tint. At the marker tier the white edges
+  // mark each cell, so the fill steps back and the markers own the colour (the
+  // darker stops otherwise swallowed the darker platform hues). Across the
+  // basemap hand-over the fill thins to a tint and the border takes over
+  // (HEX_FILL_FADE_*_ZOOM).
   const COVERAGE_HEX_OPACITY_STOPS = [
-    [hexMaxZoom, 0.6],
-    [hexMaxZoom + 1.5, 0.5],
-    [HEX_FILL_FADE_START_ZOOM, 0.43],
-    [HEX_FILL_FADE_END_ZOOM, 0],
+    [hexMaxZoom, 0.7],
+    [MARKER_FADE_END_ZOOM, 0.45],
+    [HEX_FILL_FADE_START_ZOOM, 0.4],
+    [HEX_FILL_FADE_END_ZOOM, 0.2],
   ];
+
+  const MARKER_FADE_START_FRACTION = 0.2;
+  const markerFadeIn = (opacityAt) => [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    hexMaxZoom,
+    opacityAt(MARKER_FADE_START_FRACTION),
+    MARKER_FADE_END_ZOOM,
+    opacityAt(1),
+  ];
+  const pointsOpacity = (scale = 1) =>
+    markerFadeIn((fraction) => circleOpacity * scale * fraction);
 
   // Continuous with COVERAGE_HEX_OPACITY_STOPS: ends at hexMaxZoom on the value
   // that one starts with.
@@ -557,6 +595,8 @@ export default function CreateMap({
   const rampFocusPk = useRef(undefined);
   // undefined: nothing measured for the current key, so the next idle measures.
   const rampMeasuredFor = useRef(undefined);
+  // Set by 'moveend', spent by the next settled measurement.
+  const panSettlePending = useRef(false);
   // For the one-shot map 'load' closure.
   const tracksModeRef = useRef(tracksMode);
   const scrubTimeRef = useRef(scrubTime);
@@ -684,7 +724,7 @@ export default function CreateMap({
       map.current.setPaintProperty(
         "points",
         "circle-opacity",
-        circleOpacity * scale,
+        pointsOpacity(scale),
       );
     }
     if (map.current.getLayer("points-halo")) {
@@ -703,7 +743,7 @@ export default function CreateMap({
       map.current.setPaintProperty(
         "focused-points-halo",
         "circle-opacity",
-        0.9 * scale,
+        HALO_OPACITY * scale,
       );
     }
   }
@@ -803,7 +843,9 @@ export default function CreateMap({
         closeButton: false,
         closeOnClick: true,
         className: "mapChipPopup",
-        offset: 10,
+        // Clears the largest marker and its click ring, which the chip used
+        // to sit on.
+        offset: 16,
         maxWidth: "260px",
       }),
   );
@@ -865,13 +907,18 @@ export default function CreateMap({
   // relayout that re-sends every loaded tile to the worker, so the old
   // repaint-and-overlay approach re-tessellated the viewport per list row.
   const IS_DIMMED = ["boolean", ["feature-state", "dimmed"], false];
-  const dimmable = (color) => ["case", IS_DIMMED, "lightgrey", color];
+  const dimmable = (color) => ["case", IS_DIMMED, dimmedFeatureColor, color];
 
   // Shares its source layer with 'points', so dimmed markers lose their white
   // ring; only halfway, since the casing keeps a grey dot legible over dark
   // sea.
   function pointsHaloOpacity(scale = 1) {
-    return ["case", IS_DIMMED, 0.5 * scale, 0.9 * scale];
+    return markerFadeIn((fraction) => [
+      "case",
+      IS_DIMMED,
+      0.5 * scale * fraction,
+      HALO_OPACITY * scale * fraction,
+    ]);
   }
 
   // setFeatureState addresses a source/source-layer, not a style layer.
@@ -946,10 +993,10 @@ export default function CreateMap({
   // halo and click highlight desync from the markers.
   const POINT_LAYERS = [
     ["points", 0],
-    ["points-halo", 1.25],
+    ["points-halo", HALO_PADDING],
     ["points-highlighted", 0],
     ["focused-points", 0],
-    ["focused-points-halo", 1.25],
+    ["focused-points-halo", HALO_PADDING],
     ["click-highlight-point", 0],
     ["click-highlight-point-glow", 6],
   ];
@@ -958,8 +1005,16 @@ export default function CreateMap({
     rampExpression(coverageColorStops.current, "count");
 
   // A fill's outline cannot outlive its opacity, so 'coverage-hex-outlines'
-  // draws this colour once the fill has gone.
-  const coverageHexOutlineColor = () => hexOutlineColor;
+  // takes over once the fill thins. Faded in with the markers.
+  const coverageHexOutlineColor = () => [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    hexMaxZoom,
+    withAlpha(hexOutlineColor, 0),
+    MARKER_FADE_END_ZOOM,
+    withAlpha(hexOutlineColor, 0.6),
+  ];
 
   // Zoom only: the count reaches transparency through the ramp's alpha
   // (toRampStops), and MapLibre multiplies the two. `scale` multiplies the
@@ -1145,11 +1200,12 @@ export default function CreateMap({
     return quantizeCountRange([lo, hi]);
   }
 
-  // Re-measure only when the counts change meaning (rampQueryEpoch), the ramp
-  // is scaled to another dataset (rampFocusPk), or the integer zoom changes. A
-  // PAN deliberately isn't one: re-shading on every settle flickered, so a pan
-  // from busy into quiet water stays pale until a zoom. Integer zoom, not the
-  // hex tier: z0 and z4 share a grid but show wildly different extents.
+  // Re-measure when the counts change meaning (rampQueryEpoch), the ramp is
+  // scaled to another dataset (rampFocusPk), or the integer zoom changes. A pan
+  // isn't part of the key: re-shading on every settle flickered. It re-shades
+  // only when the view's maximum leaves the painted one by PAN_RESCALE_FACTOR
+  // (rescaleIfPannedOut). Integer zoom, not the hex tier: z0 and z4 share a
+  // grid but show wildly different extents.
   function rampKey() {
     return [
       rampQueryEpoch.current,
@@ -1158,12 +1214,37 @@ export default function CreateMap({
     ].join("|");
   }
 
+  function applyViewportHexRange(range) {
+    if (rangesEqual(viewportHexRange.current, range)) return;
+    viewportHexRange.current = range;
+    setColorStopsRef.current();
+    onViewportHexRangeRef.current(range);
+  }
+
+  // Once per settled pan. An absent measurement (nothing on screen) keeps the
+  // painted ramp: the global tier would re-shade empty water for nothing.
+  function rescaleIfPannedOut() {
+    if (!hexSourcesLoaded()) return;
+    panSettlePending.current = false;
+    const painted = viewportHexRange.current;
+    if (!painted) return;
+    const range = measureVisibleHexRange(rampFocusPk.current);
+    if (!range) return;
+    const ratio = range[1] / painted[1];
+    if (ratio > PAN_RESCALE_FACTOR || ratio < 1 / PAN_RESCALE_FACTOR) {
+      applyViewportHexRange(range);
+    }
+  }
+
   // Cheap to call spuriously: the key test stops the loop, since repainting a
   // data-driven property re-renders the map, which calls this.
   function refreshViewportHexRange() {
     if (!map.current) return;
     const key = rampKey();
-    if (rampMeasuredFor.current === key) return;
+    if (rampMeasuredFor.current === key) {
+      if (panSettlePending.current) rescaleIfPannedOut();
+      return;
+    }
     // Tiles still in flight: hold what's painted and measure at the next idle.
     // Mid-load the rendered hexes include the previous zoom's stand-in tiles,
     // and each re-colouring relayouts every loaded tile (see IS_DIMMED), which
@@ -1175,11 +1256,7 @@ export default function CreateMap({
     // Loaded and empty IS an answer, so the global tier takes over. Not pinned:
     // panning into data at this zoom should find it at the next idle.
 
-    if (!rangesEqual(viewportHexRange.current, range)) {
-      viewportHexRange.current = range;
-      setColorStopsRef.current();
-      onViewportHexRangeRef.current(range);
-    }
+    applyViewportHexRange(range);
     // Even with nothing repainted, this settles the ramp the first reveal waits
     // for.
     revealDataIfRamped(range);
@@ -1205,10 +1282,10 @@ export default function CreateMap({
 
     const [lineColor, headIcon] =
       pk === "selection"
-        ? ["lightgrey", "track-head-arrow-dim"]
+        ? [dimmedFeatureColor, "track-head-arrow-dim"]
         : pk
           ? [
-              ["case", trackIsFocused(pk), trackLineColor, "lightgrey"],
+              ["case", trackIsFocused(pk), trackLineColor, dimmedFeatureColor],
               [
                 "case",
                 trackIsFocused(pk),
@@ -1391,13 +1468,26 @@ export default function CreateMap({
 
   // Guarded on the source: a share link can resolve a click payload before
   // the style has added layers. An open dataset draws its own footprint, so the
-  // click's hex, marker or grid box would read as part of it.
+  // click's hex or grid box would read as part of it. A clicked marker keeps
+  // its ring: a single click opens its dataset straight away, and without the
+  // ring the dot is lost among the dataset's own markers while the page still
+  // points at it.
   const revealedQueryNonce = useRef();
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
+    const highlight = featureQuery?.highlight;
     source.setData(
-      (!inspectDataset && featureQuery?.highlight) || emptyFeatureCollection,
+      !highlight
+        ? emptyFeatureCollection
+        : inspectDataset
+          ? {
+              ...highlight,
+              features: highlight.features.filter(
+                (feature) => feature.geometry?.type === "Point",
+              ),
+            }
+          : highlight,
     );
     if (!featureQuery?.highlight?.features?.length) return;
     if (revealedQueryNonce.current === featureQuery.nonce) return;
@@ -2153,7 +2243,7 @@ export default function CreateMap({
         },
         paint: {
           // Zero until the ramp is final — see revealData.
-          "circle-opacity": dataRevealed.current ? circleOpacity : 0,
+          "circle-opacity": dataRevealed.current ? pointsOpacity() : 0,
           "circle-radius-transition": NO_TRANSITION,
           "circle-radius": radiusExpression(pointRadiusRange.current),
           // See NO_TRANSITION.
@@ -2208,7 +2298,7 @@ export default function CreateMap({
           "line-opacity": dataRevealed.current
             ? coverageHexOutlineOpacityExpression()
             : 0,
-          "line-width": 2,
+          "line-width": COVERAGE_HEX_OUTLINE_WIDTH,
         },
       },
       "points",
@@ -2230,7 +2320,10 @@ export default function CreateMap({
           // the same ramp.
           "circle-opacity": dataRevealed.current ? pointsHaloOpacity() : 0,
           "circle-radius-transition": NO_TRANSITION,
-          "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+          "circle-radius": radiusExpression(
+            pointRadiusRange.current,
+            HALO_PADDING,
+          ),
         },
       },
       "points",
@@ -2276,7 +2369,7 @@ export default function CreateMap({
           "circle-opacity": circleOpacity,
           "circle-radius-transition": NO_TRANSITION,
           "circle-radius": radiusExpression(pointRadiusRange.current),
-          "circle-stroke-color": "black",
+          "circle-stroke-color": mapInkColor,
           // A ring around a greyed circle would still read as picked out.
           "circle-stroke-width": ["case", IS_DIMMED, 0, 0.75],
         },
@@ -2300,9 +2393,12 @@ export default function CreateMap({
         paint: {
           "circle-color": "#ffffff",
           // Zero until the ramp is final — see revealData.
-          "circle-opacity": dataRevealed.current ? 0.9 : 0,
+          "circle-opacity": dataRevealed.current ? HALO_OPACITY : 0,
           "circle-radius-transition": NO_TRANSITION,
-          "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+          "circle-radius": radiusExpression(
+            pointRadiusRange.current,
+            HALO_PADDING,
+          ),
         },
       },
       "points-highlighted",
@@ -2348,7 +2444,7 @@ export default function CreateMap({
         // Kept low because stacked rectangles composite into a solid slab;
         // the hover affordance leans on the outline.
         paint: {
-          "fill-color": "#52a79b",
+          "fill-color": gridCoverageColor,
           "fill-opacity": [
             "case",
             ["boolean", ["feature-state", "hovered"], false],
@@ -2368,8 +2464,8 @@ export default function CreateMap({
           "line-color": [
             "case",
             ["boolean", ["feature-state", "hovered"], false],
-            "#fbb03b",
-            "#52a79b",
+            gridCoverageDeepColor,
+            gridCoverageColor,
           ],
           "line-width": [
             "case",
@@ -2390,13 +2486,13 @@ export default function CreateMap({
         filter: ["==", ["geometry-type"], "Point"],
         paint: {
           "circle-radius": 5,
-          "circle-color": "#52a79b",
+          "circle-color": gridCoverageColor,
           "circle-opacity": 0.35,
           "circle-stroke-color": [
             "case",
             ["boolean", ["feature-state", "hovered"], false],
-            "#fbb03b",
-            "#52a79b",
+            gridCoverageDeepColor,
+            gridCoverageColor,
           ],
           "circle-stroke-width": [
             "case",
@@ -2413,7 +2509,7 @@ export default function CreateMap({
         id: "griddap-highlight-fill",
         type: "fill",
         source: "griddap-highlight",
-        paint: { "fill-color": "#fbb03b", "fill-opacity": 0.1 },
+        paint: { "fill-color": gridCoverageColor, "fill-opacity": 0.1 },
       },
       "points-highlighted",
     );
@@ -2422,7 +2518,7 @@ export default function CreateMap({
         id: "griddap-highlight-line",
         type: "line",
         source: "griddap-highlight",
-        paint: { "line-color": "#fbb03b", "line-width": 2.5 },
+        paint: { "line-color": gridCoverageDeepColor, "line-width": 2.5 },
       },
       "points-highlighted",
     );
@@ -2434,9 +2530,9 @@ export default function CreateMap({
         filter: ["==", ["geometry-type"], "Point"],
         paint: {
           "circle-radius": 7,
-          "circle-color": "#fbb03b",
+          "circle-color": gridCoverageColor,
           "circle-opacity": 0.1,
-          "circle-stroke-color": "#fbb03b",
+          "circle-stroke-color": gridCoverageDeepColor,
           "circle-stroke-width": 2.5,
         },
       },
@@ -2530,8 +2626,8 @@ export default function CreateMap({
         "circle-radius-transition": NO_TRANSITION,
         "circle-radius": radiusExpression(pointRadiusRange.current),
         "circle-color": "rgba(0, 0, 0, 0)",
-        "circle-stroke-color": "#000000",
-        "circle-stroke-width": 1.5,
+        "circle-stroke-color": clickHighlightColor,
+        "circle-stroke-width": 2.5,
       },
     });
 
@@ -2621,7 +2717,7 @@ export default function CreateMap({
     );
     map.current.addImage(
       "track-head-arrow-dim",
-      buildHeadArrowImage("lightgrey"),
+      buildHeadArrowImage(dimmedFeatureColor),
       {
         pixelRatio: 2,
       },
@@ -3593,12 +3689,16 @@ export default function CreateMap({
       if (HEX_SOURCE_IDS.includes(e.sourceId)) measure();
       else if (e.sourceId === "tracks") settleStaleData();
     };
-    map.current.on("moveend", measure);
+    const onMoveEnd = () => {
+      panSettlePending.current = true;
+      measure();
+    };
+    map.current.on("moveend", onMoveEnd);
     map.current.on("sourcedata", onDataSourceLoaded);
     map.current.on("idle", measureNow);
     return () => {
       measure.cancel();
-      map.current.off("moveend", measure);
+      map.current.off("moveend", onMoveEnd);
       map.current.off("sourcedata", onDataSourceLoaded);
       map.current.off("idle", measureNow);
     };
