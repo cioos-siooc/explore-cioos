@@ -25,3 +25,44 @@ def test_reload_top_requests_skips_non_regular_log_files(tmp_path, monkeypatch):
     redisFunctions.reloadTopRequests.fn()
 
     assert warmed == [redisFunctions.CACHE_WARM_BASE_URL + "/api/datasets"]
+
+
+class _FakeRedis:
+    def __init__(self, keys):
+        self.keys = set(keys)
+        self.unlink_calls = []
+
+    def scan_iter(self, count=None):
+        yield from sorted(self.keys)
+
+    def unlink(self, *keys):
+        self.unlink_calls.append(keys)
+        self.keys.difference_update(keys)
+        return len(keys)
+
+
+def test_clear_redis_cache_keeps_basemap_tiles(monkeypatch):
+    fake = _FakeRedis([
+        b"/legend?metric=days",
+        b"/tiles/2/0/1.mvt?metric=days",
+        b"emodnet:tile:4/3/4",
+        b"nonna-dem-water:tile:11/668/743",
+    ])
+    monkeypatch.setattr(redisFunctions, "_redis_client", lambda: fake)
+    monkeypatch.setattr(redisFunctions, "get_run_logger", lambda: logging.getLogger())
+
+    redisFunctions.clearRedisCache.fn()
+
+    assert fake.keys == {b"emodnet:tile:4/3/4", b"nonna-dem-water:tile:11/668/743"}
+
+
+def test_clear_redis_cache_deletes_in_batches(monkeypatch):
+    fake = _FakeRedis([f"/datasets?q={i}".encode() for i in range(5)])
+    monkeypatch.setattr(redisFunctions, "_redis_client", lambda: fake)
+    monkeypatch.setattr(redisFunctions, "get_run_logger", lambda: logging.getLogger())
+    monkeypatch.setattr(redisFunctions, "DELETE_BATCH", 2)
+
+    redisFunctions.clearRedisCache.fn()
+
+    assert fake.keys == set()
+    assert [len(call) for call in fake.unlink_calls] == [2, 2, 1]
