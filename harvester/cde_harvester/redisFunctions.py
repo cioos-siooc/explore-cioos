@@ -2,6 +2,7 @@ import glob
 import gzip
 import math
 import os
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
@@ -16,6 +17,10 @@ from cde_harvester.user_agent import HEADERS
 # Compose network, not the public domain: avoids going out through the WAF.
 CACHE_WARM_BASE_URL = os.environ.get("CACHE_WARM_BASE_URL", "http://nginx:4000")
 CACHE_WARM_TIMEOUT_SECONDS = 60
+# web-api itself, past nginx's 60 s proxy timeout: warmed in parallel through
+# nginx, the unfiltered /legend returned 504 on every warm-up on beta.
+CACHE_WARM_DIRECT_URL = os.environ.get("CACHE_WARM_DIRECT_URL", "http://web-api:5000")
+CACHE_WARM_SLOW_TIMEOUT_SECONDS = 300
 # Serially, 5000 routes at ~100ms each takes 8+ minutes.
 CACHE_WARM_CONCURRENCY = int(os.environ.get("CACHE_WARM_CONCURRENCY", "8"))
 CACHE_WARM_MAX_ROUTES = 5000
@@ -32,6 +37,13 @@ DEFAULT_VIEW_ROUTES = [
     "/api/erddapServers",
     "/api/timeExtent",
     "/api/pointQuery",
+    "/api/legend?metric=days",
+    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
+]
+# Seconds each even alone, so warmed one at a time before the parallel pass
+# competes with them for the database. web-api caches them for a week
+# (SLOW_ROUTE_CACHE_DURATION in web-api/utils/routePipeline.js).
+SLOW_DEFAULT_ROUTES = [
     "/api/legend?metric=days",
     "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
 ]
@@ -161,24 +173,32 @@ def reloadTopRequests():
         )),
     ]))
 
-    def warm(request):
+    def warm(url, timeout=CACHE_WARM_TIMEOUT_SECONDS):
         # `logger` is closed over: get_run_logger() reads a thread-local
         # Prefect run context that worker threads do not have.
         try:
-            response = requests.get(
-                CACHE_WARM_BASE_URL + request, headers=HEADERS, timeout=CACHE_WARM_TIMEOUT_SECONDS
-            )
+            response = requests.get(url, headers=HEADERS, timeout=timeout)
             response.raise_for_status()
             return True
         except requests.RequestException:
-            logger.exception(f"error while refreshing cache for {request}")
+            logger.exception(f"error while refreshing cache for {url}")
             return False
+
+    # nginx serves web-api's routes under /api, and apicache keys on the path
+    # web-api sees, so the direct request fills the same entry. One that fails
+    # stays in the parallel pass below.
+    for request in [r for r in SLOW_DEFAULT_ROUTES if r in routes]:
+        started = time.monotonic()
+        direct = CACHE_WARM_DIRECT_URL + request.removeprefix("/api")
+        if warm(direct, CACHE_WARM_SLOW_TIMEOUT_SECONDS):
+            routes.remove(request)
+            logger.info("Warmed %s in %.1fs", request, time.monotonic() - started)
 
     logger.info(
         "Warming %d route(s) with %d workers", len(routes), CACHE_WARM_CONCURRENCY
     )
     with ThreadPoolExecutor(max_workers=CACHE_WARM_CONCURRENCY) as pool:
-        warmed = sum(pool.map(warm, routes))
+        warmed = sum(pool.map(lambda r: warm(CACHE_WARM_BASE_URL + r), routes))
     logger.info("Warmed %d of %d route(s)", warmed, len(routes))
 
 def redisFlow():

@@ -66,3 +66,48 @@ def test_clear_redis_cache_deletes_in_batches(monkeypatch):
 
     assert fake.keys == set()
     assert [len(call) for call in fake.unlink_calls] == [2, 2, 1]
+
+
+def _warm_with(monkeypatch, get):
+    monkeypatch.setattr(redisFunctions.glob, "glob", lambda _: [])
+    monkeypatch.setattr(
+        redisFunctions,
+        "default_view_routes",
+        lambda _: ["/api/datasets", *redisFunctions.SLOW_DEFAULT_ROUTES],
+    )
+    monkeypatch.setattr(redisFunctions, "get_run_logger", lambda: logging.getLogger())
+    monkeypatch.setattr(redisFunctions.requests, "get", get)
+    redisFunctions.reloadTopRequests.fn()
+
+
+_OK = type("R", (), {"raise_for_status": lambda self: None})()
+
+
+def test_slow_default_routes_warm_first_straight_to_web_api(monkeypatch):
+    calls = []
+    _warm_with(monkeypatch, lambda url, timeout, **_: calls.append((url, timeout)) or _OK)
+
+    direct = redisFunctions.CACHE_WARM_DIRECT_URL
+    slow = redisFunctions.CACHE_WARM_SLOW_TIMEOUT_SECONDS
+    assert calls == [
+        (f"{direct}/legend?metric=days", slow),
+        (f"{direct}/coverageHistogram?groupBy=source&count=days&view=timeline&", slow),
+        (redisFunctions.CACHE_WARM_BASE_URL + "/api/datasets", 60),
+    ]
+
+
+def test_a_failed_direct_warm_falls_back_to_nginx(monkeypatch):
+    calls = []
+
+    def get(url, timeout, **_):
+        calls.append(url)
+        if url.startswith(redisFunctions.CACHE_WARM_DIRECT_URL):
+            raise redisFunctions.requests.ConnectionError("web-api not reachable")
+        return _OK
+
+    _warm_with(monkeypatch, get)
+
+    base = redisFunctions.CACHE_WARM_BASE_URL
+    assert sorted(c for c in calls if c.startswith(base)) == sorted(
+        base + r for r in ["/api/datasets", *redisFunctions.SLOW_DEFAULT_ROUTES]
+    )
