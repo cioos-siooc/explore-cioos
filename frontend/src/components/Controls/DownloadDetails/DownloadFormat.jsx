@@ -12,8 +12,8 @@ import {
 import { CLIPPABLE_FORMATS } from "../../../downloadLinks.js";
 import "./styles.css";
 
-// Above both delivery options, not inside either: the emailed package, the
-// script and the ERDDAP direct links all take these formats. A source's
+// Above both delivery options, not inside either: the emailed package and the
+// dataset list's ERDDAP links both take these formats. A source's
 // picker shows only when the selection holds one of its datasets. Under a
 // polygon, the ERDDAP formats split by whether the package can clip them to it.
 export default function DownloadFormat({

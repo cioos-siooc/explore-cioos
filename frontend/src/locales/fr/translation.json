@@ -96,7 +96,7 @@
   "downloadPackageFormat_kml": "KML, emplacements des stations (.kml)",
   "downloadPackageFormatGroupClipped": "Découpés selon le polygone",
   "downloadPackageFormatGroupBox": "Rectangle englobant du polygone seulement",
-  "downloadPackageFormatTooltipText": "Le paquet envoyé par courriel, le script Python et les liens directs ERDDAP prennent ces formats. Le paquet découpe le CSV, le Parquet, l'ODV et le NetCDF (CF) selon le polygone tracé; les autres types de fichiers d'ERDDAP sont livrés tels qu'ERDDAP les écrit, sur le rectangle englobant du polygone. Les jeux de données OBIS contiennent leurs champs Darwin Core, avec leurs mesures et données ADN : en tableaux CSV ou Parquet, ou en archive Darwin Core; les liens directs OBIS sont toujours l'archive Darwin Core du jeu de données.",
+  "downloadPackageFormatTooltipText": "Le paquet envoyé par courriel et les liens ERDDAP de la liste des jeux de données prennent ces formats. Le paquet découpe le CSV, le Parquet, l'ODV et le NetCDF (CF) selon le polygone tracé; les autres types de fichiers d'ERDDAP sont livrés tels qu'ERDDAP les écrit, sur le rectangle englobant du polygone. Les jeux de données OBIS contiennent leurs champs Darwin Core, avec leurs mesures et données ADN : en tableaux CSV ou Parquet, ou en archive Darwin Core; les liens directs OBIS sont toujours l'archive Darwin Core du jeu de données.",
   "downloadEmailLabelText": "M'envoyer un lien par courriel",
   "downloadEmailPlaceholder": "vous@institution.ca",
   "downloadRememberEmailLabel": "Mémoriser mon courriel sur cet appareil",
