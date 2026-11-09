@@ -24,7 +24,7 @@ def test_reload_top_requests_skips_non_regular_log_files(tmp_path, monkeypatch):
 
     redisFunctions.reloadTopRequests.fn()
 
-    assert warmed == [redisFunctions.CACHE_WARM_BASE_URL + "/api/datasets"]
+    assert warmed == [redisFunctions.CACHE_WARM_URL + "/datasets"]
 
 
 class _FakeRedis:
@@ -83,31 +83,28 @@ def _warm_with(monkeypatch, get):
 _OK = type("R", (), {"raise_for_status": lambda self: None})()
 
 
-def test_slow_default_routes_warm_first_straight_to_web_api(monkeypatch):
+def test_slow_default_routes_warm_first_with_a_longer_timeout(monkeypatch):
     calls = []
     _warm_with(monkeypatch, lambda url, timeout, **_: calls.append((url, timeout)) or _OK)
 
-    direct = redisFunctions.CACHE_WARM_DIRECT_URL
+    url = redisFunctions.CACHE_WARM_URL
     slow = redisFunctions.CACHE_WARM_SLOW_TIMEOUT_SECONDS
     assert calls == [
-        (f"{direct}/legend?metric=days", slow),
-        (f"{direct}/coverageHistogram?groupBy=source&count=days&view=timeline&", slow),
-        (redisFunctions.CACHE_WARM_BASE_URL + "/api/datasets", 60),
+        (f"{url}/legend?metric=days", slow),
+        (f"{url}/coverageHistogram?groupBy=source&count=days&view=timeline&", slow),
+        (f"{url}/datasets", redisFunctions.CACHE_WARM_TIMEOUT_SECONDS),
     ]
 
 
-def test_a_failed_direct_warm_falls_back_to_nginx(monkeypatch):
+def test_a_timed_out_slow_route_is_not_requested_again(monkeypatch):
     calls = []
 
     def get(url, timeout, **_):
         calls.append(url)
-        if url.startswith(redisFunctions.CACHE_WARM_DIRECT_URL):
-            raise redisFunctions.requests.ConnectionError("web-api not reachable")
+        if timeout == redisFunctions.CACHE_WARM_SLOW_TIMEOUT_SECONDS:
+            raise redisFunctions.requests.ReadTimeout("still computing")
         return _OK
 
     _warm_with(monkeypatch, get)
 
-    base = redisFunctions.CACHE_WARM_BASE_URL
-    assert sorted(c for c in calls if c.startswith(base)) == sorted(
-        base + r for r in ["/api/datasets", *redisFunctions.SLOW_DEFAULT_ROUTES]
-    )
+    assert len(calls) == 3
