@@ -25,6 +25,14 @@ CACHE_WARM_SLOW_TIMEOUT_SECONDS = 300
 CACHE_WARM_CONCURRENCY = int(os.environ.get("CACHE_WARM_CONCURRENCY", "8"))
 CACHE_WARM_MAX_ROUTES = 5000
 
+# The default-view routes that take seconds each even alone, so they are
+# warmed one at a time before the parallel pass competes with them for the
+# database. web-api caches them for a week (SLOW_ROUTE_CACHE_DURATION in
+# web-api/utils/routePipeline.js).
+SLOW_DEFAULT_ROUTES = [
+    "/api/legend?metric=days",
+    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
+]
 # What a first visitor's browser requests with default filters (frontend
 # FilterProvider, MapStateProvider, CoverageModal), byte-for-byte: apicache
 # keys on the exact URL. Warmed even when there are no access logs to replay.
@@ -37,15 +45,7 @@ DEFAULT_VIEW_ROUTES = [
     "/api/erddapServers",
     "/api/timeExtent",
     "/api/pointQuery",
-    "/api/legend?metric=days",
-    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
-]
-# Seconds each even alone, so warmed one at a time before the parallel pass
-# competes with them for the database. web-api caches them for a week
-# (SLOW_ROUTE_CACHE_DURATION in web-api/utils/routePipeline.js).
-SLOW_DEFAULT_ROUTES = [
-    "/api/legend?metric=days",
-    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
+    *SLOW_DEFAULT_ROUTES,
 ]
 # The default view (zoom 2.75) loads z2 tiles; z0-z3 is the whole world for
 # zooming out and one level in, 85 tiles per source.
