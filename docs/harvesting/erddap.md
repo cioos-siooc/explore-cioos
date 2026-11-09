@@ -84,8 +84,13 @@ flowchart TD
    (`/{tabledap|griddap}/{id}.croissant`, ERDDAP 2.28+; older servers are not
    asked) is hashed when it lists source files. On an incremental run an
    unchanged hash ends the dataset here: one request, status `UNCHANGED`.
-   Database-backed datasets (no file list) are always re-harvested; federated
-   datasets are followed to their origin server (up to 3 hops). When no hash
+   Database-backed datasets (no file list) are hashed only when their
+   Croissant `temporalCoverage` is closed (`start/end`): a finished
+   deployment, whose coverage would move if data were added. That hash also
+   rolls over every 30 days (`DB_REFRESH_DAYS`), offset per dataset so the
+   refreshes spread across runs, to catch reprocessed values the metadata
+   can't show. Ongoing ones publish no coverage and are always re-harvested. Federated datasets are
+   followed to their origin server (up to 3 hops). When no hash
    is produced, the reason (`HASH_NO_FILE_LIST`, `HASH_CROISSANT_HTTP_ERROR`,
    `HASH_CROISSANT_UNREADABLE`, `HASH_CROISSANT_UNSUPPORTED`,
    `HASH_FEDERATED_UNRESOLVED`, or `HASH_CKAN_UNAVAILABLE` after a CKAN
@@ -138,7 +143,7 @@ in `cde.profiles`, identified by the dataset's `cf_role` variables
 
 | Step | How | Requests |
 | --- | --- | --- |
-| Feature list | `distinct()` over the `cf_role` variables. When they are all `subsetVariables`, ERDDAP answers from its subset table, and per-feature lat/lon come along if latitude and longitude are subset variables too. If the `distinct()` is empty (a never-filled `cf_role` column), `orderByMinMax` with `time` instead. | 1–2 |
+| Feature list | `distinct()` over the `cf_role` variables. When they are all `subsetVariables`, ERDDAP answers from its subset table, and per-feature lat/lon come along if latitude and longitude are subset variables too. If the `distinct()` is empty (a never-filled `cf_role` column), `orderByMinMax` with `time` instead. No request when the only `cf_role` variable is a `byte`: the IOOS template's dataless `platform` container, so the dataset is one feature whose ranges come from metadata. A `timeseries_id` on `time` is refused (`NO_PROFILES_FOUND`) without a request, since its `distinct()` lists every record. | 0–2 |
 | Time / depth range | Single-feature dataset: `actual_range`, else `time_coverage_start`/`end` (missing end = ongoing). Otherwise `orderByMinMax("<cf_role vars>,time")`, and the same for `depth`/`altitude`. | 0–2 |
 | Position | Single-feature dataset: `actual_range` or `geospatial_*` globals. Subset-table positions when available. Otherwise `orderByMinMax` on latitude and on longitude. | 0–2 |
 | Record count, days with data, EOVs | See *Counting* below. | 0–3 |

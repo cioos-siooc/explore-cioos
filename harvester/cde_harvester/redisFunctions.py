@@ -53,8 +53,13 @@ REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD") or None
 REDIS_TLS = os.environ.get("REDIS_TLS", "").lower() == "true"
 
 
+# Basemap tiles web-api proxies (createTileCache namespaces in
+# web-api/routes/emodnet.js and nonna.js): not harvest data, and slow to refetch.
+KEPT_KEY_PREFIXES = (b"emodnet:tile:", b"nonna-dem-water:tile:")
+DELETE_BATCH = 1000
+
+
 def _redis_client():
-    # No db index: flushall covers every database anyway.
     if REDIS_URL:
         return redis.Redis.from_url(REDIS_URL)
     return redis.Redis(
@@ -66,8 +71,15 @@ def _redis_client():
 def clearRedisCache():
     logger = get_run_logger()
 
-    _redis_client().flushall()
-    logger.info("redis cache flushed")
+    client = _redis_client()
+    stale = [
+        key
+        for key in client.scan_iter(count=DELETE_BATCH)
+        if not key.startswith(KEPT_KEY_PREFIXES)
+    ]
+    for start in range(0, len(stale), DELETE_BATCH):
+        client.unlink(*stale[start : start + DELETE_BATCH])
+    logger.info("redis cache flushed: %d key(s), basemap tiles kept", len(stale))
 
 def _world_tiles(max_zoom):
     for z in range(max_zoom + 1):

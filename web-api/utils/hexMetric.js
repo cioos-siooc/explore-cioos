@@ -31,15 +31,14 @@ const RECORDS = {
 // database/3_day_ranges_migration.sql, or a single-cast Profile) falls back
 // to the [time_min, time_max] span. GREATEST guards time_max < time_min,
 // which daterange() rejects; LEFT keeps a dayless row in the dataset list.
-const DAY_SET_JOIN = `LEFT JOIN LATERAL (
-      SELECT r AS day
-        FROM unnest(day_ranges) r
-       WHERE day_ranges IS NOT NULL
-      UNION ALL
-      SELECT daterange(time_min::date, GREATEST(time_max::date, time_min::date) + 1)
-       WHERE coalesce(array_length(day_ranges, 1), 0) = 0
-         AND time_min IS NOT NULL
-    ) metric_days ON true`;
+// One unnest, not a UNION ALL subquery: the planner memoized that subquery on
+// a per-row key, missing every time (the unfiltered /legend took 20 s).
+const DAY_SET_JOIN = `LEFT JOIN LATERAL unnest(
+      CASE WHEN coalesce(array_length(day_ranges, 1), 0) > 0 THEN day_ranges
+           WHEN time_min IS NOT NULL
+           THEN ARRAY[daterange(time_min::date, GREATEST(time_max::date, time_min::date) + 1)]
+      END
+    ) metric_days(day) ON true`;
 
 // Typed bigint or daterange by metric, which is why the empty-UNION guard in
 // utils/selection.js wraps a real branch rather than a typed NULL.
