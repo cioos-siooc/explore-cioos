@@ -128,6 +128,7 @@ CREATE TABLE datasets (
     -- harvester/cde_harvester/core/record_metadata.py. NULL until re-harvested.
     metadata jsonb,
     cdm_altitude_proxy text, -- ERDDAP NC_GLOBAL: the column standing in for depth (e.g. PRES)
+    archive_url text, -- OBIS: the dataset's Darwin Core Archive on its IPT
     UNIQUE(dataset_id, erddap_url)
 );
 

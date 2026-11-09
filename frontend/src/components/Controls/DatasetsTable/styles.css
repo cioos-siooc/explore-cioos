@@ -740,6 +740,12 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
+.datasetCardUnapplied {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .datasetCardSourceLink {
   display: inline-flex;
   align-items: center;

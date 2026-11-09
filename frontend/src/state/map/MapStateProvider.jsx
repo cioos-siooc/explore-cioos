@@ -11,15 +11,14 @@ import {
 
 import { server } from "../../config.js";
 import {
-  defaultMapCenter,
-  defaultMapZoom,
+  bathymetryPalettes,
+  defaultBathymetryPalette,
   defaultTrailingDays,
   HEX_METRIC,
   isMarkerTier,
   trailingWindowOptions,
 } from "../../components/config.js";
 import {
-  applyDatasetPKs,
   createDataFilterQueryString,
   getCurrentRangeLevel,
   rangesEqual,
@@ -28,7 +27,10 @@ import {
 import { wmsSliceFromParams } from "../../wmsUtilities.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
-import { useUrlSeededPersistentState } from "../usePersistentState.js";
+import {
+  usePersistentState,
+  useUrlSeededPersistentState,
+} from "../usePersistentState.js";
 
 // Always written out, never omitted: the API counts something else when the
 // param is absent (see HEX_METRIC), and the tile URLs spell it out the same way.
@@ -93,17 +95,24 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
   // Number.isFinite('12') is false.
   const [mapView, setMapView] = useState(() => {
     const params = new URL(window.location.href).searchParams;
-    const asNumber = (name, fallback) => {
+    const asNumber = (name) => {
       const value = Number(params.get(name));
       return Number.isFinite(value) && params.get(name) !== null
         ? value
-        : fallback;
+        : undefined;
     };
-    return {
-      lat: asNumber("lat", defaultMapCenter.lat),
-      lon: asNumber("lon", defaultMapCenter.lon),
-      zoom: asNumber("zoom", defaultMapZoom),
+    const shared = {
+      lat: asNumber("lat"),
+      lon: asNumber("lon"),
+      zoom: asNumber("zoom"),
     };
+    if (Object.values(shared).every((value) => value !== undefined)) {
+      return shared;
+    }
+    // No camera to restore: Map fits defaultMapBounds to the canvas and
+    // pushes the real view at first paint. Zoom 0 is under every zoom tier,
+    // as that fit is on an ordinary screen.
+    return { zoom: 0 };
   });
   const { zoom } = mapView;
 
@@ -189,15 +198,11 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
 export default function MapStateProvider({ children }) {
   const { query } = useFilters();
 
-  // Pushed from SelectionProvider (downstream of this provider). Map-only on
-  // purpose: the list, its counts and the download selection keep hidden
-  // datasets. undefined = nothing hidden.
-  const [mapDatasetPKs, setMapDatasetPKs] = useState();
   // Memoized: the query string build does full passes over every filter
   // array.
   const mapQueryString = useMemo(
-    () => applyDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
-    [query, mapDatasetPKs],
+    () => createDataFilterQueryString(query),
+    [query],
   );
   const [rangeLevels, setRangeLevels] = useState();
   // The whole dedupe test for the refetch effect below.
@@ -237,6 +242,17 @@ export default function MapStateProvider({ children }) {
     true,
     (raw) => raw !== "false",
   );
+  // Colour vision is the viewer's, not the map's, so a share link doesn't carry it.
+  const [storedBathymetryPalette, setBathymetryPalette] = usePersistentState(
+    "bathymetryPalette",
+    defaultBathymetryPalette,
+  );
+  const bathymetryPalette = Object.hasOwn(
+    bathymetryPalettes,
+    storedBathymetryPalette,
+  )
+    ? storedBathymetryPalette
+    : defaultBathymetryPalette;
   // The NONNA sounding under the latest click: depth null where CHS has none.
   const [depthReading, setDepthReading] = useState();
   const depthRequest = useRef();
@@ -471,6 +487,8 @@ export default function MapStateProvider({ children }) {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    bathymetryPalette,
+    setBathymetryPalette,
     depthReading,
     readDepthAt,
     depthToolActive,
@@ -508,8 +526,6 @@ export default function MapStateProvider({ children }) {
     featureQuery,
     sharedFeatureQueryAt,
     setFeatureQuery,
-    mapDatasetPKs,
-    setMapDatasetPKs,
     mapQueryString,
     loadLegend: () => loadLegend(mapQueryString),
   };

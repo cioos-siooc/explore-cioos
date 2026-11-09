@@ -2,6 +2,7 @@ const createError = require("http-errors");
 const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
+require("./utils/upstreamUserAgent");
 
 const swaggerUi = require("swagger-ui-express");
 const downloadRouter = require("./routes/download");
@@ -23,7 +24,6 @@ const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
 const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
-const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
 const nonnaRouter = require("./routes/nonna");
 const depthRouter = require("./routes/depth");
@@ -94,7 +94,6 @@ app.use("/obisNodes", obisNodesRouter);
 app.use("/erddapServers", erddapServersRouter);
 // Mounted before /harvest so its literal paths aren't matched by that
 // router's /:runId-style routes.
-app.use("/harvest/downloads", harvestDownloadsRouter);
 app.use("/harvest", harvestRouter);
 app.use("/trajectories", trajectoriesRouter);
 app.use("/nonna", nonnaRouter);

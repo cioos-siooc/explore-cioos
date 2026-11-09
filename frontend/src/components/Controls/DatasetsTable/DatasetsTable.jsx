@@ -25,11 +25,8 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
-import useMediaQuery, { SHORT_QUERY } from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
-import { usePersistentState } from "../../../state/usePersistentState.js";
-import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GRID_KEY,
   GROUP_NONE,
@@ -41,6 +38,12 @@ import {
   parentGroupKeys,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
+import {
+  DEFAULT_SORT,
+  GROUP_SIZE,
+  pinnedPksOf,
+  sortDatasets,
+} from "../../../state/datasetSort.js";
 import { useChanged } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
@@ -48,15 +51,6 @@ import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
 import "../../Map/ClearMapSelection/styles.css";
-
-// Offered only while the list is grouped, and its default then.
-const GROUP_SIZE = "groupSize";
-const DEFAULT_SORT = { field: "title", dir: "asc" };
-const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
-
-// Stable empty set, so an unpinned list doesn't create a new Set every render
-// and thrash memo deps.
-const EMPTY_SET = new Set();
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -68,10 +62,8 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
+  downloadLinkByPk,
   // The format OBIS rows fall back to when the chosen one has no OBIS version.
-  obisFallbackFormat,
-  // Likewise for ERDDAP rows (a Darwin Core Archive is OBIS-only).
-  erddapFallbackFormat,
   // Beside the pager's range: the download modal's selection totals.
   pagerExtra,
   // Kept mounted under an open dataset page, so coming back finds the same
@@ -89,27 +81,26 @@ export default function DatasetsTable({
     // dataset within this batch.
     handleSelectDataset: removeFromSelection,
     pointsError,
+    listSort,
+    setListSort,
   } = useSelection();
-  const { openFilters, showFiltersModal } = useUI();
+  const { openFilters, showFiltersModal, compactList, setListDensity } =
+    useUI();
   const activeFilterCount = useActiveFilters().length;
   // The "what's here" card's datasets sort to the top, tying the card to the
   // list; the download modal ignores them.
   const { featureQuery, setFeatureQuery, griddapCoverageVisible } =
     useMapState();
-  const pinnedPks = useMemo(() => {
-    if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
-    return new Set(featureQuery.datasetPks.map(Number));
-  }, [featureQuery, isDownloadModal]);
+  const pinnedPks = useMemo(
+    () => pinnedPksOf(isDownloadModal ? null : featureQuery),
+    [featureQuery, isDownloadModal],
+  );
   // With the gridded coverage layer on, the reader is looking for grids.
   const gridFirst = griddapCoverageVisible && !isDownloadModal;
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
-  const shortScreen = useMediaQuery(SHORT_QUERY);
-  // Unset until the viewer picks one, so the list follows the window height.
-  const [density, setDensity] = usePersistentState("listDensity", null);
-  const compact =
-    !isDownloadModal && (density ? density === "compact" : shortScreen);
+  const compact = !isDownloadModal && compactList;
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const listRef = useRef(null);
@@ -172,10 +163,12 @@ export default function DatasetsTable({
     return base;
   }, [isDownloadModal, grouped, t]);
 
-  const [sort, setSort] = useState(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  // The sidebar's sort is shared with the "what's here" card; the download
+  // modal's batch and fields are its own.
+  const [modalSort, setModalSort] = useState(DEFAULT_SORT);
+  const sort = isDownloadModal ? modalSort : listSort;
+  const setSort = isDownloadModal ? setModalSort : setListSort;
   const [toggledGroups, setToggledGroups] = useState(() => new Set());
-  if (useChanged(grouped)) setSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
-  const rowSort = sort.field === GROUP_SIZE ? DEFAULT_SORT : sort;
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
   const {
@@ -185,66 +178,17 @@ export default function DatasetsTable({
   } = useGroupFilter(groupBy);
   const ownFilterId = ownFilterKeys.join("\n");
 
-  const sortValue = useCallback(
-    (row, field) => {
-      const isGrid = row.cdm_data_type === "Grid";
-      switch (field) {
-        case "title":
-          return (row.title || "").toLowerCase();
-        case "type":
-          return (
-            isGrid
-              ? t("griddapTypeLabel")
-              : cdmDataTypeLabel(row.cdm_data_type, t) || ""
-          ).toLowerCase();
-        case "platform":
-          return (
-            isGrid ? t("griddapTypeLabel") : row.platform || ""
-          ).toLowerCase();
-        case "locations":
-          return isGrid ? -1 : Number(row.profiles_count) || 0;
-        case "days":
-          return Number(row.days) || 0;
-        case "size":
-          return Number(row?.sizeEstimate?.filteredSize) || 0;
-        case "downloadable":
-          return row.internalDownload ? 1 : 0;
-        default:
-          return 0;
-      }
-    },
-    [t],
-  );
-
   // Filtering happens upstream (SelectionProvider's filteredDatasets).
-  const visibleRows = useMemo(() => {
-    const field = sortFields.find((f) => f.id === rowSort.field);
-    const factor = rowSort.dir === "asc" ? 1 : -1;
-    const sorted = [...(datasets || [])].sort((a, b) => {
-      // Map-click datasets come first; each block keeps the chosen sort.
-      const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1;
-      const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1;
-      if (pa !== pb) return pa - pb;
-      if (gridFirst) {
-        const ga = a.cdm_data_type === "Grid" ? 0 : 1;
-        const gb = b.cdm_data_type === "Grid" ? 0 : 1;
-        if (ga !== gb) return ga - gb;
-      }
-      const va = sortValue(a, rowSort.field);
-      const vb = sortValue(b, rowSort.field);
-      if (field?.type === "number") return (va - vb) * factor;
-      return String(va).localeCompare(String(vb), i18n.language) * factor;
-    });
-    return sorted;
-  }, [
-    datasets,
-    rowSort,
-    i18n.language,
-    pinnedPks,
-    gridFirst,
-    sortFields,
-    sortValue,
-  ]);
+  const visibleRows = useMemo(
+    () =>
+      sortDatasets(datasets, sort, {
+        pinnedPks,
+        gridFirst,
+        t,
+        language: i18n.language,
+      }),
+    [datasets, sort, pinnedPks, gridFirst, t, i18n.language],
+  );
 
   const byGroup = useMemo(() => {
     const groups = new Map();
@@ -558,7 +502,7 @@ export default function DatasetsTable({
             type="button"
             className="datasetsCardDensity"
             data-testid="datasets-density-toggle"
-            onClick={() => setDensity(compact ? "full" : "compact")}
+            onClick={() => setListDensity(compact ? "full" : "compact")}
             aria-pressed={compact}
             aria-label={t("datasetsCardDensityCompactTitle")}
             title={t(
@@ -662,8 +606,7 @@ export default function DatasetsTable({
                   isDownloadModal={isDownloadModal}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
-                  obisFallbackFormat={obisFallbackFormat}
-                  erddapFallbackFormat={erddapFallbackFormat}
+                  downloadLink={downloadLinkByPk?.get(item.row.pk)}
                   onSelect={handleSelectDataset}
                   onRemove={isDownloadModal ? removeFromSelection : undefined}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}

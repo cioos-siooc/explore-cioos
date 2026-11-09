@@ -64,6 +64,13 @@ The SPA calls `/api` relative to its own host, so changing the URL never needs a
 frontend rebuild. `DB_HOST` and `REDIS_HOST` are pinned to the compose service
 names; setting them in `.env` does nothing.
 
+`NOTICES` puts per-deployment messages (such as a beta notice) in a toast and
+in the About window: a JSON array of `{"id", "en", "fr"?, "starts"?, "expires"?,
+"tone"?, "background"?, "icon"?, "css"?}` with markdown text, example
+in `.env.sample`. The frontend container writes it to `/notices.json` at start,
+so changing it needs a restart, not a rebuild. Closing a toast is remembered
+per `id`; it shows from `starts` and is hidden from `expires` (both optional).
+
 ## Harvesting
 
 Harvests are Prefect flows run **in-process** by the `prefect_worker` container
@@ -75,7 +82,8 @@ When harvests run is set in `.env` (all optional):
 
 - `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules; unset means none
   (vernaculars also run after every OBIS harvest).
-- `RUN_ON_DEPLOY=true` — one full harvest on every (re)deploy.
+- `RUN_ON_DEPLOY=true` — one full harvest on deploy when the database is empty
+  (`always`: on every deploy).
 - `INCREMENTAL_MODE=true` — full runs only update changed datasets. Single-source
   runs are always incremental so they can't truncate other sources.
 
@@ -265,7 +273,7 @@ gh release create v1.2.0-rc.1 --target master --prerelease             # staging
 gh release create v1.2.0 --target master                               # production
 ```
 
-Beta and staging are one stack on one Juno host (`explore.dev.cioos.ca`) and
+Beta and staging are one stack on one Juno host (`beta.explore.cioos.ca`) and
 deploy one at a time; production is another host. All run over WireGuard through
 the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
 roll back or redeploy, dispatch Deploy with an existing published release tag;
@@ -277,12 +285,13 @@ production settings there, not on the box.
 
 `.env.staging` is the beta/staging template. Create its referenced
 `explore-cioos-staging` 1Password item with the listed fields.
-`docker-compose.staging.yaml` suffixes the Postgres and harvester volumes
-(`harvest_data`, `harvester_cache`, `obis_cache`) with the tag: a new tag starts
-empty (schema + `RUN_ON_DEPLOY` harvest), redeploying the same tag keeps its
-data. Superseded volumes are not removed; list them with
-`docker volume ls -f name=explore-cioos-staging_` and `docker volume rm` the old
-tags'. The host has 2 CPU / 8 GB, so `HARVESTER_MEM_LIMIT` is 3g.
+Deploys always keep the stack's volumes (`explore-cioos-staging_postgres18-data`,
+`_harvest_data`, `_harvester_cache`, `_obis_cache`); nothing resets them
+automatically. For a schema change, run **Rebuild Database**, or on the host
+`docker compose -p explore-cioos-staging down`, `docker volume rm` those
+volumes and redeploy: `RUN_ON_DEPLOY` then initialises the schema and
+harvests into the empty database. The host has 2 CPU / 8 GB, so
+`HARVESTER_MEM_LIMIT` is 3g.
 
 ### Coolify (latest)
 

@@ -61,7 +61,9 @@ All runs are Prefect flows executed by the `prefect_worker` process pool.
   triggers one **Harvest Source** run per configured source (each ERDDAP URL,
   plus `obis` when OBIS is enabled) and waits for all of them. One failing
   source does not cancel the others. The orchestrator ends red if any source
-  did not complete.
+  did not complete. Only one runs at a time: a run that starts while another
+  is still going is cancelled, since a waiting orchestrator holds a worker
+  slot and overlapping ones would starve their own sources.
 - **Harvest Source** (`cde-harvester-<host-slug>` / `cde-harvester-obis`) is
   one source end to end: harvest, enrich, write CSVs, load into the database,
   and refresh the cache. The dashboard's *Trigger harvest* button starts this
@@ -143,7 +145,7 @@ describes the data still stored.
 
 | | ERDDAP | OBIS |
 | --- | --- | --- |
-| Change signal | Croissant document hash (ERDDAP 2.28+, file-backed datasets) | None |
+| Change signal | Croissant document hash (ERDDAP 2.28+: file-backed datasets, and database-backed ones with a closed time coverage) | None |
 | Unchanged dataset | Skipped after 1 request, rows kept | Re-harvested every run |
 | Upstream data cache | Off by default. With `cache: true`, data responses are kept 12 h on the `harvester_cache` volume (never the `allDatasets` listing, the Croissant change check or errors), so a re-run after an interrupted harvest is fast | `obis_cache` volume, refetched when OBIS republishes the dataset's parquet (newer `Last-Modified` than the cache) |
 | New or removed datasets | From the server's `allDatasets` listing | From [discovery](obis.md#choosing-datasets) |
@@ -262,4 +264,5 @@ files) are loaded into PostgreSQL by `cde_harvester.loading`.
 With `flush_redis` on, the redis tile/API cache is flushed and its top
 requests re-warmed when the load re-harvested or pruned at least one dataset
 (or was a full reload). A run where every dataset was unchanged keeps the
-cache warm. OBIS has no change signal, so every OBIS run flushes.
+cache warm. OBIS has no change signal, so every OBIS run flushes. The flush
+keeps the proxied basemap tiles (EMODnet, NONNA), which no harvest changes.

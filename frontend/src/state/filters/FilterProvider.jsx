@@ -36,13 +36,17 @@ import {
   defaultRealtimeOnly,
 } from "../../components/config.js";
 import {
-  capitalizeFirstLetter,
+  filterOptionLabel,
   useDebounce,
   createDataFilterQueryString,
   formatErddapServerName,
 } from "../../utilities.jsx";
 
 const FilterContext = createContext();
+
+// The API's searchIn scopes (web-api/utils/dbFilter.js).
+export const SEARCH_TITLES = "titles";
+export const SEARCH_ALL = "all";
 
 export function useFilters() {
   return useContext(FilterContext);
@@ -61,6 +65,8 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected,
   erddapServersSelected: defaultErddapServersSelected,
   realtimeOnly: defaultRealtimeOnly,
+  searchText: "",
+  searchIn: SEARCH_TITLES,
   eovsMatchAll: true,
   orgsMatchAll: false,
   scientificNamesExcluded: defaultScientificNamesSelected,
@@ -85,7 +91,6 @@ export default function FilterProvider({ children }) {
     defaultDatatsetsSelected,
   );
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500);
-  const [datasetSearchTerms, setDatasetSearchTerms] = useState("");
 
   const [platformsSelected, setPlatformsSelected] = useState(
     defaultPlatformsSelected,
@@ -123,6 +128,19 @@ export default function FilterProvider({ children }) {
 
   // Not debounced: a single toggle, unlike the list filters.
   const [realtimeOnly, setRealtimeOnly] = useState(defaultRealtimeOnly);
+
+  // Not debounced either: the search box submits on Enter.
+  const [search, setSearchState] = useState(() => {
+    const params = new URL(window.location.href).searchParams;
+    return {
+      text: params.get("search") || "",
+      in: params.get("searchIn") === SEARCH_ALL ? SEARCH_ALL : SEARCH_TITLES,
+    };
+  });
+  const setSearch = useCallback(
+    (text, scope = SEARCH_TITLES) => setSearchState({ text, in: scope }),
+    [],
+  );
 
   const [startDate, setStartDate] = useState(defaultStartDate);
   const debouncedStartDate = useDebounce(startDate, 500);
@@ -200,6 +218,8 @@ export default function FilterProvider({ children }) {
       obisNodesSelected: debouncedObisNodesSelected,
       erddapServersSelected: debouncedErddapServersSelected,
       realtimeOnly,
+      searchText: search.text,
+      searchIn: search.in,
       eovsMatchAll,
       orgsMatchAll,
       scientificNamesMatchAll,
@@ -218,6 +238,7 @@ export default function FilterProvider({ children }) {
       debouncedObisNodesSelected,
       debouncedErddapServersSelected,
       realtimeOnly,
+      search,
       eovsMatchAll,
       orgsMatchAll,
       scientificNamesMatchAll,
@@ -501,6 +522,7 @@ export default function FilterProvider({ children }) {
 
   function resetFilters() {
     setRealtimeOnly(defaultRealtimeOnly);
+    setSearch("");
     setEovsMatchAll(true);
     setOrgsMatchAll(false);
     setScientificNamesMatchAll(false);
@@ -542,22 +564,8 @@ export default function FilterProvider({ children }) {
     setScientificNamesExcluded([]);
   }
 
-  // Matches how MultiCheckboxFilter renders it.
-  const optionLabel = (option, translatable) => {
-    let title = option.title;
-    if (translatable) {
-      if (
-        option.titleTranslated &&
-        option.titleTranslated[i18n.languages[0]] &&
-        option.titleTranslated[i18n.languages[1]]
-      ) {
-        title = option.titleTranslated[i18n.language];
-      } else if (t(option.title)) {
-        title = t(option.title);
-      }
-    }
-    return capitalizeFirstLetter(title);
-  };
+  const optionLabel = (option, translatable) =>
+    filterOptionLabel(option, translatable, t, i18n.language);
 
   const value = {
     query,
@@ -572,8 +580,6 @@ export default function FilterProvider({ children }) {
     setOrgsSearchTerms,
     datasetsSelected,
     setDatasetsSelected,
-    datasetSearchTerms,
-    setDatasetSearchTerms,
     platformsSelected,
     setPlatformsSelected,
     platformsSearchTerms,
@@ -586,6 +592,9 @@ export default function FilterProvider({ children }) {
     setSourcesSearchTerms,
     realtimeOnly,
     setRealtimeOnly,
+    searchText: search.text,
+    searchIn: search.in,
+    setSearch,
     eovsMatchAll,
     setEovsMatchAll,
     orgsMatchAll,

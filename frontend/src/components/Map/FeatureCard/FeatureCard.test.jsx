@@ -48,6 +48,26 @@ async function renderReady(width = MOBILE_WIDTH) {
   return result;
 }
 
+// What hitTest's buildFeatureQuery derives from the items; the card lists the
+// results' rows for these pks, as the datasets list pins them.
+const click = (query) =>
+  act(() => {
+    latestMap.setFeatureQuery({
+      lngLat: [0, 0],
+      datasetPks: [...new Set((query.items || []).map((item) => item.pk))],
+      ...query,
+    });
+  });
+
+const cardRows = () => [
+  ...document.querySelectorAll(
+    '[data-testid="feature-card"] [data-testid="dataset-card"]',
+  ),
+];
+
+const cardFor = (row) =>
+  cardRows().find((card) => card.dataset.datasetPk === String(row.pk));
+
 describe("FeatureCard", () => {
   beforeEach(() => {
     installMockFetch();
@@ -60,12 +80,9 @@ describe("FeatureCard", () => {
 
   it("shows the empty state when nothing under the click resolves against pointsData", async () => {
     await renderReady();
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 1,
-        lngLat: [0, 0],
-        items: [{ kind: "observation", pk: 999999, count: 3 }],
-      });
+    click({
+      nonce: 1,
+      items: [{ kind: "observation", pk: 999999, count: 3 }],
     });
     expect(
       screen.getByText(
@@ -76,7 +93,7 @@ describe("FeatureCard", () => {
 
   it("is never open at the same time as the datasets sidebar", async () => {
     await renderReady(DESKTOP_WIDTH);
-    expect(latestUI.sidebarOpen).toBe(true);
+    act(() => latestUI.setSidebarOpen(true));
     act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
     expect(screen.getByTestId("feature-card")).not.toHaveClass("open");
     act(() => latestUI.setSidebarOpen(false));
@@ -100,14 +117,9 @@ describe("FeatureCard", () => {
   it("resolves an observation row against pointsData and shows its title", async () => {
     await renderReady();
     const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 2,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: row.pk, count: 4, title: row.title },
-        ],
-      });
+    click({
+      nonce: 2,
+      items: [{ kind: "observation", pk: row.pk, count: 4, title: row.title }],
     });
     expect(screen.getByTitle(row.title)).toBeInTheDocument();
   });
@@ -115,16 +127,11 @@ describe("FeatureCard", () => {
   it("gives a row the same second row as the datasets list's card", async () => {
     await renderReady();
     const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 13,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: row.pk, count: 4, title: row.title },
-        ],
-      });
+    click({
+      nonce: 13,
+      items: [{ kind: "observation", pk: row.pk, count: 4, title: row.title }],
     });
-    const meta = screen.getByTitle(row.title).querySelector(".datasetCardMeta");
+    const meta = cardFor(row).querySelector(".datasetCardMeta");
     expect(meta).toHaveTextContent("Time series profile");
     expect(meta).toHaveTextContent(String(row.profiles_count));
   });
@@ -132,14 +139,9 @@ describe("FeatureCard", () => {
   it("closing (X) clears the featureQuery", async () => {
     const { user } = await renderReady();
     const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 3,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: row.pk, count: 1, title: row.title },
-        ],
-      });
+    click({
+      nonce: 3,
+      items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
     });
     await user.click(screen.getByTitle("Close"));
     expect(latestMap.featureQuery).toBeNull();
@@ -148,118 +150,141 @@ describe("FeatureCard", () => {
   it("Escape closes the card", async () => {
     const { user } = await renderReady();
     const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 4,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: row.pk, count: 1, title: row.title },
-        ],
-      });
+    click({
+      nonce: 4,
+      items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
     });
     await user.keyboard("{Escape}");
     expect(latestMap.featureQuery).toBeNull();
   });
 
-  it("Add one adds the dataset to the selection without closing the card", async () => {
+  it("toggles a dataset in and out of the selection, like the list, without closing the card", async () => {
     const { user } = await renderReady();
     const row =
       pointQueryFixture.find((r) => !r.selected) || pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 5,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: row.pk, count: 1, title: row.title },
-        ],
-      });
+    click({
+      nonce: 5,
+      items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
     });
-    await user.click(screen.getByTitle("Add this dataset to the selection"));
-    await waitFor(() => expect(latestMap.featureQuery).not.toBeNull());
+    const toggle = screen.getByRole("checkbox", {
+      name: new RegExp(`: ${RegExp.escape(row.title)}$`),
+    });
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(latestSelection.selectedPks.has(row.pk)).toBe(true),
+    );
+    expect(latestMap.featureQuery).not.toBeNull();
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(latestSelection.selectedPks.has(row.pk)).toBe(false),
+    );
   });
 
-  it("opening a track row selects the trajectory and closes the card", async () => {
+  it("opening a dataset with one track under the click selects that track and closes the card", async () => {
     const { user } = await renderReady();
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 6,
-        lngLat: [0, 0],
-        items: [
-          {
-            kind: "track",
-            pk: 424242,
-            trajectoryId: "traj-a",
-            title: "Glider track",
-          },
-        ],
-      });
+    const row = pointQueryFixture[0];
+    click({
+      nonce: 6,
+      items: [{ kind: "track", pk: row.pk, trajectoryId: "traj-a" }],
     });
-    await user.click(screen.getByTitle("Glider track"));
+    expect(cardRows()[0]).toHaveTextContent("traj-a");
+    await user.click(screen.getByRole("button", { name: row.title }));
     await waitFor(() =>
       expect(latestSelection.selectedTrajectory).toMatchObject({
-        datasetPk: 424242,
+        datasetPk: row.pk,
         trajectoryId: "traj-a",
       }),
     );
     expect(latestMap.featureQuery).toBeNull();
   });
 
+  it("opening a dataset with several tracks under the click opens its page", async () => {
+    const { user } = await renderReady();
+    const row = pointQueryFixture[0];
+    click({
+      nonce: 7,
+      items: ["traj-a", "traj-b"].map((trajectoryId) => ({
+        kind: "track",
+        pk: row.pk,
+        trajectoryId,
+      })),
+    });
+    expect(cardRows()).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: row.title }));
+    await waitFor(() =>
+      expect(latestSelection.inspectDataset?.pk).toBe(row.pk),
+    );
+    expect(latestSelection.selectedTrajectory).toBeFalsy();
+  });
+
+  it("drops what the click found outside the current results, as the list does", async () => {
+    await renderReady();
+    const row = pointQueryFixture[0];
+    click({
+      nonce: 8,
+      items: [
+        { kind: "observation", pk: row.pk },
+        { kind: "track", pk: 111, trajectoryId: "t1", title: "A track" },
+        { kind: "grid", pk: 222, title: "A gridded dataset" },
+      ],
+    });
+    expect(cardRows()).toHaveLength(1);
+    expect(cardRows()[0]).toHaveTextContent(row.title);
+  });
+
   it("shows a Show more button past the visible-row cap, and expands the list", async () => {
     const { user } = await renderReady();
     const rows = pointQueryFixture.slice(0, 7);
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 9,
-        lngLat: [0, 0],
-        items: rows.map((row) => ({
-          kind: "observation",
-          pk: row.pk,
-          count: 1,
-          title: row.title,
-        })),
-      });
+    click({
+      nonce: 9,
+      items: rows.map((row) => ({
+        kind: "observation",
+        pk: row.pk,
+        count: 1,
+        title: row.title,
+      })),
     });
     const moreButton = await screen.findByText("Show 2 more");
-    expect(document.querySelectorAll(".featureCardRow")).toHaveLength(5);
+    expect(cardRows()).toHaveLength(5);
     await user.click(moreButton);
-    await waitFor(() =>
-      expect(document.querySelectorAll(".featureCardRow")).toHaveLength(7),
-    );
+    await waitFor(() => expect(cardRows()).toHaveLength(7));
   });
 
-  it("a track row and grid row sort before observations, and a grid row shows the grid icon", async () => {
-    const row = pointQueryFixture[0];
+  it("lists the rows in the datasets list's order, following its sort", async () => {
     await renderReady();
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 10,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: row.pk, count: 1, title: row.title },
-          {
-            kind: "track",
-            pk: 111,
-            trajectoryId: "t1",
-            title: "A track",
-          },
-          {
-            kind: "grid",
-            pk: 222,
-            title: "A gridded dataset",
-          },
-        ],
-      });
+    const rows = pointQueryFixture.slice(0, 6);
+    click({
+      nonce: 10,
+      items: [...rows]
+        .reverse()
+        .map((row) => ({ kind: "observation", pk: row.pk })),
     });
-    const rowsShown = document.querySelectorAll(".featureCardRow");
-    // KIND_ORDER is track, observation, grid.
-    expect(rowsShown[0]).toHaveTextContent("A track");
-    expect(rowsShown[1]).toHaveTextContent(row.title);
-    expect(rowsShown[2]).toHaveTextContent("A gridded dataset");
-    // A grid row's "+" is disabled — griddap is metadata-only, never
-    // selectable — and titled accordingly.
+    const byTitle = [...rows]
+      .sort((a, b) => a.title.localeCompare(b.title, "en"))
+      .slice(0, 5)
+      .map((row) => String(row.pk));
+    expect(cardRows().map((card) => card.dataset.datasetPk)).toEqual(byTitle);
+
+    act(() => latestSelection.setListSort({ field: "days", dir: "desc" }));
+    const byDays = [...rows]
+      .sort((a, b) => Number(b.days) - Number(a.days))
+      .slice(0, 5)
+      .map((row) => String(row.pk));
+    expect(cardRows().map((card) => card.dataset.datasetPk)).toEqual(byDays);
+  });
+
+  it("follows the datasets list's density, with no toggle of its own", async () => {
+    window.localStorage.setItem("cde.listDensity", '"compact"');
+    await renderReady();
+    const row = pointQueryFixture[0];
+    click({ nonce: 14, items: [{ kind: "observation", pk: row.pk }] });
+    const list = document.querySelector(".featureCardList");
+    expect(list).toHaveClass("compact");
     expect(
-      screen.getByTitle("Gridded datasets are accessed directly on ERDDAP"),
-    ).toBeInTheDocument();
+      screen.queryByTestId("datasets-density-toggle"),
+    ).not.toBeInTheDocument();
+    act(() => latestUI.setListDensity("full"));
+    expect(list).not.toHaveClass("compact");
   });
 
   // The tile carries one `count` for the whole cell; each dataset needs its
@@ -267,31 +292,26 @@ describe("FeatureCard", () => {
   it("gives each dataset in a cell its own day count, not the cell's total", async () => {
     await renderReady();
     const [a, b, c] = pointQueryFixture;
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 11,
-        lngLat: [0, 0],
-        // No `count` on the items: the cell total is deliberately not the
-        // per-dataset figure, so it is not carried here at all.
-        items: [a, b, c].map((row) => ({
-          kind: "observation",
-          pk: row.pk,
-          aggregate: true,
-          title: row.title,
-        })),
-        observationCount: 1121,
-        buckets: { hexPks: [970], pointPks: [], source: "main", z: 6 },
-      });
+    click({
+      nonce: 11,
+      // No `count` on the items: the cell total is deliberately not the
+      // per-dataset figure, so it is not carried here at all.
+      items: [a, b, c].map((row) => ({
+        kind: "observation",
+        pk: row.pk,
+        aggregate: true,
+        title: row.title,
+      })),
+      observationCount: 1121,
+      buckets: { hexPks: [970], pointPks: [], source: "main", z: 6 },
     });
 
     // Fixture: pk 7 -> 1115, pk 8 -> 5, pk 9 -> 1.
     await waitFor(() =>
-      expect(screen.getByTitle(a.title)).toHaveTextContent(
-        "1,115 day(s) of data",
-      ),
+      expect(cardFor(a)).toHaveTextContent("1,115 day(s) of data"),
     );
-    expect(screen.getByTitle(b.title)).toHaveTextContent("5 day(s) of data");
-    expect(screen.getByTitle(c.title)).toHaveTextContent("1 day(s) of data");
+    expect(cardFor(b)).toHaveTextContent("5 day(s) of data");
+    expect(cardFor(c)).toHaveTextContent("1 day(s) of data");
   });
 
   // A coverage hex at marker zoom lists the stations inside it too. Those are
@@ -313,26 +333,19 @@ describe("FeatureCard", () => {
     });
     const hexRow = pointQueryFixture[0];
     const markerRow = pointQueryFixture[3];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 13,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: hexRow.pk, aggregate: true },
-          { kind: "observation", pk: markerRow.pk, aggregate: false },
-        ],
-        buckets: { hexPks: [5], pointPks: [42], source: "cells", z: 9 },
-      });
+    click({
+      nonce: 13,
+      items: [
+        { kind: "observation", pk: hexRow.pk, aggregate: true },
+        { kind: "observation", pk: markerRow.pk, aggregate: false },
+      ],
+      buckets: { hexPks: [5], pointPks: [42], source: "cells", z: 9 },
     });
 
     await waitFor(() =>
-      expect(screen.getByTitle(markerRow.title)).toHaveTextContent(
-        "4 day(s) of data",
-      ),
+      expect(cardFor(markerRow)).toHaveTextContent("4 day(s) of data"),
     );
-    expect(screen.getByTitle(hexRow.title)).toHaveTextContent(
-      "30 day(s) of data",
-    );
+    expect(cardFor(hexRow)).toHaveTextContent("30 day(s) of data");
     const asked = globalThis.fetch.mock.calls
       .map(([input]) => new URL(input).searchParams)
       .filter((params) => params.has("source"));
@@ -345,30 +358,22 @@ describe("FeatureCard", () => {
   it("shows no day count for a dataset the breakdown has not answered for", async () => {
     await renderReady();
     const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 12,
-        lngLat: [0, 0],
-        items: [{ kind: "observation", pk: row.pk, title: row.title }],
-        // No buckets: nothing to ask about, so no figure is claimed.
-        buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
-      });
+    click({
+      nonce: 12,
+      items: [{ kind: "observation", pk: row.pk, title: row.title }],
+      // No buckets: nothing to ask about, so no figure is claimed.
+      buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
     });
-    expect(screen.getByTitle(row.title)).not.toHaveTextContent(
-      "day(s) of data",
-    );
+    expect(cardFor(row)).not.toHaveTextContent("day(s) of data");
   });
 
   describe("tips", () => {
     const seenTips = () =>
       JSON.parse(window.localStorage.getItem("cde.seenTips") || "[]");
     const openOn = (row) =>
-      act(() => {
-        latestMap.setFeatureQuery({
-          nonce: 3,
-          lngLat: [0, 0],
-          items: [{ kind: "observation", pk: row.pk, title: row.title }],
-        });
+      click({
+        nonce: 3,
+        items: [{ kind: "observation", pk: row.pk, title: row.title }],
       });
 
     beforeEach(() => {

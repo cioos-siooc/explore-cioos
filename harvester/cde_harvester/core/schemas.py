@@ -164,6 +164,7 @@ class DatasetSchema(pa.DataFrameModel):
     wms_url: Series[str] = pa.Field(nullable=True)
     metadata: Series[object] = pa.Field(nullable=True)  # dict -> jsonb
     cdm_altitude_proxy: Series[str] = pa.Field(nullable=True)
+    archive_url: Series[str] = pa.Field(nullable=True)
 
     class Config:
         coerce = True

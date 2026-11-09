@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import FiltersPanel from "./FiltersPanel.jsx";
 
 describe("FiltersPanel", () => {
@@ -30,6 +31,34 @@ describe("FiltersPanel", () => {
       "title",
       expect.stringMatching(/^\d+ of 40 datasets shown$/),
     );
+  });
+
+  it("text search takes a term and where to look for it", async () => {
+    const seen = {};
+    function Probe() {
+      const { searchText, searchIn } = useFilters();
+      Object.assign(seen, { searchText, searchIn });
+      return null;
+    }
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <FiltersPanel />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    expect(screen.queryByText("Dataset title")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Text Search" }));
+    await user.type(
+      screen.getByPlaceholderText("Search dataset titles…"),
+      "argo{Enter}",
+    );
+    expect(seen).toEqual({ searchText: "argo", searchIn: "titles" });
+
+    await user.click(screen.getByTestId("text-search-all"));
+    expect(seen).toEqual({ searchText: "argo", searchIn: "all" });
   });
 
   it("Show results is offered only where there is something to close", async () => {

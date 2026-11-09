@@ -13,7 +13,12 @@ from cde_harvester.core.day_sets import (
     days_to_ranges,
     total_days,
 )
-from cde_harvester.core.harvest_warnings import DAY_COUNT_FALLBACK, FEATURES_DROPPED
+from cde_harvester.core.errors import EmptyVariableError
+from cde_harvester.core.harvest_warnings import (
+    DAY_COUNT_FALLBACK,
+    DEPTH_RANGE_UNAVAILABLE,
+    FEATURES_DROPPED,
+)
 from cde_harvester.dataset_types.geo import classify_profile_location
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
 from cde_harvester.sources.erddap.dataset import is_valid_duration
@@ -418,23 +423,19 @@ def extract_features(dataset, handler):
             profile_min_max = dataset.get_max_min(variables)
 
             if profile_min_max.empty:
-                logger.error(f"No data found for  {dataset.id}")
-                dataset.no_features_reason = (
+                raise EmptyVariableError(
                     f"orderByMinMax of {llat_variable} per feature returned no "
                     f"rows: {llat_variable} is never filled"
                 )
-                return profile_min_max
 
         profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
 
     box = _lat_lon_box(dataset, profiles, profile_variable_list, logger, identity)
     if box.empty:
-        logger.error(f"No lat/lon data found for {dataset.id}")
-        dataset.no_features_reason = (
+        raise EmptyVariableError(
             "No latitude/longitude values per feature: the per-feature min/max "
             "query returned no rows"
         )
-        return box
 
     profiles_with_lat_lon = profiles_with_lat_lon.join(box)
 
@@ -605,22 +606,38 @@ def extract_features(dataset, handler):
 
     profiles = profiles.round(4)
 
+    # A depth outside the range is a bad sample (e.g. QC-flagged recovery
+    # spikes in actual_range), not a misplaced feature: drop the range only.
+    bad_depth = (profiles["depth_max"] > 15000) | (profiles["depth_min"] < -100)
+    if bad_depth.any():
+        dataset.warnings.add(
+            DEPTH_RANGE_UNAVAILABLE,
+            f"Depth range of {int(bad_depth.sum())} of {len(profiles)} features "
+            "outside -100..15000 m; kept at depth 0",
+            items=_feature_ids(profiles[bad_depth]),
+            count=int(bad_depth.sum()),
+        )
+        profiles.loc[bad_depth, ["depth_min", "depth_max"]] = None
+
     profiles_bad_geom_query = """((latitude <= -90) or (latitude >= 90) or  \
-                                (longitude <= -180) or (longitude >= 180) or  \
-                                (depth_max > 15000) or (depth_min < -100)) or \
+                                (longitude <= -180) or (longitude >= 180)) or \
                                 records_per_day.isnull()
                               """
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
+        message = (
+            f"{len(profiles_bad_geom)} of {len(profiles)} features removed: "
+            "latitude/longitude out of range or no record count"
+        )
         dataset.warnings.add(
             FEATURES_DROPPED,
-            f"{len(profiles_bad_geom)} of {len(profiles)} features removed: "
-            "latitude/longitude out of range, depth outside -100..15000 m, "
-            "or no record count",
+            message,
             items=_feature_ids(profiles_bad_geom),
             count=len(profiles_bad_geom),
         )
         profiles = profiles.query("not " + profiles_bad_geom_query)
+        if profiles.empty:
+            dataset.no_features_reason = message
 
     return profiles

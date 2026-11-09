@@ -515,6 +515,10 @@
     display: none;
   }
 
+  .introModal .modal-header > .introReopen + .closeButton {
+    margin-left: auto;
+  }
+
   .introModal .modal-header {
     gap: var(--cioos-space-md);
     padding: var(--cioos-space-sm) var(--cioos-space-md);
@@ -748,4 +752,24 @@
   .introFooterCard:hover .introShowcaseArrow {
     transform: none;
   }
+}
+
+.introNotices {
+  display: grid;
+  gap: var(--cioos-space-sm);
+  margin: 0 0 var(--cioos-space-md);
+  padding: 0;
+  list-style: none;
+}
+
+/* Nested in the window, so a card corner rather than a floating panel's, and
+   untoned ones take a wash rather than white on the white window. A
+   deployment's own background (inline) still wins. */
+.introNotices .notice:not([data-tone]) {
+  --notice-bg: var(--cioos-surface-2);
+}
+
+.introNotices .notice {
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
 }

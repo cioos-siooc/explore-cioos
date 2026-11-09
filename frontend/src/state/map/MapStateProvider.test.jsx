@@ -14,8 +14,7 @@ let latest;
 function Probe() {
   latest = { ...useMapState(), ...useMapView() };
   // SelectionProvider's initial /pointQuery can settle after legendLoading
-  // clears and reset mapDatasetPKs to undefined, clobbering what this suite
-  // sets, so wait for both loads.
+  // clears, so wait for both loads.
   const { initialPointsQueryComplete } = useSelection();
   const ready = !latest.legendLoading && initialPointsQueryComplete;
   return <span data-testid="state">{ready ? "ready" : "loading"}</span>;
@@ -97,9 +96,14 @@ describe("MapStateProvider", () => {
     );
   });
 
-  it("seeds the camera from ?lat&lon&zoom, defaulting anything absent", async () => {
+  it("seeds the camera from ?lat&lon&zoom", async () => {
     await renderReady({ url: "/?lat=48.5&lon=-125&zoom=8" });
     expect(latest.mapView).toEqual({ lat: 48.5, lon: -125, zoom: 8 });
+  });
+
+  it("leaves the centre to the map's default-bounds fit without a full camera", async () => {
+    await renderReady({ url: "/?zoom=8" });
+    expect(latest.mapView).toEqual({ zoom: 0 });
   });
 
   it("defaults bathymetry/observations/projection switches to on/on/mercator", async () => {
@@ -114,6 +118,20 @@ describe("MapStateProvider", () => {
     expect(latest.bathymetryVisible).toBe(false);
     expect(latest.dataLayersVisible).toBe(false);
     expect(latest.projection).toBe("globe");
+  });
+
+  it("defaults the depth colours to the colour-safe palette, and keeps the choice", async () => {
+    await renderReady();
+    expect(latest.bathymetryPalette).toBe("deep");
+    act(() => latest.setBathymetryPalette("chs"));
+    expect(latest.bathymetryPalette).toBe("chs");
+    expect(window.localStorage.getItem("cde.bathymetryPalette")).toBe('"chs"');
+  });
+
+  it("falls back to the default depth colours for a palette that no longer exists", async () => {
+    window.localStorage.setItem("cde.bathymetryPalette", '"emodnet"');
+    await renderReady();
+    expect(latest.bathymetryPalette).toBe("deep");
   });
 
   it("defaults tracksMode on", async () => {
@@ -205,17 +223,5 @@ describe("MapStateProvider", () => {
     await renderReady();
     act(() => latest.requestDraw("box"));
     expect(latest.drawRequest.mode).toBe("box");
-  });
-
-  it("narrows mapQueryString's datasetPKs to mapDatasetPKs, when set", async () => {
-    await renderReady();
-    const withoutHidden = latest.mapQueryString;
-    act(() => latest.setMapDatasetPKs([1, 2]));
-    await waitFor(() => {
-      expect(new URLSearchParams(latest.mapQueryString).get("datasetPKs")).toBe(
-        "1,2",
-      );
-    });
-    expect(latest.mapQueryString).not.toBe(withoutHidden);
   });
 });

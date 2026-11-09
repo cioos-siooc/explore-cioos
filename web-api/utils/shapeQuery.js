@@ -204,6 +204,7 @@ async function buildShapeSql(
                   'https://catalogue.cioos.ca/dataset/'
                            || ckan_id AS ckan_url,
                   d.wms_url,
+                  d.archive_url,
                   d.grid_variables,
                   d.grid_dimensions,
                   to_char(d.coverage_time_max AT TIME ZONE 'UTC',

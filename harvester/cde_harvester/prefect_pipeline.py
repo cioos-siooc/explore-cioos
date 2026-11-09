@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
+from prefect.client.schemas.objects import ConcurrencyLimitConfig, ConcurrencyLimitStrategy
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
 from sqlalchemy import text
@@ -482,6 +483,9 @@ class PrefectCDEPipeline:
         )
 
         # Registered after the per-source deployments it triggers.
+        # One at a time: a waiting orchestrator holds a worker slot, so overlapping
+        # runs (cron fires on the 31st and the 1st) can take every slot and starve
+        # the children they wait on.
         orchestrator_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:cde_harvest_all_run",
@@ -491,6 +495,9 @@ class PrefectCDEPipeline:
             cron=_cron_env("HARVESTER_CRON"),
             parameters={"config_file": "/app/harvester/harvest_config.yaml"},
             job_variables=job_vars,
+            concurrency_limit=ConcurrencyLimitConfig(
+                limit=1, collision_strategy=ConcurrencyLimitStrategy.CANCEL_NEW
+            ),
         )
 
         print("\nTo start a worker, run:")

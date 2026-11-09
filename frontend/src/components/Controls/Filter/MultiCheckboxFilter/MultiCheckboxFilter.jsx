@@ -9,7 +9,7 @@ import {
 import { useTranslation } from "react-i18next";
 import Tooltip from "../../../ui/Tooltip.jsx";
 import {
-  capitalizeFirstLetter,
+  filterOptionLabel,
   toggleOptionExcluded,
   toggleOptionIncluded,
   withCategoryState,
@@ -30,9 +30,13 @@ export default function MultiCheckboxFilter({
   const { t, i18n } = useTranslation();
   const { tipHighlight } = useTips();
 
+  const labelOf = (option) =>
+    filterOptionLabel(option, translatable, t, i18n.language);
+  // Labelled once up front: a comparator would relabel each option log n times.
+  const labels = new Map(optionsSelected.map((o) => [o, labelOf(o)]));
   // Copy first: optionsSelected is caller state and sort mutates in place.
   const optionsSelectedSorted = [...optionsSelected].sort((a, b) =>
-    t(a.title).localeCompare(t(b.title), i18n.language),
+    labels.get(a).localeCompare(labels.get(b), i18n.language),
   );
 
   // An empty selection means "all": short URLs, and newly harvested options
@@ -120,22 +124,7 @@ export default function MultiCheckboxFilter({
   }
 
   function renderOption(option, isFirst) {
-    let title;
-    if (translatable) {
-      if (
-        option.titleTranslated &&
-        option.titleTranslated[i18n.languages[0]] &&
-        option.titleTranslated[i18n.languages[1]]
-      ) {
-        title = option.titleTranslated[i18n.language];
-      } else if (t(option.title)) {
-        title = t(option.title);
-      } else {
-        title = option.title;
-      }
-    } else {
-      title = option.title;
-    }
+    const title = labels.get(option);
 
     const swatchColor = colored && platformColor(option.title);
     const hoverText = option[`hover_${i18n.language}`] || title;
@@ -148,7 +137,7 @@ export default function MultiCheckboxFilter({
         content={hoverText}
       >
         <FilterOption
-          label={capitalizeFirstLetter(title)}
+          label={title}
           isSelected={option.isSelected}
           isExcluded={option.isExcluded}
           onInclude={() => updateOption(option, toggleOptionIncluded)}
@@ -160,7 +149,7 @@ export default function MultiCheckboxFilter({
           data-selected={isChecked(option)}
           data-excluded={Boolean(option.isExcluded)}
         >
-          <span className="optionName">{capitalizeFirstLetter(title)}</span>
+          <span className="optionName">{title}</span>
           {colored && (
             <CircleFill
               className="optionColorCircle"

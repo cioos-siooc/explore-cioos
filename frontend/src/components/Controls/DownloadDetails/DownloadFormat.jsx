@@ -1,56 +1,78 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { ExclamationTriangleFill } from "react-bootstrap-icons";
 
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import {
-  ERDDAP_FORMATS,
   OBIS_FORMATS,
   OBIS_VALUES,
   PACKAGE_FORMATS,
   useDownload,
 } from "../../../state/download/DownloadProvider.jsx";
+import { CLIPPABLE_FORMATS } from "../../../downloadLinks.js";
 import "./styles.css";
 
 // Above both delivery options, not inside either: the emailed package, the
-// script and the direct links all take this format.
-function formatGroup(id) {
-  if (!OBIS_FORMATS.includes(id)) return "downloadPackageFormatGroupErddap";
-  if (!ERDDAP_FORMATS.includes(id)) return "downloadPackageFormatGroupObis";
-  return "downloadPackageFormatGroupAll";
-}
-
-export default function DownloadFormat({ obisCount, erddapCount }) {
+// script and the ERDDAP direct links all take these formats. A source's
+// picker shows only when the selection holds one of its datasets. Under a
+// polygon, the ERDDAP formats split by whether the package can clip them to it.
+export default function DownloadFormat({
+  erddapCount,
+  obisCount,
+  polygonFiltered,
+}) {
   const { t } = useTranslation();
-  const { packageFormat, setPackageFormat, obisValues, setObisValues } =
-    useDownload();
-  const obisFallback = obisCount > 0 && !OBIS_FORMATS.includes(packageFormat);
-  const erddapFallback =
-    erddapCount > 0 && !ERDDAP_FORMATS.includes(packageFormat);
+  const {
+    packageFormat,
+    setPackageFormat,
+    obisFormat,
+    setObisFormat,
+    obisValues,
+    setObisValues,
+  } = useDownload();
+  const options = (formats) =>
+    formats.map((id) => ({ id, label: t(`downloadPackageFormat_${id}`) }));
+  // OBIS is always clipped, so only the ERDDAP picker needs the split.
+  const erddapOptions = options(PACKAGE_FORMATS).map((option) => ({
+    ...option,
+    group: polygonFiltered
+      ? t(
+          CLIPPABLE_FORMATS.includes(option.id)
+            ? "downloadPackageFormatGroupClipped"
+            : "downloadPackageFormatGroupBox",
+        )
+      : undefined,
+  }));
 
   return (
-    <>
-      <div className="downloadFormat">
-        <span className="downloadFormatLabel">
-          {t("downloadPackageFormatLabel")}
-          <QuestionIconTooltip
-            tooltipText={t("downloadPackageFormatTooltipText")}
-            tooltipPlacement="top"
-            size={16}
-          />
-        </span>
-        <SelectPill
-          label={t("downloadPackageFormatPillLabel")}
-          value={packageFormat}
-          options={PACKAGE_FORMATS.map((id) => ({
-            id,
-            label: t(`downloadPackageFormat_${id}`),
-            group: t(formatGroup(id)),
-          }))}
-          onChange={setPackageFormat}
-          data-testid="download-package-format"
+    <div className="downloadBandGroup">
+      <span className="downloadBandLabel">
+        {t("downloadPackageFormatLabel")}
+        <QuestionIconTooltip
+          tooltipText={t("downloadPackageFormatTooltipText")}
+          tooltipPlacement="top"
+          size={16}
         />
+      </span>
+      <div className="downloadBandContent">
+        {erddapCount > 0 && (
+          <SelectPill
+            label="ERDDAP™"
+            value={packageFormat}
+            options={erddapOptions}
+            onChange={setPackageFormat}
+            data-testid="download-package-format"
+          />
+        )}
+        {obisCount > 0 && (
+          <SelectPill
+            label="OBIS"
+            value={obisFormat}
+            options={options(OBIS_FORMATS)}
+            onChange={setObisFormat}
+            data-testid="download-obis-format"
+          />
+        )}
         {obisCount > 0 && (
           <SelectPill
             label={t("downloadObisValuesPillLabel")}
@@ -64,21 +86,6 @@ export default function DownloadFormat({ obisCount, erddapCount }) {
           />
         )}
       </div>
-      {obisFallback && (
-        <p className="downloadFormatNotice">
-          <ExclamationTriangleFill size={14} aria-hidden="true" />
-          {t("downloadPackageFormatObisNote", {
-            count: obisCount,
-            format: t(`downloadPackageFormat_${packageFormat}`),
-          })}
-        </p>
-      )}
-      {erddapFallback && (
-        <p className="downloadFormatNotice">
-          <ExclamationTriangleFill size={14} aria-hidden="true" />
-          {t("downloadPackageFormatErddapNote", { count: erddapCount })}
-        </p>
-      )}
-    </>
+    </div>
   );
 }

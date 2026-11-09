@@ -118,11 +118,14 @@ describe("POST /download — format and OBIS values", () => {
   it("queues a Darwin Core Archive with the provider's OBIS values", async () => {
     const res = await request(app)
       .post("/download")
-      .query({ ...BASE_QUERY, format: "dwca", obisValues: "submitted" })
+      .query({ ...BASE_QUERY, obisFormat: "dwca", obisValues: "submitted" })
       .send(EMAIL);
     expect(res.status).toBe(200);
     const query = queuedQuery();
-    expect(query).toMatchObject({ format: "dwca", obis_values: "submitted" });
+    expect(query).toMatchObject({
+      obis_format: "dwca",
+      obis_values: "submitted",
+    });
     expect(query.filters).not.toHaveProperty("obisValues");
     expect(query.explorer_url).not.toContain("obisValues");
   });

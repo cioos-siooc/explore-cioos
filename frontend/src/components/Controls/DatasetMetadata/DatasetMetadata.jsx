@@ -16,7 +16,7 @@ import {
 } from "../../../downloadLinks.js";
 import { formatRange } from "../../../utilities.jsx";
 import { licenseLabel, licenseText } from "./license.js";
-import { renderMarkdown } from "./markdown.js";
+import { renderMarkdown } from "../../../markdown.js";
 import "./styles.css";
 
 // CKAN keyword lists run to dozens (every CF standard name and EOV); the

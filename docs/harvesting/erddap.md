@@ -84,8 +84,13 @@ flowchart TD
    (`/{tabledap|griddap}/{id}.croissant`, ERDDAP 2.28+; older servers are not
    asked) is hashed when it lists source files. On an incremental run an
    unchanged hash ends the dataset here: one request, status `UNCHANGED`.
-   Database-backed datasets (no file list) are always re-harvested; federated
-   datasets are followed to their origin server (up to 3 hops). When no hash
+   Database-backed datasets (no file list) are hashed only when their
+   Croissant `temporalCoverage` is closed (`start/end`): a finished
+   deployment, whose coverage would move if data were added. That hash also
+   rolls over every 30 days (`DB_REFRESH_DAYS`), offset per dataset so the
+   refreshes spread across runs, to catch reprocessed values the metadata
+   can't show. Ongoing ones publish no coverage and are always re-harvested. Federated datasets are
+   followed to their origin server (up to 3 hops). When no hash
    is produced, the reason (`HASH_NO_FILE_LIST`, `HASH_CROISSANT_HTTP_ERROR`,
    `HASH_CROISSANT_UNREADABLE`, `HASH_CROISSANT_UNSUPPORTED`,
    `HASH_FEDERATED_UNRESOLVED`, or `HASH_CKAN_UNAVAILABLE` after a CKAN
@@ -112,7 +117,9 @@ flowchart TD
    shown on the harvest dataset page, so it says what the publisher should
    change.
 6. **Feature extraction** by the type's handler (below). No rows means
-   `NO_PROFILES_FOUND`.
+   `NO_PROFILES_FOUND`, except when a declared variable (the `cf_role` ids,
+   time/depth or lat/lon) comes back with no values at all: that is an
+   `EMPTY_VARIABLE` error.
 
 Unchanged datasets are not re-harvested. The loader only bumps their
 `verified_at` and keeps their stored rows.
@@ -136,7 +143,7 @@ in `cde.profiles`, identified by the dataset's `cf_role` variables
 
 | Step | How | Requests |
 | --- | --- | --- |
-| Feature list | `distinct()` over the `cf_role` variables. When they are all `subsetVariables`, ERDDAP answers from its subset table, and per-feature lat/lon come along if latitude and longitude are subset variables too. If the `distinct()` is empty (a never-filled `cf_role` column), `orderByMinMax` with `time` instead. | 1–2 |
+| Feature list | `distinct()` over the `cf_role` variables. When they are all `subsetVariables`, ERDDAP answers from its subset table, and per-feature lat/lon come along if latitude and longitude are subset variables too. If the `distinct()` is empty (a never-filled `cf_role` column), `orderByMinMax` with `time` instead. No request when the only `cf_role` variable is a `byte`: the IOOS template's dataless `platform` container, so the dataset is one feature whose ranges come from metadata. A `timeseries_id` on `time` is refused (`NO_PROFILES_FOUND`) without a request, since its `distinct()` lists every record. | 0–2 |
 | Time / depth range | Single-feature dataset: `actual_range`, else `time_coverage_start`/`end` (missing end = ongoing). Otherwise `orderByMinMax("<cf_role vars>,time")`, and the same for `depth`/`altitude`. | 0–2 |
 | Position | Single-feature dataset: `actual_range` or `geospatial_*` globals. Subset-table positions when available. Otherwise `orderByMinMax` on latitude and on longitude. | 0–2 |
 | Record count, days with data, EOVs | See *Counting* below. | 0–3 |
@@ -328,7 +335,8 @@ are no longer listed upstream (see [Loading](workflow.md#loading)).
 | `MISSING_REQUIRED_VARS` | skipped | No `time` / `latitude` / `longitude` (or no readable `info` page); a grid without a lat/lon extent |
 | `NO_SUPPORTED_VARIABLES` | skipped | No `standard_name` maps to an EOV |
 | `DEPTH_AND_ALTITUDE` | skipped | Both `depth` and `altitude` present |
-| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable, ids never filled, no lat/lon, or a failed record count); the message names which |
+| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable or a failed record count); the message names which |
+| `EMPTY_VARIABLE` | error | A declared variable (`cf_role` ids, time/depth, lat/lon) has no values: its per-feature query returned no rows |
 | `HTTP_ERROR` | error | ERDDAP answered an error status after retries (other than those read as an empty result); the message holds ERDDAP's own error text |
 | `RESPONSE_TOO_LARGE` | error | A required response passed the 200 MB cap |
 | `UNKNOWN_ERROR` | error | Any other exception |

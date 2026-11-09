@@ -11,6 +11,8 @@ import requests
 from prefect import task
 from prefect.logging import get_run_logger
 
+from cde_harvester.user_agent import HEADERS
+
 # Compose network, not the public domain: avoids going out through the WAF.
 CACHE_WARM_BASE_URL = os.environ.get("CACHE_WARM_BASE_URL", "http://nginx:4000")
 CACHE_WARM_TIMEOUT_SECONDS = 60
@@ -50,8 +52,13 @@ REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD") or None
 REDIS_TLS = os.environ.get("REDIS_TLS", "").lower() == "true"
 
 
+# Basemap tiles web-api proxies (createTileCache namespaces in
+# web-api/routes/emodnet.js and nonna.js): not harvest data, and slow to refetch.
+KEPT_KEY_PREFIXES = (b"emodnet:tile:", b"nonna-dem-water:tile:")
+DELETE_BATCH = 1000
+
+
 def _redis_client():
-    # No db index: flushall covers every database anyway.
     if REDIS_URL:
         return redis.Redis.from_url(REDIS_URL)
     return redis.Redis(
@@ -63,8 +70,15 @@ def _redis_client():
 def clearRedisCache():
     logger = get_run_logger()
 
-    _redis_client().flushall()
-    logger.info("redis cache flushed")
+    client = _redis_client()
+    stale = [
+        key
+        for key in client.scan_iter(count=DELETE_BATCH)
+        if not key.startswith(KEPT_KEY_PREFIXES)
+    ]
+    for start in range(0, len(stale), DELETE_BATCH):
+        client.unlink(*stale[start : start + DELETE_BATCH])
+    logger.info("redis cache flushed: %d key(s), basemap tiles kept", len(stale))
 
 def _world_tiles(max_zoom):
     for z in range(max_zoom + 1):
@@ -152,7 +166,7 @@ def reloadTopRequests():
         # Prefect run context that worker threads do not have.
         try:
             response = requests.get(
-                CACHE_WARM_BASE_URL + request, timeout=CACHE_WARM_TIMEOUT_SECONDS
+                CACHE_WARM_BASE_URL + request, headers=HEADERS, timeout=CACHE_WARM_TIMEOUT_SECONDS
             )
             response.raise_for_status()
             return True

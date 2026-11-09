@@ -31,6 +31,16 @@
   }
 }
 
+/* Here the open column has the top bar beside it (TopControls' besideSidebar),
+   so it opens full height rather than waiting for the bar's slide to end
+   before --cioos-top-bar-space drops to 0. The height bound keeps the phone
+   layout's inset winning. */
+@media (min-width: 1000px) and (min-height: 501px) {
+  .sidebar:not(.wide):has(> .sidebarDatasets.expanded) {
+    top: var(--sidebar-inset);
+  }
+}
+
 .sidebar > * {
   pointer-events: auto;
 }

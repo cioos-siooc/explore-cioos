@@ -12,7 +12,8 @@ x-env-file: &env-file
 
 # --- The public URL of the site ----------------------------------------------
 # Anything that has to produce a link usable from OUTSIDE the compose network
-# (download emails, the OpenAPI "servers" entry) resolves it from one chain:
+# (download emails, the OpenAPI "servers" entry, the User-Agent upstream
+# servers see) resolves it from one chain:
 #
 #   ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}
 #
@@ -42,6 +43,13 @@ x-db-env: &db-env
   DB_PASSWORD: ${DB_PASSWORD:?required — run ./scripts/init-dev-env.sh, or set it in .env}
   DB_PORT: ${DB_PORT:-5432}
 
+# Who is calling, for the User-Agent of every upstream request: the public URL
+# (chain above) and the build, the release tag else the commit (both set by
+# deploy.yml; Coolify sets SOURCE_COMMIT). Empty => the services say "dev".
+x-app-env: &app-env
+  APP_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}
+  APP_VERSION: ${SENTRY_RELEASE:-${SOURCE_COMMIT:-}}
+
 services:
   db:
     restart: unless-stopped
@@ -52,7 +60,9 @@ services:
     shm_size: 1gb
     # log_lock_waits: near-zero cost, and makes db-loader vs web-api lock
     # contention diagnosable straight from `docker logs`.
-    command: ["postgres", "-c", "log_lock_waits=on"]
+    # jit=off: compiling took 0.3-1.5 s per tile/legend/histogram query, often
+    # longer than the query itself ran.
+    command: ["postgres", "-c", "log_lock_waits=on", "-c", "jit=off"]
     environment:
       # Postgres' own variable names, so this service cannot use *db-env; the
       # values behind them are the same, defaults included.
@@ -121,7 +131,7 @@ services:
     environment:
       # Docker-network service names so the API reaches Postgres/Redis without a
       # repo .env, plus the credentials by interpolation — see *db-env above.
-      <<: *db-env
+      <<: [*db-env, *app-env]
       REDIS_HOST: redis
       # Server URL shown in the Swagger UI and openapi.json.
       PUBLIC_BASE_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/api
@@ -166,7 +176,7 @@ services:
     env_file: *env-file
     environment:
       # download_scheduler.py reads envs["DB_HOST"] at import.
-      <<: *db-env
+      <<: [*db-env, *app-env]
       # Emailed download links must work from outside the compose network.
       # `environment:` beats `env_file:`, so a DOWNLOAD_WAF_URL in .env is ignored.
       DOWNLOAD_WAF_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/downloads
@@ -201,6 +211,9 @@ services:
       # `environment:` secret source below; unset => upload is skipped.
       secrets:
         - sentry_auth_token
+    environment:
+      # Runtime, unlike the args above: a change needs a restart, not a rebuild.
+      NOTICES: ${NOTICES:-}
     expose:
       - "80"
   # Prefect PROCESS worker: runs harvest flows in-process (no spawned flow-run
@@ -258,7 +271,7 @@ services:
       # In-process flows inherit this container's env for DB / redis access.
       # The harvester reads DB_HOST_EXTERNAL rather than DB_HOST (it also runs
       # outside compose); the production overlay repoints it across the VPN.
-      <<: *db-env
+      <<: [*db-env, *app-env]
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis
       HARVESTER_LOG_DIR: /app/harvester/logs

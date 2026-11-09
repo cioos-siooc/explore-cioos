@@ -11,32 +11,47 @@
   padding: 4px 8px 0;
 }
 
+.filtersPanel .filterSearchPage > .filterOptionsTitle {
+  margin-bottom: 12px;
+}
+
+/* Dressed as the filter pages' search box (.filterSearch). */
 .filterSearchField {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+  gap: 8px;
+  padding: 0 10px;
   border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-md);
+  border-radius: var(--cioos-radius-sm);
   color: var(--cioos-ink-60);
 }
 
 .filterSearchField:focus-within {
-  border-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
 }
 
 .filterSearchInput {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 12px 0;
+  padding: 6px 0;
   border: none;
   outline: none;
   background: transparent;
   font: inherit;
-  font-size: var(--cioos-font-size-lg);
   color: var(--cioos-ink);
+}
+
+@media (max-width: 700px), (max-height: 500px) {
+  .filterSearchField {
+    min-height: 44px;
+  }
+
+  /* iOS Safari zooms into typed fields under 16px. */
+  .filterSearchInput {
+    font-size: 16px;
+  }
 }
 
 /* An indeterminate line along the box's bottom edge while places, the slow
@@ -90,11 +105,12 @@
   border: none;
   border-radius: var(--cioos-radius-sm);
   background: transparent;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-40);
   cursor: pointer;
 }
 
 .filterSearchClear:hover {
+  background-color: var(--cioos-surface-2);
   color: var(--cioos-ink);
 }
 

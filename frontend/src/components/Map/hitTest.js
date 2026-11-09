@@ -352,3 +352,12 @@ export const featureHasDataset = (feature, pk) => {
     return false;
   }
 };
+
+// A feature near a tile edge comes back once per tile whose buffer holds it.
+export const idsOutsideDataset = (features, pk) => [
+  ...new Set(
+    features
+      .filter((feature) => !featureHasDataset(feature, pk))
+      .map((feature) => feature.id),
+  ),
+];
