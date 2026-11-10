@@ -163,7 +163,7 @@ describe("DatasetPreviewPlot", () => {
   });
 
   it("swaps to the colour plot's controls when its layout is picked", async () => {
-    const user = open("/", STATION);
+    const user = open("/?playout=panels", STATION);
     await plotted();
     const layout = screen.getByTestId("preview-layout-toggle");
     expect(screen.getByRole("button", { name: "Panels" })).toHaveAttribute(
@@ -333,7 +333,7 @@ describe("DatasetPreviewPlot", () => {
           }),
       }),
     );
-    const user = open("/", STATION);
+    const user = open("/?playout=panels", STATION);
     await plotted();
     expect(
       await screen.findByRole("button", { name: "Previous profile" }),

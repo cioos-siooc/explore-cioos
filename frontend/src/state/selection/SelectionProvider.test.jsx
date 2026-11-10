@@ -378,7 +378,7 @@ describe("SelectionProvider", () => {
     // which is why the provider reads it at all.
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&playout=panels`,
     });
     await waitFor(() => expect(latest.recordLoading).toBe(false));
     expect(previewUrls().at(-1)).toContain("at=cast-1");
@@ -417,7 +417,7 @@ describe("SelectionProvider", () => {
     // profile the new station never took and /preview answers NO_DATA.
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&playout=panels`,
     });
     await waitFor(() => expect(latest.recordLoading).toBe(false));
 

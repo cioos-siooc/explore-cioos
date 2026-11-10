@@ -18,12 +18,15 @@ import {
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
+  defaultPlotLayoutFor,
   hasColorPlotFor,
+  plotLayoutFor,
 } from "./previewFacetPlan.js";
 import { parseColorsParam, formatColorsParam } from "./previewColors.js";
 import {
   COLOR_LAYOUT,
   LAYOUT_PARAM,
+  PANELS_LAYOUT,
   PLOT_PARAMS,
   STEP_PARAM,
 } from "../../../state/selection/previewParams.js";
@@ -61,10 +64,9 @@ export const onlyOneMulti = (list, ...others) =>
 // variable per panel against a shared axis; `color` draws the same X and Y in
 // every panel and shades each by its own variable.
 export const PLOT_LAYOUTS = [
-  { value: "panels", labelKey: "datasetPreviewPlotLayoutPanels" },
+  { value: PANELS_LAYOUT, labelKey: "datasetPreviewPlotLayoutPanels" },
   { value: COLOR_LAYOUT, labelKey: "datasetPreviewPlotLayoutColor" },
 ];
-const DEFAULT_LAYOUT = "panels";
 // Each filled panel needs its height and its own colourbar; past this the
 // stack scrolls apart panels meant to be read against each other.
 export const MAX_COLOR_PANELS = 5;
@@ -229,17 +231,16 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   // A link may ask for the colour plot on a record that has one profile.
   const colorPlotAvailable = hasColorPlotFor(inspectDataset);
-  const layoutParam = searchParams.get(LAYOUT_PARAM);
-  const plotLayout =
-    colorPlotAvailable &&
-    PLOT_LAYOUTS.some((layout) => layout.value === layoutParam)
-      ? layoutParam
-      : DEFAULT_LAYOUT;
+  const plotLayout = plotLayoutFor(
+    inspectDataset,
+    searchParams.get(LAYOUT_PARAM),
+  );
   const isColorLayout = plotLayout === COLOR_LAYOUT;
+  const defaultLayout = defaultPlotLayoutFor(inspectDataset);
   const setPlotLayout = useCallback(
     (layout) =>
-      setParams({ [LAYOUT_PARAM]: layout === DEFAULT_LAYOUT ? null : layout }),
-    [setParams],
+      setParams({ [LAYOUT_PARAM]: layout === defaultLayout ? null : layout }),
+    [setParams, defaultLayout],
   );
 
   // One plot with an axis per panel variable: a single shared axis, and no

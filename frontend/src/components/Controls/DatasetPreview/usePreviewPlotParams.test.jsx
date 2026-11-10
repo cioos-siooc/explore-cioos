@@ -487,9 +487,11 @@ describe("usePreviewPlotParams", () => {
   });
 
   describe("the colour plot", () => {
-    it("opens on panels, adding nothing to the link", () => {
+    it("is what a record of many profiles opens on, adding nothing to the link", () => {
       openStation();
-      expect(api.plotLayout).toBe("panels");
+      expect(api.plotLayout).toBe("color");
+      expect(api.colorX).toBe("time");
+      expect(api.colorY).toBe("depth");
       ["playout", "pcx", "pcy", "pzscales"].forEach((name) =>
         expect(param(name)).toBeNull(),
       );
@@ -502,15 +504,15 @@ describe("usePreviewPlotParams", () => {
     });
 
     it("runs time across depth, keeping the variables already picked", async () => {
-      openStation("pvars=temperature,salinity");
+      openStation("playout=panels&pvars=temperature,salinity");
       await run(() => api.setPlotLayout("color"));
-      expect(param("playout")).toBe("color");
+      expect(param("playout")).toBeNull();
       expect(api.colorX).toBe("time");
       expect(api.colorY).toBe("depth");
       expect(api.panels).toEqual(["temperature", "salinity"]);
 
       await run(() => api.setPlotLayout("panels"));
-      expect(param("playout")).toBeNull();
+      expect(param("playout")).toBe("panels");
     });
 
     it("never shades a panel by its own X or Y", () => {
@@ -537,7 +539,7 @@ describe("usePreviewPlotParams", () => {
       openWide(`playout=color&${pvars}`);
       expect(api.panels).toEqual(measurements.slice(0, MAX_COLOR_PANELS));
 
-      openWide(pvars);
+      openWide(`playout=panels&${pvars}`);
       expect(api.panels).toEqual(measurements); // the panels layout is not capped
     });
 

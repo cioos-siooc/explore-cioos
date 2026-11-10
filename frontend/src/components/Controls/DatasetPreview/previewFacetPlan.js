@@ -21,6 +21,10 @@ import {
   EUCLIDEAN_DISTANCE_COLUMN,
   TOTAL_DISTANCE_TRAVELED_COLUMN,
 } from "./previewTrackDistance.js";
+import {
+  COLOR_LAYOUT,
+  PANELS_LAYOUT,
+} from "../../../state/selection/previewParams.js";
 
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
@@ -106,7 +110,7 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // out of pointing the shared axis at a measurement.
 //
 // `colorPlot` marks the records holding many profiles: a filled section needs
-// several of them side by side.
+// several of them side by side, and it is what they open on.
 const CDM_LAYOUTS = {
   Profile: {
     defaultPanelCount: 3,
@@ -203,8 +207,8 @@ export function colorCandidatesFor(variables) {
 
 // The colour plot's X and Y when the link names neither: every panel draws Y
 // against X and is shaded by its own variable, so the two are the record's
-// "where" — time (or the track) across, depth down. A profile's shared axis is
-// already that depth, a stack's is already that time.
+// "where" — time across (the track when there is none), depth down. A
+// profile's shared axis is already that depth, a stack's is already that time.
 export function colorPlotAxesFor(dataset, variables, plan) {
   if (!plan) return { x: null, y: null };
   const layout = layoutFor(dataset);
@@ -214,7 +218,7 @@ export function colorPlotAxesFor(dataset, variables, plan) {
       layout && layout.leadingAxesFor
         ? layout.leadingAxesFor(variables).filter(Boolean)
         : [];
-    const across = leading[0] || timeCoordinateOf(variables);
+    const across = timeCoordinateOf(variables) || leading[0];
     return { x: (across && across.columnName) || null, y: plan.sharedAxis };
   }
   const notTaken = (variable) =>
@@ -474,3 +478,11 @@ export function defaultVisFor(dataset) {
 export function hasColorPlotFor(dataset) {
   return Boolean(layoutFor(dataset)?.colorPlot);
 }
+
+// The arrangement drawn: the link's when this record offers it, else the type's.
+export function plotLayoutFor(dataset, layoutParam) {
+  if (!hasColorPlotFor(dataset)) return PANELS_LAYOUT;
+  return layoutParam === PANELS_LAYOUT ? PANELS_LAYOUT : COLOR_LAYOUT;
+}
+
+export const defaultPlotLayoutFor = (dataset) => plotLayoutFor(dataset, null);

@@ -14,6 +14,7 @@ export const STEP_PARAM = "pstep";
 // window instead of the stepped one — see the /preview `allProfiles` parameter.
 export const LAYOUT_PARAM = "playout";
 export const COLOR_LAYOUT = "color";
+export const PANELS_LAYOUT = "panels";
 
 // `YYYY-MM-DD~YYYY-MM-DD` (inclusive UTC days), set when a trajectory pass is
 // plotted. Absent means the record's most recent data.
@@ -55,12 +56,14 @@ export function parsePeriod(value) {
 //                                  one was doing)
 //   pzscale  retired single scale, read as the first `pz` column's
 //            `pzscales` entry until the next scale or colour write
-//   playout  color                 (default: one panel per variable against a
-//                                  shared axis; `color` draws the same X and Y
-//                                  in every panel, one panel per `pvars`
-//                                  variable, each shaded by that variable)
+//   playout  panels | color        `panels`: one panel per variable against a
+//                                  shared axis; `color`: the same X and Y in
+//                                  every panel, one panel per `pvars`
+//                                  variable, each shaded by that variable
+//                                  (default: color for TimeSeriesProfile and
+//                                  TrajectoryProfile, panels otherwise)
 //   pcx      the colour plot's X, comma-separated; several make a grid
-//                                  (default: time / track, per type)
+//                                  (default: time, else the track)
 //   pcy      the colour plot's Y, comma-separated
 //                                  (default: depth, else a measurement)
 //   pzscales the scale per colour variable, in either layout,

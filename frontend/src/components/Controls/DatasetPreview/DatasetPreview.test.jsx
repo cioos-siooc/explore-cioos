@@ -272,6 +272,7 @@ describe("DatasetPreview", () => {
       open({
         table: STATION_TABLE,
         dataset: STATION,
+        url: "/?playout=panels",
         sample: { rowCount: 3, totalRowCount: 26131 },
       });
       expect(
@@ -299,7 +300,7 @@ describe("DatasetPreview", () => {
       open({
         table: STATION_TABLE,
         dataset: STATION,
-        url: "/?pstep=cast-1",
+        url: "/?pstep=cast-1&playout=panels",
         sample: { rowCount: 3, totalRowCount: 1500 },
       });
       await waitFor(() => expect(global.fetch).toHaveBeenCalled());

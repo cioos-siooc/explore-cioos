@@ -14,6 +14,8 @@ import {
   resolvePanels,
   defaultVisFor,
   hasColorPlotFor,
+  defaultPlotLayoutFor,
+  plotLayoutFor,
   COLUMNS,
   ROWS,
 } from "./previewFacetPlan.js";
@@ -618,7 +620,7 @@ test("a profile's colour plot runs time across its depth", () => {
   }
 });
 
-test("a trajectory profile's colour plot runs its track across its depth", () => {
+test("a trajectory profile's colour plot runs time across its depth", () => {
   const dataset = { ...VIKING_DATASET, cdm_data_type: "TrajectoryProfile" };
   const variables = variablesFrom(VIKING, dataset);
   const data = [
@@ -632,8 +634,22 @@ test("a trajectory profile's colour plot runs its track across its depth", () =>
       [...variables, trackIndex.variable],
       data,
     ),
-    { x: POSITION_INDEX_COLUMN, y: "depth" },
+    { x: "time", y: "depth" },
   );
+});
+
+test("a record of many profiles opens on the colour plot, any link may ask for panels", () => {
+  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
+    const dataset = { cdm_data_type: type };
+    assert.equal(defaultPlotLayoutFor(dataset), "color", type);
+    assert.equal(plotLayoutFor(dataset, "panels"), "panels", type);
+    assert.equal(plotLayoutFor(dataset, "bogus"), "color", type);
+  }
+  for (const type of ["Profile", "TimeSeries", "Trajectory", "Point"]) {
+    const dataset = { cdm_data_type: type };
+    assert.equal(defaultPlotLayoutFor(dataset), "panels", type);
+    assert.equal(plotLayoutFor(dataset, "color"), "panels", type);
+  }
 });
 
 test("a timeseries' colour plot keeps time across and puts depth down", () => {

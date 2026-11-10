@@ -46,7 +46,10 @@ import {
   networkPreviewError,
   previewErrorFrom,
 } from "../../components/Controls/DatasetPreview/previewErrors.js";
-import { hasColorPlotFor } from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
+import {
+  hasColorPlotFor,
+  plotLayoutFor,
+} from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
 
 const SelectionContext = createContext();
 
@@ -681,8 +684,9 @@ export default function SelectionProvider({ children }) {
   // drawn, so they ride this fetch instead of a second one — one request, one
   // previewError, one recordLoading.
   const inspectAllProfiles =
-    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
-    hasColorPlotFor(inspectDataset);
+    hasColorPlotFor(inspectDataset) &&
+    plotLayoutFor(inspectDataset, searchParams.get(LAYOUT_PARAM)) ===
+      COLOR_LAYOUT;
   const inspectRecordStep = inspectAllProfiles
     ? undefined
     : searchParams.get(STEP_PARAM) || undefined;
