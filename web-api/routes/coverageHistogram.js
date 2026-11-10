@@ -3,7 +3,10 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { check } = require("express-validator");
-const { pipeline } = require("../utils/routePipeline");
+const {
+  pipeline,
+  SLOW_ROUTE_CACHE_DURATION,
+} = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
 const {
@@ -277,6 +280,7 @@ function rankSeriesFromCells(rows) {
 router.get(
   "/",
   ...pipeline({
+    cacheFor: SLOW_ROUTE_CACHE_DURATION,
     checks: [
       check("count").isIn(COUNTS).optional(),
       check("view").isIn(VIEWS).optional(),

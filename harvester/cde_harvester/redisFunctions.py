@@ -2,6 +2,7 @@ import glob
 import gzip
 import math
 import os
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
@@ -13,13 +14,24 @@ from prefect.logging import get_run_logger
 
 from cde_harvester.user_agent import HEADERS
 
-# Compose network, not the public domain: avoids going out through the WAF.
-CACHE_WARM_BASE_URL = os.environ.get("CACHE_WARM_BASE_URL", "http://nginx:4000")
+# web-api on the compose network: not out through the WAF, and not through
+# nginx, whose 60 s proxy timeout 504'd the unfiltered /legend on every warm-up
+# on beta. nginx only strips the /api prefix, so apicache stores the same entry.
+CACHE_WARM_URL = os.environ.get("CACHE_WARM_URL", "http://web-api:5000")
 CACHE_WARM_TIMEOUT_SECONDS = 60
+CACHE_WARM_SLOW_TIMEOUT_SECONDS = 300
 # Serially, 5000 routes at ~100ms each takes 8+ minutes.
 CACHE_WARM_CONCURRENCY = int(os.environ.get("CACHE_WARM_CONCURRENCY", "8"))
 CACHE_WARM_MAX_ROUTES = 5000
 
+# The default-view routes that take seconds each even alone, so they are
+# warmed one at a time before the parallel pass competes with them for the
+# database. web-api caches them for a week (SLOW_ROUTE_CACHE_DURATION in
+# web-api/utils/routePipeline.js).
+SLOW_DEFAULT_ROUTES = [
+    "/api/legend?metric=days",
+    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
+]
 # What a first visitor's browser requests with default filters (frontend
 # FilterProvider, MapStateProvider, CoverageModal), byte-for-byte: apicache
 # keys on the exact URL. Warmed even when there are no access logs to replay.
@@ -32,8 +44,7 @@ DEFAULT_VIEW_ROUTES = [
     "/api/erddapServers",
     "/api/timeExtent",
     "/api/pointQuery",
-    "/api/legend?metric=days",
-    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
+    *SLOW_DEFAULT_ROUTES,
 ]
 # The default view (zoom 2.75) loads z2 tiles; z0-z3 is the whole world for
 # zooming out and one level in, 85 tiles per source.
@@ -161,18 +172,28 @@ def reloadTopRequests():
         )),
     ]))
 
-    def warm(request):
+    def warm(request, timeout=CACHE_WARM_TIMEOUT_SECONDS):
         # `logger` is closed over: get_run_logger() reads a thread-local
         # Prefect run context that worker threads do not have.
         try:
-            response = requests.get(
-                CACHE_WARM_BASE_URL + request, headers=HEADERS, timeout=CACHE_WARM_TIMEOUT_SECONDS
-            )
-            response.raise_for_status()
+            requests.get(
+                CACHE_WARM_URL + request.removeprefix("/api"),
+                headers=HEADERS,
+                timeout=timeout,
+            ).raise_for_status()
             return True
         except requests.RequestException:
             logger.exception(f"error while refreshing cache for {request}")
             return False
+
+    # A failed one isn't retried below: a timeout leaves web-api still
+    # computing it, so a second request would only run the query twice.
+    slow = [r for r in SLOW_DEFAULT_ROUTES if r in routes]
+    for request in slow:
+        started = time.monotonic()
+        if warm(request, CACHE_WARM_SLOW_TIMEOUT_SECONDS):
+            logger.info("Warmed %s in %.1fs", request, time.monotonic() - started)
+    routes = [r for r in routes if r not in slow]
 
     logger.info(
         "Warming %d route(s) with %d workers", len(routes), CACHE_WARM_CONCURRENCY
