@@ -31,7 +31,7 @@ import {
   getCurrentRangeLevel,
   mapCoverPadding,
   polygonIsRectangle,
-  quantizeCountRange,
+  viewportCountRange,
   rangesEqual,
   revealOffset,
   zoomToDatasetCamera,
@@ -493,7 +493,7 @@ export default function CreateMap({
 
   const circleOpacity = 0.7;
   // Count is carried by colour alone; opacity varies with zoom alone.
-  const hexOpacity = 0.8;
+  const hexOpacity = 0.65;
   const hexMinZoom = 0;
   // Shared with the Legend: the hex band and the marker tier must not drift.
   const hexMaxZoom = MARKER_MIN_ZOOM;
@@ -504,9 +504,8 @@ export default function CreateMap({
   // of anything. Across the basemap hand-over the fill goes to nothing and the
   // border carries the ramp (HEX_FILL_FADE_*_ZOOM).
   const COVERAGE_HEX_OPACITY_STOPS = [
-    [hexMaxZoom, 0.6],
-    [hexMaxZoom + 1.5, 0.5],
-    [HEX_FILL_FADE_START_ZOOM, 0.43],
+    [hexMaxZoom, 0.4],
+    [HEX_FILL_FADE_START_ZOOM, 0.4],
     [HEX_FILL_FADE_END_ZOOM, 0],
   ];
 
@@ -1136,23 +1135,17 @@ export default function CreateMap({
     // Hidden layers and layers outside their zoom range return nothing.
     const features = map.current.queryRenderedFeatures({ layers });
     if (features.length < MIN_VIEWPORT_HEXES) return undefined;
-    let lo = Infinity;
-    let hi = -Infinity;
-    // A plain loop: intermediate arrays would be the expensive part over every
-    // rendered hex. Duplicates across tile boundaries are harmless for a
-    // min/max.
+    const counts = [];
+    // Duplicates across tile boundaries nudge the percentile negligibly.
     for (const feature of features) {
       // Greyed cells carry none of the ramp's colours, so they don't set its
       // domain.
       if (focusPk !== undefined && !featureHasDataset(feature, focusPk))
         continue;
       const count = Number(feature.properties?.count);
-      if (!Number.isFinite(count) || count <= 0) continue;
-      if (count < lo) lo = count;
-      if (count > hi) hi = count;
+      if (Number.isFinite(count) && count > 0) counts.push(count);
     }
-    if (!Number.isFinite(hi)) return undefined;
-    return quantizeCountRange([lo, hi]);
+    return viewportCountRange(counts);
   }
 
   // Re-measure only when the counts change meaning (rampQueryEpoch), the ramp
