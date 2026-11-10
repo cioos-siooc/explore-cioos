@@ -78,6 +78,7 @@
 
   /* Navy-tinted rather than pure black, like every neutral here. */
   --cioos-globe-space: #050f14;
+  --cioos-globe-star: rgb(232 244 247 / 85%);
 
   /* --- Elevation --- */
   --cioos-shadow-card: 0 2px 8px rgb(21 47 55 / 8%);
