@@ -20,7 +20,7 @@ import {
   WindowSidebar,
 } from "../../ui/WindowControlIcons.jsx";
 import useSheetDrag from "../../ui/useSheetDrag.js";
-import DatasetsPanel from "../Panels/DatasetsPanel.jsx";
+import DatasetsPanel, { DatasetPage } from "../Panels/DatasetsPanel.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -30,13 +30,16 @@ import useBackDismiss from "../../../state/ui/useBackDismiss.js";
 import useWideView from "../../../state/selection/useWideView.js";
 import useMediaQuery, {
   MOBILE_QUERY,
+  RAIL_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
 import "../../ui/sheetHandleStyles.css";
 
 // A dataset page swaps the header for a banner so the two surfaces the card
-// hosts can be told apart. Map minimizes the page to a card (DatasetMapCard),
-// keeping the map keyed to it; the X leaves the dataset.
+// hosts can be told apart; where there's room the list stays beside the page
+// (DatasetsPanel) and its header is the way back. Map minimizes the page to a
+// card (DatasetMapCard), keeping the map keyed to it; the X leaves the dataset
+// for the list, as the map card's does.
 export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
@@ -70,6 +73,7 @@ export default function Sidebar() {
   if (useChanged(expanded) && expanded) setBackable(!inspectDataset);
   useBackDismiss(isMobile && expanded && backable, () => setSidebarOpen(false));
   const inspecting = Boolean(inspectDataset);
+  const railed = useMediaQuery(RAIL_QUERY) && inspecting;
   // Wide is the card's, not the page's: the list and a dataset page share it.
   // Hiding the card keeps it, so it reopens the size it was left, as a
   // minimized window does.
@@ -106,6 +110,80 @@ export default function Sidebar() {
     />
   );
 
+  const datasetsBanner = (
+    <div className="datasetsBanner">
+      {/* Names the destination, so it needs no tooltip. */}
+      {!railed && (
+        <button
+          type="button"
+          className="datasetsBackButton"
+          data-testid="sidebar-back"
+          onClick={returnToDatasetList}
+        >
+          <ChevronLeft
+            className="datasetsBackButtonIcon"
+            size={14}
+            aria-hidden="true"
+          />
+          <span>{t("sidebarBackToDatasetsText")}</span>
+        </button>
+      )}
+      <span className="datasetsBannerMode">
+        <FileEarmarkText size={13} aria-hidden="true" />
+        {t("sidebarDatasetDetailsLabel")}
+      </span>
+      <CloseButton
+        label={t("sidebarShowMapTitle")}
+        onClick={() => setSidebarOpen(false)}
+        icon={WindowMinimize}
+        testId="sidebar-collapse"
+      />
+      {wideButton}
+      <CloseButton
+        label={t("closeDatasetText")}
+        onClick={returnToDatasetList}
+        testId="sidebar-close-dataset"
+      />
+    </div>
+  );
+  const datasetsHeader = (
+    <div className="datasetsHeader">
+      <span className="datasetsHeaderIcon" aria-hidden="true">
+        <ListUl size={20} />
+      </span>
+      <span className="datasetsHeaderText">
+        <span className="datasetsHeaderTitleRow">
+          <span className="datasetsHeaderLabel">{t("datasetsFilterName")}</span>
+          <span
+            className={classNames("datasetsHeaderCount", {
+              updating: countsUpdating,
+            })}
+            data-testid="sidebar-toggle-count"
+            title={countsTitle}
+          >
+            {countsReady ? (
+              countLabel
+            ) : (
+              <Spinner size="xs" className="countSpinner" />
+            )}
+          </span>
+        </span>
+        <span className="datasetsHeaderSubtitle">
+          {t("datasetsToggleSubtitleText")}
+        </span>
+      </span>
+      {/* Beside a page, the page's banner holds the card's controls. */}
+      {!railed && wideButton}
+      {!railed && (
+        <CloseButton
+          label={t("sidebarCollapseTitle")}
+          onClick={() => setSidebarOpen(false)}
+          testId="sidebar-collapse"
+        />
+      )}
+    </div>
+  );
+
   return (
     <>
       {wide && (
@@ -117,7 +195,7 @@ export default function Sidebar() {
         />
       )}
       <aside
-        className={classNames("sidebar", { wide })}
+        className={classNames("sidebar", { wide, railed })}
         aria-label={t("datasetsFilterName")}
         data-testid="sidebar"
       >
@@ -141,78 +219,7 @@ export default function Sidebar() {
           }
         >
           {isMobile && <div className="sheetHandle" aria-hidden="true" />}
-          {inspecting ? (
-            <div className="datasetsBanner">
-              {/* Names the destination, so it needs no tooltip. */}
-              <button
-                type="button"
-                className="datasetsBackButton"
-                data-testid="sidebar-back"
-                onClick={returnToDatasetList}
-              >
-                <ChevronLeft
-                  className="datasetsBackButtonIcon"
-                  size={14}
-                  aria-hidden="true"
-                />
-                <span>{t("sidebarBackToDatasetsText")}</span>
-              </button>
-              <span className="datasetsBannerMode">
-                <FileEarmarkText size={13} aria-hidden="true" />
-                {t("sidebarDatasetDetailsLabel")}
-              </span>
-              <CloseButton
-                label={t("sidebarShowMapTitle")}
-                onClick={() => setSidebarOpen(false)}
-                icon={WindowMinimize}
-                testId="sidebar-collapse"
-              />
-              {wideButton}
-              <CloseButton
-                label={t("closeDatasetText")}
-                onClick={() => {
-                  returnToDatasetList();
-                  setSidebarOpen(false);
-                }}
-                testId="sidebar-close-dataset"
-              />
-            </div>
-          ) : (
-            <div className="datasetsHeader">
-              <span className="datasetsHeaderIcon" aria-hidden="true">
-                <ListUl size={20} />
-              </span>
-              <span className="datasetsHeaderText">
-                <span className="datasetsHeaderTitleRow">
-                  <span className="datasetsHeaderLabel">
-                    {t("datasetsFilterName")}
-                  </span>
-                  <span
-                    className={classNames("datasetsHeaderCount", {
-                      updating: countsUpdating,
-                    })}
-                    data-testid="sidebar-toggle-count"
-                    title={countsTitle}
-                  >
-                    {countsReady ? (
-                      countLabel
-                    ) : (
-                      <Spinner size="xs" className="countSpinner" />
-                    )}
-                  </span>
-                </span>
-                <span className="datasetsHeaderSubtitle">
-                  {t("datasetsToggleSubtitleText")}
-                </span>
-              </span>
-              {wideButton}
-              <CloseButton
-                label={t("sidebarCollapseTitle")}
-                onClick={() => setSidebarOpen(false)}
-                testId="sidebar-collapse"
-              />
-            </div>
-          )}
+          {inspecting && !railed ? datasetsBanner : datasetsHeader}
           <div className="sidebarBody" data-testid="sidebar-body">
             <DatasetsPanel />
           </div>
@@ -261,6 +268,19 @@ export default function Sidebar() {
             </button>
           </footer>
         </section>
+        {railed && (
+          <section
+            className={classNames("sidebarWindow", { expanded })}
+            data-testid="dataset-window"
+            data-map-cover={expanded || undefined}
+            aria-label={inspectDataset.title}
+          >
+            {datasetsBanner}
+            <div className="sidebarWindowBody">
+              <DatasetPage />
+            </div>
+          </section>
+        )}
       </aside>
     </>
   );

@@ -284,6 +284,15 @@ button.datasetCardTitle:focus-visible {
   border-color: var(--cioos-primary);
 }
 
+/* Its page is open beside the list. */
+.datasetCard.active {
+  border-color: var(--cioos-primary-700);
+  background-color: var(--cioos-surface-2);
+  box-shadow:
+    0 0 0 1px var(--cioos-primary-700),
+    var(--cioos-shadow-card);
+}
+
 /* Opaque, since it sticks over the cards scrolling beneath it. */
 .datasetsCardGroupHeader {
   position: sticky;

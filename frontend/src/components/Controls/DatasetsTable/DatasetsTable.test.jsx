@@ -643,6 +643,55 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
   });
 });
 
+describe("DatasetsTable (beside an open dataset page)", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  const titleOf = (card) => card.querySelector(".datasetCardTitle").textContent;
+
+  it("keeps its toolbar and cards, marking the open dataset's card", async () => {
+    renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+        activePk={1}
+      />,
+      { providers: "app" },
+    );
+    const cards = await screen.findAllByTestId("dataset-card");
+    expect(cards).toHaveLength(3);
+    expect(screen.getByTestId("datasets-controls")).toBeInTheDocument();
+    expect(
+      cards.filter((c) => c.getAttribute("aria-current")).map(titleOf),
+    ).toEqual(["Beta station"]);
+  });
+
+  it("turns to the page holding the open dataset", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      makeRow({
+        pk: i + 1,
+        title: `Station ${String(i + 1).padStart(2, "0")}`,
+      }),
+    );
+    renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+        activePk={28}
+      />,
+      { providers: "app" },
+    );
+    await waitFor(() =>
+      expect(titleOf(document.querySelector('[aria-current="true"]'))).toBe(
+        "Station 28",
+      ),
+    );
+  });
+});
+
 describe("DatasetsTable (download modal)", () => {
   beforeEach(() => {
     installMockFetch();

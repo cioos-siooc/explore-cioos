@@ -318,23 +318,9 @@ export default function DatasetInspector({
     [trajectoryPlatforms],
   );
 
-  useEffect(() => {
-    const typingIn = (target) =>
-      target instanceof Element &&
-      (target.isContentEditable ||
-        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
-
-    const onKeyDown = (e) => {
-      if (e.key !== "Backspace" || typingIn(e.target)) return;
-      e.preventDefault();
-      returnToList();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [returnToList]);
-
-  // Swipe left (touch, trackpad, or horizontal wheel) returns to the list.
+  // A touch swipe left returns to the list. Not Backspace or a sideways
+  // trackpad scroll: both left the page by accident, the latter while panning
+  // the records table.
   useEffect(() => {
     const el = inspectorRef.current;
     if (!el) return undefined;
@@ -355,30 +341,12 @@ export default function DatasetInspector({
       returnToList();
     };
 
-    let wheelAccumX = 0;
-    let wheelTimer = null;
-    const onWheel = (e) => {
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-      wheelAccumX += e.deltaX;
-      if (wheelTimer) clearTimeout(wheelTimer);
-      wheelTimer = setTimeout(() => {
-        wheelAccumX = 0;
-      }, 150);
-      if (wheelAccumX <= -SWIPE_THRESHOLD) {
-        wheelAccumX = 0;
-        returnToList();
-      }
-    };
-
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: true });
 
     return () => {
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchend", onTouchEnd);
-      el.removeEventListener("wheel", onWheel);
-      if (wheelTimer) clearTimeout(wheelTimer);
     };
   }, [returnToList]);
 
