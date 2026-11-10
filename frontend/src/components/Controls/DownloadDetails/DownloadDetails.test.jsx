@@ -349,7 +349,7 @@ describe("DownloadDetails", () => {
     expect(values("ERDDAP™")).toEqual(
       expect.arrayContaining(["csvp", "json", "nc", "mat", "kml"]),
     );
-    expect(values("OBIS")).toEqual(["csv", "parquet"]);
+    expect(values("OBIS")).toEqual(["csv", "parquet", "dwca"]);
   });
 
   it("splits the ERDDAP formats by whether a polygon can clip them", () => {
@@ -392,5 +392,28 @@ describe("DownloadDetails", () => {
     renderDetails();
     expect(screen.getByLabelText("ERDDAP™")).toBeInTheDocument();
     expect(screen.queryByLabelText("OBIS")).not.toBeInTheDocument();
+  });
+
+  it("offers the OBIS values choice for OBIS datasets", () => {
+    renderDetails({
+      pointsToReview: [
+        makePoint({
+          pk: EST_LARGE.pk,
+          title: "Fish survey",
+          source_type: "obis",
+          erddap_url: "https://obis.org",
+        }),
+      ],
+    });
+    expect(
+      within(screen.getByLabelText("OBIS values"))
+        .getAllByRole("option")
+        .map((option) => option.value),
+    ).toEqual(["curated", "submitted"]);
+  });
+
+  it("offers no OBIS values choice without an OBIS dataset", () => {
+    renderDetails();
+    expect(screen.queryByLabelText("OBIS values")).not.toBeInTheDocument();
   });
 });

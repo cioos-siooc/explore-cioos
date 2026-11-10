@@ -29,7 +29,9 @@ const DownloadContext = createContext();
 // The formats the packaged download is written in, per source: OBIS
 // occurrences are a flat table, with no ODV or CF-DSG rendition.
 export const PACKAGE_FORMATS = Object.keys(ERDDAP_FORMATS);
-export const OBIS_FORMATS = ["csv", "parquet"];
+export const OBIS_FORMATS = ["csv", "parquet", "dwca"];
+// OBIS's curated values, or the provider's as submitted to OBIS.
+export const OBIS_VALUES = ["curated", "submitted"];
 
 const FAILURE_TEXT_KEYS = {
   network: "submissionStateTextFailedNetwork",
@@ -59,6 +61,7 @@ export default function DownloadProvider({ children }) {
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false);
   const [packageFormat, setPackageFormat] = useState("csv");
   const [obisFormat, setObisFormat] = useState("csv");
+  const [obisValues, setObisValues] = useState("curated");
 
   const emailValid = validateEmail(email);
   const polygonFilterActive = !isEmpty(polygon);
@@ -152,7 +155,7 @@ export default function DownloadProvider({ children }) {
     let queryString = `${applyDatasetPKs(
       createDataFilterQueryString(downloadQuery),
       pks,
-    )}&lang=${i18n.language}&format=${packageFormat}&obisFormat=${obisFormat}`;
+    )}&lang=${i18n.language}&format=${packageFormat}&obisFormat=${obisFormat}&obisValues=${obisValues}`;
     if (polygon && filterDownloadByPolygon) {
       queryString += `&polygon=${JSON.stringify(polygon)}`;
     }
@@ -205,6 +208,8 @@ export default function DownloadProvider({ children }) {
     setPackageFormat,
     obisFormat,
     setObisFormat,
+    obisValues,
+    setObisValues,
     handleEmailChange,
     handleSubmission,
   };

@@ -5,14 +5,15 @@ import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx"
 import SelectPill from "../../ui/SelectPill.jsx";
 import {
   OBIS_FORMATS,
+  OBIS_VALUES,
   PACKAGE_FORMATS,
   useDownload,
 } from "../../../state/download/DownloadProvider.jsx";
 import { CLIPPABLE_FORMATS } from "../../../downloadLinks.js";
 import "./styles.css";
 
-// Above both delivery options, not inside either: the emailed package, the
-// script and the ERDDAP direct links all take these formats. A source's
+// Above both delivery options, not inside either: the emailed package and the
+// dataset list's ERDDAP links both take these formats. A source's
 // picker shows only when the selection holds one of its datasets. Under a
 // polygon, the ERDDAP formats split by whether the package can clip them to it.
 export default function DownloadFormat({
@@ -21,8 +22,14 @@ export default function DownloadFormat({
   polygonFiltered,
 }) {
   const { t } = useTranslation();
-  const { packageFormat, setPackageFormat, obisFormat, setObisFormat } =
-    useDownload();
+  const {
+    packageFormat,
+    setPackageFormat,
+    obisFormat,
+    setObisFormat,
+    obisValues,
+    setObisValues,
+  } = useDownload();
   const options = (formats) =>
     formats.map((id) => ({ id, label: t(`downloadPackageFormat_${id}`) }));
   // OBIS is always clipped, so only the ERDDAP picker needs the split.
@@ -64,6 +71,18 @@ export default function DownloadFormat({
             options={options(OBIS_FORMATS)}
             onChange={setObisFormat}
             data-testid="download-obis-format"
+          />
+        )}
+        {obisCount > 0 && (
+          <SelectPill
+            label={t("downloadObisValuesPillLabel")}
+            value={obisValues}
+            options={OBIS_VALUES.map((id) => ({
+              id,
+              label: t(`downloadObisValues_${id}`),
+            }))}
+            onChange={setObisValues}
+            data-testid="download-obis-values"
           />
         )}
       </div>
