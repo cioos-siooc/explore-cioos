@@ -14,6 +14,7 @@ import {
   Server,
   PinMapFill,
   FileEarmarkSpreadsheet,
+  JournalText,
   X,
 } from "react-bootstrap-icons";
 import classNames from "classnames";
@@ -28,7 +29,8 @@ import {
   localizedErddapUrl,
 } from "../../../downloadLinks.js";
 import erddapServersJSONfile from "../../../erddapServers.json";
-import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
+import { isCatalogueRecord } from "../../../state/dataLayers.js";
+import { datasetTypeLabel } from "../../../state/datasetSort.js";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 
@@ -54,12 +56,14 @@ export default function DatasetCard({
   children,
 }) {
   const isGrid = row.cdm_data_type === "Grid";
+  const isCatalogue = isCatalogueRecord(row);
   const isObis = row.source_type === "obis";
   const erddapUrl = localizedErddapUrl(row, row.erddap_url, i18n.language);
   const ckanUrl = localizedCkanUrl(row.ckan_url, i18n.language);
-  // griddap is metadata-only, and in the modal a dataset is only selectable
-  // when the CDE can deliver it (internalDownload).
-  const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
+  // griddap and catalogue records are metadata-only, and in the modal a
+  // dataset is only selectable when the CDE can deliver it (internalDownload).
+  const selectDisabled =
+    isGrid || isCatalogue || (isDownloadModal && !row.internalDownload);
   const estimatesReady = !isEmpty(downloadSizeEstimates);
   // Failed estimates will never arrive: say so instead of spinning.
   const estimatesFailed = !estimatesLoading && !estimatesReady;
@@ -73,9 +77,11 @@ export default function DatasetCard({
   const clickable = typeof onInspect === "function";
   const handleCardClick = clickable ? () => onInspect(row) : undefined;
 
-  const selectTitle = isGrid
-    ? t("griddapNotDownloadableTooltip")
-    : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
+  const selectTitle = isCatalogue
+    ? t("catalogueRecordNotDownloadableTooltip")
+    : isGrid
+      ? t("griddapNotDownloadableTooltip")
+      : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
 
   return (
     <div
@@ -293,7 +299,8 @@ export default function DatasetCard({
 
 // The dataset's glyph, shaped like what the map draws for it: a grid for a
 // gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
-// a dot for everything drawn as markers. Coloured by platform.
+// a dot for everything drawn as markers, a record for catalogue records,
+// which draw nothing. Coloured by platform.
 // `decorative` drops the tooltip for a spot whose own text already names it.
 export function DatasetPlatformIcon({
   platform,
@@ -303,6 +310,15 @@ export function DatasetPlatformIcon({
   decorative,
 }) {
   const { i18n } = useTranslation();
+  if (sourceType === "ckan") {
+    return (
+      <JournalText
+        title={decorative ? undefined : t("catalogueRecordTypeLabel")}
+        color="var(--cioos-ink-60)"
+        size={13}
+      />
+    );
+  }
   // Grid amber, the colour the map draws gridded coverage in.
   if (cdmDataType === "Grid") {
     return (
@@ -329,14 +345,15 @@ export function DatasetPlatformIcon({
 
 function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
-  const serverName = formatErddapServerName(
-    row.erddap_server_url || row.erddap_url,
-    i18n.language,
-    erddapServersJSONfile,
-  );
-  const typeLabel = isGrid
-    ? t("griddapTypeLabel")
-    : cdmDataTypeLabel(row.cdm_data_type, t) || "";
+  const isCatalogue = isCatalogueRecord(row);
+  const serverName = isCatalogue
+    ? t("catalogueRecordSourceLabel")
+    : formatErddapServerName(
+        row.erddap_server_url || row.erddap_url,
+        i18n.language,
+        erddapServersJSONfile,
+      );
+  const typeLabel = datasetTypeLabel(row, t);
   const locationsLabel = isGrid
     ? formatGridSize(row.grid_dimensions) || "—"
     : row.profiles_count !== row.n_profiles
@@ -356,18 +373,20 @@ function DatasetCardMeta({ row, t, i18n }) {
         <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
         {typeLabel}
       </span>
-      <span
-        className="datasetCardMetaItem"
-        title={
-          isGrid
-            ? t("griddapGridSizeTooltip")
-            : t("datasetsTableHeaderLocationsText")
-        }
-      >
-        <PinMapFill size={13} aria-hidden="true" />
-        {locationsLabel}
-      </span>
-      {row.days != null && (
+      {!isCatalogue && (
+        <span
+          className="datasetCardMetaItem"
+          title={
+            isGrid
+              ? t("griddapGridSizeTooltip")
+              : t("datasetsTableHeaderLocationsText")
+          }
+        >
+          <PinMapFill size={13} aria-hidden="true" />
+          {locationsLabel}
+        </span>
+      )}
+      {row.days != null && !isCatalogue && (
         <span
           className="datasetCardMetaItem"
           title={t("datasetsCardSortDaysText")}

@@ -24,6 +24,10 @@ flush_redis: false
 # defaults to false
 incremental: true
 
+# Also load the CIOOS CKAN records no harvested ERDDAP or OBIS dataset cites, as
+# footprint-only datasets (the "ckan" source). Defaults to false.
+ckan_catalogue: false
+
 # --- OBIS Configuration ---
 #
 # How the dataset list is chosen, highest precedence first:

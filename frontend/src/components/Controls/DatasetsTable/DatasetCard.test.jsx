@@ -109,6 +109,39 @@ describe("DatasetCard", () => {
     expect(screen.getByText("184×80")).toBeInTheDocument();
   });
 
+  it("shows a catalogue record as metadata only: not selectable, no locations or days", () => {
+    const record = {
+      ...ROW,
+      source_type: "ckan",
+      cdm_data_type: "Other",
+      erddap_url: null,
+      erddap_server_url: "https://catalogue.cioos.ca",
+      ckan_url: "https://catalogue.cioos.ca/dataset/abc",
+      days: 0,
+    };
+    render(<DatasetCard row={record} t={t} i18n={i18n} onSelect={() => {}} />);
+    const select = screen.getByRole("checkbox", {
+      name: "datasetsCardSelectForDownloadText: Green Bay LoRaWAN Buoy 4",
+    });
+    expect(select).toBeDisabled();
+    expect(select).toHaveAttribute(
+      "title",
+      "catalogueRecordNotDownloadableTooltip",
+    );
+    expect(screen.getByTitle("coverageGroup_source")).toHaveTextContent(
+      "catalogueRecordSourceLabel",
+    );
+    expect(screen.getByTitle("datasetsTableHeaderTypeText")).toHaveTextContent(
+      "catalogueRecordTypeLabel",
+    );
+    expect(
+      screen.queryByTitle("datasetsTableHeaderLocationsText"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTitle("datasetsCardSortDaysText"),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows profiles_count / n_profiles when they differ", () => {
     const partial = { ...ROW, profiles_count: 3, n_profiles: 10 };
     render(<DatasetCard row={partial} t={t} i18n={i18n} />);

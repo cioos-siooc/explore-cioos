@@ -34,6 +34,10 @@ flush_redis: True
 # ACCESS EXCLUSIVE lock, taking the site down; keep it for disaster recovery.
 incremental: True
 
+# Also load the CIOOS CKAN records no harvested ERDDAP or OBIS dataset cites, as
+# footprint-only datasets (the "ckan" source). Defaults to false.
+ckan_catalogue: true
+
 # Discover OBIS datasets from the OBIS API: OBIS Canada + OTN-OBIS + anything
 # with occurrences inside the Canadian EEZ. Discovery is all-or-nothing — if any
 # query fails the OBIS harvest fails, so the db-loader never runs and nothing is

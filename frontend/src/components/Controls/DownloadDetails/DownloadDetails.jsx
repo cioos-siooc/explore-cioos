@@ -30,6 +30,7 @@ import {
   downloadConstraints,
 } from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
+import { isFootprintOnly } from "../../../state/dataLayers.js";
 import "./styles.css";
 import Spinner from "../../ui/Spinner.jsx";
 
@@ -57,8 +58,9 @@ export default function DownloadDetails({
   const [selectAll, setSelectAll] = useState(true);
   const [pointsData, setPointsData] = useState(
     pointsToReview
-      // Griddap is metadata-only and must never reach the estimate/queue flow.
-      .filter((ptr) => ptr.cdm_data_type !== "Grid")
+      // Grids and catalogue records are metadata-only and must never reach
+      // the estimate/queue flow.
+      .filter((ptr) => !isFootprintOnly(ptr))
       .map((ptr) => {
         return { ...ptr, downloadDisabled: false };
       }),

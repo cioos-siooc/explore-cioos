@@ -22,7 +22,7 @@ source servers or the local database.
 | --- | --- | --- | --- |
 | **ERDDAP** | Primary data source, one server per regional association | One row per **feature** (station, cast), trajectory track, or grid extent | [ERDDAP strategy](erddap.md) |
 | **OBIS** | Biological occurrences | One row per ~5 nmi **cell**, with its species | [OBIS strategy](obis.md) |
-| **CKAN** | Metadata enrichment only | Title (EN/FR), organizations, catalogue link, the dataset page's [descriptive metadata](#descriptive-metadata); EOVs for OBIS | [CKAN](#ckan) below |
+| **CKAN** | Metadata enrichment, plus the catalogue records no harvested dataset cites | Title (EN/FR), organizations, catalogue link, the dataset page's [descriptive metadata](#descriptive-metadata); EOVs for OBIS. One footprint-only row per uncited record | [CKAN](#ckan) below |
 
 ```mermaid
 flowchart TD
@@ -30,6 +30,7 @@ flowchart TD
     fan --> e1["Harvest Source<br/>ERDDAP server A"]
     fan --> e2["Harvest Source<br/>ERDDAP server B ..."]
     fan --> o["Harvest Source<br/>OBIS"]
+    fan --> c["Harvest Source<br/>CKAN catalogue"]
     dash["Dashboard 'Trigger harvest'"] --> e1
 
     e1 --> ehv["ERDDAP strategy:<br/>change check, per cdm_data_type"]
@@ -39,6 +40,9 @@ flowchart TD
     o --> ohv["OBIS strategy:<br/>discovery, occurrences to cells"]
     ohv --> ockan["CKAN: match records by OBIS<br/>or IPT link, else convert<br/>the OBIS metadata"]
     ockan --> csv
+
+    c --> chv["Every record no harvested<br/>dataset cites, as a footprint"]
+    chv --> csv
 
     csv --> stage["Stage CSVs into temp tables<br/>(no advisory lock)"]
     stage --> apply["Advisory lock: apply phase<br/>upsert, points, track sweep, hexes"]
@@ -114,7 +118,8 @@ A full reload truncates everything first, so only `success` datasets remain
 after it.
 
 The reason codes are listed on the [ERDDAP](erddap.md#reason-codes)
-and [OBIS](obis.md#reason-codes) pages. Each attempt also
+and [OBIS](obis.md#reason-codes) pages, and for catalogue records
+[below](#catalogue-records). Each attempt also
 records the query URLs used. Errors are grouped per server and distinct error
 before being sent to Sentry, so only a new problem raises an alert.
 
@@ -160,7 +165,8 @@ keep the load incremental and leave OBIS and its cache alone.
 
 ## CKAN
 
-CKAN is enrichment only. A CKAN outage never fails a harvest. ERDDAP and OBIS
+For ERDDAP and OBIS, CKAN is enrichment only: a CKAN outage never fails their
+harvest. (The [catalogue records](#catalogue-records) run is the exception.) ERDDAP and OBIS
 use different CKAN instances: ERDDAP datasets are matched against the CIOOS
 national catalogue (`catalogue.cioos.ca`), OBIS datasets against the OGSL
 pre-production CKAN's OBIS XML harvest source.
@@ -193,6 +199,36 @@ conversions are cached on disk. If CKAN is unreachable, the datasets keep the
 CKAN metadata stored by the previous harvest and the rest are converted.
 
 The database then normalizes organization names into `cde.organizations`.
+
+### Catalogue records
+
+With `ckan_catalogue: true` in the harvest config, the `ckan` source (its own
+*Harvest Source* run, deployment `cde-harvester-ckan`) loads every national
+catalogue record of type `dataset` that no harvested ERDDAP or OBIS dataset
+cites (`ckan_id`), as a dataset of its own: `source_type = 'ckan'`, the
+sentinel `erddap_url` `https://catalogue.cioos.ca`, `dataset_id` = `ckan_id` =
+the record id. One paged `package_search` (`*:*`) fetches the whole catalogue;
+a CKAN outage fails the run, so nothing is pruned.
+
+A row holds the record's bounding box (`coverage_lat/lon_*`, drawn as its
+footprint), temporal and vertical extents, EOVs, organizations and
+[descriptive metadata](#descriptive-metadata), and no features: no hexes, no
+day set, no download. The site lists these after the data-backed datasets and
+outlines a record's footprint only while it is hovered or open. Under a time
+filter, a record without a start date is left out; one without an end date is
+treated as ongoing.
+
+| | |
+| --- | --- |
+| Change signal | The record's `metadata_modified`, stored as `content_hash` with `CATALOGUE_VERSION` (`cde_harvester/sources/ckan/catalogue_records.py`); bump the version to reload every record |
+| Unchanged record | Skipped as `UNCHANGED`, `verified_at` bumped |
+| A dataset starts citing the record | Skipped by the next catalogue run; `ckan_process()` also deletes it in the citing source's own load, whichever runs first |
+| Record gone from the catalogue | Pruned like any dataset gone upstream |
+
+| Reason code | Status | Meaning |
+| --- | --- | --- |
+| `NO_SPATIAL_EXTENT` | skipped | The record has no valid bounding box, so it has no footprint to list it by |
+| `UNCHANGED` | skipped | `metadata_modified` unchanged since the last load |
 
 ### Descriptive metadata
 

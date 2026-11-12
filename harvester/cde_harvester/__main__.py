@@ -23,6 +23,7 @@ from cde_harvester.core.observability import (
 from cde_harvester.core.record_metadata import merge
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources import resolve_source
+from cde_harvester.sources.ckan.catalogue_records import harvest_ckan_catalogue
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     erddap_join_key,
     get_ckan_records,
@@ -163,7 +164,8 @@ def _run_logger():
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
                          obis_datasets, obis_cells, obis_skipped, df_ckan,
                          erddap_verified=None, erddap_trajectory_days=None,
-                         erddap_trajectory_points=None):
+                         erddap_trajectory_points=None, catalogue_datasets=None,
+                         catalogue_skipped=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
@@ -260,8 +262,10 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         erddap_profiles["depth_max"] = erddap_profiles["depth_max"].fillna(0)
         erddap_profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
 
-    datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
-    skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
+    datasets = pd.concat([erddap_datasets, obis_datasets, catalogue_datasets], ignore_index=True)
+    skipped_datasets = pd.concat(
+        [erddap_skipped, obis_skipped, catalogue_skipped], ignore_index=True
+    )
 
     # title is required by validate_loaded_data(); a missing one would roll
     # back the WHOLE harvest.
@@ -359,7 +363,8 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
-         obis_discovery=None, source=None, triggered_by=None, skip_unchanged=False):
+         obis_discovery=None, source=None, triggered_by=None, skip_unchanged=False,
+         ckan_catalogue=False):
     logger = _run_logger()
     if obis_geo_filter is None or isinstance(obis_geo_filter, dict):
         obis_geo_filter = ObisGeoFilter.from_config(obis_geo_filter)
@@ -385,6 +390,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     run_error_message = None
     erddap_attempts = pd.DataFrame()
     obis_attempts = pd.DataFrame()
+    catalogue_attempts = pd.DataFrame()
     erddap_verified = pd.DataFrame()
     logger.info(
         "Harvest run started: run_id=%s git_sha=%s scope=%s source=%s flow_run=%s",
@@ -401,11 +407,19 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         if resolved_source == "obis":
             logger.info("Single-source harvest: OBIS only")
             erddap_urls_list = []
+            ckan_catalogue = False
+        elif resolved_source == "ckan":
+            logger.info("Single-source harvest: CKAN catalogue records only")
+            erddap_urls_list = []
+            obis_dataset_ids = None
+            obis_discovery = None
+            ckan_catalogue = True
         elif resolved_source:
             logger.info("Single-source harvest: %s", resolved_source)
             erddap_urls_list = [resolved_source]
             obis_dataset_ids = None
             obis_discovery = None
+            ckan_catalogue = False
 
         for erddap_url in erddap_urls_list:
             logger.info("Submitting harvest task for %s", erddap_url)
@@ -432,6 +446,13 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
                 geo_filter=obis_geo_filter,
                 run_id=run_id,
                 discovery=obis_discovery if obis_discovery_enabled else None,
+            )
+
+        catalogue_future = None
+        if ckan_catalogue:
+            logger.info("Submitting CKAN catalogue records harvest task")
+            catalogue_future = harvest_ckan_catalogue.submit(
+                run_id=run_id, cache=cache_requests, skip_unchanged=skip_unchanged,
             )
 
         logger.info("Waiting for all harvest tasks to complete")
@@ -473,6 +494,15 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             obis_skipped = obis_result.skipped
             obis_attempts = obis_result.attempts
             logger.info("OBIS harvest completed: %d datasets, %d cells", len(obis_datasets), len(obis_cells))
+
+        catalogue_datasets = pd.DataFrame()
+        catalogue_skipped = pd.DataFrame()
+        if catalogue_future:
+            catalogue_result = catalogue_future.result()
+            catalogue_datasets = catalogue_result.datasets
+            catalogue_skipped = catalogue_result.skipped
+            catalogue_attempts = catalogue_result.attempts
+            erddap_verified = pd.concat([erddap_verified, catalogue_result.verified])
     except Exception as e:
         run_status = "failed"
         run_error_message = f"{type(e).__name__}: {e}"
@@ -484,7 +514,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             git_sha=git_sha,
             status=run_status,
             error_message=run_error_message,
-            attempts_frames=[erddap_attempts, obis_attempts],
+            attempts_frames=[erddap_attempts, obis_attempts, catalogue_attempts],
             logger=logger,
             prefect_flow_run_id=prefect_flow_run_id,
             scope=run_scope,
@@ -497,7 +527,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         os.makedirs(folder)
 
     # Unchanged datasets (erddap_verified) still need verified_at bumped.
-    if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
+    harvested = [erddap_datasets, obis_datasets, catalogue_datasets]
+    if all(df.empty for df in harvested) and erddap_verified.empty:
         logger.info("No datasets harvested from any source")
         _write_run_audit_csvs(
             folder=folder,
@@ -507,7 +538,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             git_sha=git_sha,
             status="failed",
             error_message="No datasets harvested from any source",
-            attempts_frames=[erddap_attempts, obis_attempts],
+            attempts_frames=[erddap_attempts, obis_attempts, catalogue_attempts],
             logger=logger,
             prefect_flow_run_id=prefect_flow_run_id,
             scope=run_scope,
@@ -518,7 +549,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         # "Crashed" instead of Failed.
         raise RuntimeError("No datasets harvested from any source")
 
-    if erddap_datasets.empty and obis_datasets.empty:
+    if all(df.empty for df in harvested):
         logger.info(
             "No new/changed datasets to harvest; %d unchanged datasets to verify",
             len(erddap_verified),
@@ -571,7 +602,9 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         obis_skipped=obis_skipped,
         df_ckan=df_ckan,
         erddap_verified=erddap_verified,
-        wait_for=[f for f in [*erddap_futures, obis_future] if f is not None],
+        catalogue_datasets=catalogue_datasets,
+        catalogue_skipped=catalogue_skipped,
+        wait_for=[f for f in [*erddap_futures, obis_future, catalogue_future] if f is not None],
     ).result()
 
     _write_run_audit_csvs(
@@ -582,7 +615,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         git_sha=git_sha,
         status=run_status,
         error_message=run_error_message,
-        attempts_frames=[erddap_attempts, obis_attempts],
+        attempts_frames=[erddap_attempts, obis_attempts, catalogue_attempts],
         logger=logger,
         prefect_flow_run_id=prefect_flow_run_id,
         scope=run_scope,
@@ -630,6 +663,7 @@ if __name__ == "__main__":
         obis_discovery = obis.discovery
         obis_geo_filter = obis.geo_filter
         obis_folder = config.get("obis_folder")
+        ckan_catalogue = bool(config.get("ckan_catalogue"))
 
     else:
         logger.info("Using command line arguments")
@@ -645,6 +679,11 @@ if __name__ == "__main__":
 
         parser.add_argument(
             "--cache", help="Cache requests, for testing only", action="store_true"
+        )
+        parser.add_argument(
+            "--ckan-catalogue",
+            help="Also load the CKAN records no harvested dataset cites",
+            action="store_true",
         )
 
         parser.add_argument(
@@ -757,10 +796,11 @@ if __name__ == "__main__":
         obis_discovery = obis.discovery
         obis_geo_filter = obis.geo_filter
         obis_folder = args.obis_folder
+        ckan_catalogue = args.ckan_catalogue
 
-        if not urls and obis.mode == "off":
+        if not urls and obis.mode == "off" and not ckan_catalogue:
             parser.error(
-                "At least one of --urls, --obis-discover, or "
+                "At least one of --urls, --obis-discover, --ckan-catalogue or "
                 "--obis-datasets-file/--obis-dataset-ids is required"
             )
 
@@ -770,7 +810,8 @@ if __name__ == "__main__":
         flow(name="cde-main", log_prints=True)(main)(
             urls, cache, folder or "harvest", dataset_ids,
             obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder,
-            obis_geo_filter=obis_geo_filter, obis_discovery=obis_discovery)
+            obis_geo_filter=obis_geo_filter, obis_discovery=obis_discovery,
+            ckan_catalogue=ckan_catalogue)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

@@ -355,6 +355,17 @@ test("GET /harvest/ckan-coverage counts each CKAN record once, ERDDAP rows by no
   assert.match(db.queries[0], /WHERE ckan_id IS NOT NULL/);
 });
 
+test("GET /harvest/ckan-coverage leaves the catalogue records loaded on their own out", async () => {
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueResponse(ckanPage(0, []));
+
+  await agent.get("/harvest/ckan-coverage");
+
+  assert.match(db.queries[0], /AND source_type IS DISTINCT FROM 'ckan'/);
+  assert.match(db.queries[1], /WHERE source_type IS DISTINCT FROM 'ckan'/);
+});
+
 test("GET /harvest/ckan-coverage keeps the linked counts when CKAN fails mid-listing", async () => {
   db.queueRaw([
     { ckan_id: "a1", erddap: true, obis: false },
