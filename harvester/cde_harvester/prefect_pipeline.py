@@ -38,7 +38,7 @@ from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.loader import record_failed_run
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
-from cde_harvester.sources import OBIS_ALIASES
+from cde_harvester.sources import CKAN_ALIASES, OBIS_ALIASES
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 
@@ -169,6 +169,8 @@ def deployment_slug(source):
     """Stable per-source slug; must match harvest-dashboard/app/config.deployment_slug."""
     if not source or str(source).strip().lower() in OBIS_ALIASES:
         return "obis"
+    if str(source).strip().lower().rstrip("/") in CKAN_ALIASES:
+        return "ckan"
     host = urlparse(source if "://" in source else "https://" + source).hostname or str(source)
     return host.lower().replace(".", "-")
 
@@ -188,7 +190,7 @@ def _cron_env(var_name):
     return (os.getenv(var_name) or "").strip() or None
 
 
-def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
+def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery, ckan_catalogue=False):
     """Shared by create_deployment() and cde_harvest_all_run(): registered
     deployments and the fan-out list must never disagree. Under discovery
     `obis_dataset_ids` is empty at config time."""
@@ -196,6 +198,8 @@ def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
         if isinstance(erddap_urls, str) else [u.strip() for u in (erddap_urls or []) if u and u.strip()]
     if obis_dataset_ids or (obis_discovery or {}).get("enabled", bool(obis_discovery)):
         sources.append("obis")
+    if ckan_catalogue:
+        sources.append("ckan")
     return sources
 
 
@@ -222,6 +226,7 @@ class PrefectCDEPipeline:
     obis_discovery: dict
     obis_geo_filter: dict
     obis_folder: str
+    ckan_catalogue: bool
     source: str
     triggered_by: str
 
@@ -253,6 +258,7 @@ class PrefectCDEPipeline:
         self.obis_discovery = obis.discovery
         self.obis_geo_filter = obis.geo_filter
         self.obis_folder = config.get("obis_folder")
+        self.ckan_catalogue = bool(config.get("ckan_catalogue"))
 
         # Fail a malformed OBIS block at registration, not the first harvest.
         ObisDiscoveryConfig.from_config(self.obis_discovery)
@@ -341,6 +347,7 @@ class PrefectCDEPipeline:
                 obis_folder=str(obis_folder),
                 obis_geo_filter=self.obis_geo_filter,
                 obis_discovery=self.obis_discovery,
+                ckan_catalogue=self.ckan_catalogue,
                 source=self.source,
                 triggered_by=self.triggered_by,
                 skip_unchanged=effective_incremental and not self.force,
@@ -451,7 +458,7 @@ class PrefectCDEPipeline:
         )
 
         per_source = _configured_sources(
-            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
+            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery, self.ckan_catalogue
         )
         source_deployment_names = []
         for src in per_source:
@@ -519,8 +526,8 @@ def _pipeline_run_name():
     if not source:
         return "harvest-full"
     slug = deployment_slug(source)
-    if slug == "obis":
-        return "harvest-obis"
+    if slug in ("obis", "ckan"):
+        return f"harvest-{slug}"
     return f"harvest-erddap-{slug}"
 
 
@@ -531,7 +538,7 @@ def cde_pipeline_run(
     triggered_by: str | None = None,
     force: bool = False,
 ):
-    """Deployable entry point. `source` (None = full) narrows to one ERDDAP url or 'obis';
+    """Deployable entry point. `source` (None = full) narrows to one ERDDAP url, 'obis' or 'ckan';
     `triggered_by` is recorded on the audit row; `force` re-harvests datasets whose
     Croissant hash is unchanged. Single-source runs force incremental db-load."""
     config_file = resolve_harvest_config_file(config_file)
@@ -670,7 +677,8 @@ def cde_harvest_all_run(
 
     obis = resolve_obis_config(config)
     configured = _configured_sources(
-        config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery
+        config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery,
+        bool(config.get("ckan_catalogue")),
     )
     if sources is None:
         sources = configured
@@ -683,7 +691,7 @@ def cde_harvest_all_run(
     if not sources:
         raise ValueError(
             "No sources configured to harvest (erddap_urls / obis_discovery / "
-            "obis_dataset_ids / obis_datasets_file)"
+            "obis_dataset_ids / obis_datasets_file / ckan_catalogue)"
         )
 
     # The worker's own limit: the flow runs as its subprocess. This orchestrator holds one slot.
