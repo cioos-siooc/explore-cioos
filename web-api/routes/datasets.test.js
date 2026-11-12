@@ -41,7 +41,7 @@ test("GET /datasets counts only datasets /pointQuery can return", async () => {
   assert.match(sql, /FROM cde\.obis_cells o WHERE o\.dataset_pk = d\.pk/);
   assert.match(
     sql,
-    /d\.cdm_data_type = 'Grid' AND d\.coverage_bbox IS NOT NULL/,
+    /\(d\.cdm_data_type = 'Grid' OR d\.source_type = 'ckan'\)\s+AND d\.coverage_bbox IS NOT NULL/,
   );
 });
 

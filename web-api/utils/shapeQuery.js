@@ -8,6 +8,8 @@ const {
   TRAJECTORY_COVERAGE_FROM,
   GRIDDAP_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
+  CATALOGUE_FROM,
+  CATALOGUE_TIME_DEPTH_COLUMNS,
   unionBranches,
 } = require("./selection");
 
@@ -65,8 +67,11 @@ async function buildShapeSql(
         FROM cde.obis_cells
         WHERE :obisFilters`;
   // Column order is the combined-CTE contract shared by every branch.
-  const griddapBranch = `SELECT d.pk AS dataset_pk,
-               ${GRIDDAP_TIME_DEPTH_COLUMNS},
+  const datasetCoverageBranch = (
+    timeDepthColumns,
+    from,
+  ) => `SELECT d.pk AS dataset_pk,
+               ${timeDepthColumns},
                0 AS records_per_day,
                NULL::daterange[] AS day_ranges,
                NULL::text AS profile_id, NULL::text AS timeseries_id,
@@ -74,13 +79,19 @@ async function buildShapeSql(
                NULL::double precision AS latitude, NULL::double precision AS longitude,
                NULL::integer AS point_pk, NULL::geometry AS geom,
                d.coverage_bbox AS search_geom
-        ${GRIDDAP_FROM}`;
+        ${from}`;
 
   const branches = [];
   if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
   if (showObis) branches.push(obisBranch);
-  // Grids are never estimated: they are downloaded from ERDDAP directly.
-  if (includeProfiles && !doEstimate) branches.push(griddapBranch);
+  // Neither is estimated: grids download from ERDDAP directly, catalogue
+  // records from their CKAN page.
+  if (includeProfiles && !doEstimate) {
+    branches.push(
+      datasetCoverageBranch(GRIDDAP_TIME_DEPTH_COLUMNS, GRIDDAP_FROM),
+      datasetCoverageBranch(CATALOGUE_TIME_DEPTH_COLUMNS, CATALOGUE_FROM),
+    );
+  }
   const combinedInner = unionBranches(branches, profilesBranch);
 
   if (pksOnly) {
@@ -197,6 +208,8 @@ async function buildShapeSql(
                   d.erddap_url AS erddap_server_url,
                   CASE WHEN d.source_type = 'obis'
                            THEN 'https://obis.org/dataset/' || d.dataset_id
+                       -- A catalogue record's only link is ckan_url.
+                       WHEN d.source_type = 'ckan' THEN NULL
                        WHEN d.cdm_data_type = 'Grid'
                            THEN d.erddap_url || '/griddap/' || d.dataset_id || '.html'
                            ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'
@@ -223,7 +236,7 @@ async function buildShapeSql(
                            daterange(:timeMin::date, (:timeMax::date) + 1))::integer
                            AS days,`
                   }
-                  CASE WHEN d.cdm_data_type = 'Grid'
+                  CASE WHEN d.cdm_data_type = 'Grid' OR d.source_type = 'ckan'
                            THEN ST_AsGeoJSON(ST_Transform(d.coverage_bbox, 4326), 6)::json
                   END AS coverage_bbox_geojson,
                   ST_AsGeoJSON(

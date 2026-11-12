@@ -167,6 +167,8 @@ router.get(
       `SELECT pk_url AS pk, dataset_id, title, title_fr, metadata,
               CASE WHEN source_type = 'obis'
                    THEN 'https://obis.org/dataset/' || dataset_id
+                   WHEN source_type = 'ckan'
+                   THEN 'https://catalogue.cioos.ca/dataset/' || ckan_id
                    ELSE erddap_url || '/info/' || dataset_id || '/index.html'
               END AS landing_url
        FROM cde.datasets
