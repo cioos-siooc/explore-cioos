@@ -1,3 +1,4 @@
+import { isFootprintOnly } from "../dataLayers.js";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
@@ -40,7 +41,7 @@ export default function useTourStages() {
     if (dataset) setInspectDataset(dataset);
   };
   const hasFeatureList = (dataset) =>
-    dataset.source_type !== "obis" && dataset.cdm_data_type !== "Grid";
+    dataset.source_type !== "obis" && !isFootprintOnly(dataset);
   const showQuickFilters = () => setQuickFiltersCollapsed(false);
   const openFilter = (filterName) => () => {
     setOpenFilter(filterName);

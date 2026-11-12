@@ -59,6 +59,19 @@ describe("sortDatasets", () => {
     ).toEqual([1, 3, 2]);
   });
 
+  it("puts catalogue records after every data-backed dataset, grids first included", () => {
+    const record = { pk: 4, title: "Aardvark record", source_type: "ckan" };
+    expect(
+      pks(
+        sortDatasets([record, ...rows], DEFAULT_SORT, {
+          gridFirst: true,
+          t,
+          language: "en",
+        }),
+      ),
+    ).toEqual([3, 2, 1, 4]);
+  });
+
   it("does not reorder its input", () => {
     const input = [...rows];
     sortDatasets(input, DEFAULT_SORT, { t, language: "en" });

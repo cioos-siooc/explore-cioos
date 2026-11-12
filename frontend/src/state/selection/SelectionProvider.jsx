@@ -29,7 +29,11 @@ import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { DEFAULT_SORT, GROUP_SIZE_SORT } from "../datasetSort.js";
-import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
+import {
+  allDataLayersOn,
+  datasetInDataLayers,
+  isCatalogueRecord,
+} from "../dataLayers.js";
 import {
   COLOR_LAYOUT,
   LAYOUT_PARAM,
@@ -59,10 +63,12 @@ const PLATFORMLESS_DATASET_TYPES = new Set([
 ]);
 
 // OBIS datasets draw as coverage hexes too but carry cdm_data_type 'Point',
-// like some ERDDAP datasets, so they're matched on source.
+// like some ERDDAP datasets, so they're matched on source; catalogue records
+// draw nothing.
 const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
-  row.source_type === "obis";
+  row.source_type === "obis" ||
+  isCatalogueRecord(row);
 
 function datasetInLanguage(point, language) {
   return {

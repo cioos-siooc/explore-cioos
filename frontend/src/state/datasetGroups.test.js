@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  CATALOGUE_KEY,
   GROUP_NONE,
   GRID_KEY,
   OTHER_KEY,
@@ -28,6 +29,32 @@ describe("isGroupDimension", () => {
   it("is false for the in-view and selection groupings old links may name", () => {
     expect(isGroupDimension("inView")).toBe(false);
     expect(isGroupDimension("selected")).toBe(false);
+  });
+});
+
+describe("catalogue records", () => {
+  const record = {
+    source_type: "ckan",
+    cdm_data_type: "Other",
+    platform: "unknown",
+    erddap_server_url: "https://catalogue.cioos.ca",
+    eovs: ["oxygen"],
+  };
+
+  it("group apart by type, platform and source, but by their own EOVs", () => {
+    for (const dimension of ["type", "platform", "source"]) {
+      expect(groupKeysFor(record, dimension)).toEqual([CATALOGUE_KEY]);
+    }
+    expect(groupKeysFor(record, "eov")).toEqual(["Biogeochemical:oxygen"]);
+  });
+
+  it("sort after every other group, Other included", () => {
+    expect(
+      sortGroupKeys([CATALOGUE_KEY, OTHER_KEY, "Profile"], "type", t, "en"),
+    ).toEqual(["Profile", OTHER_KEY, CATALOGUE_KEY]);
+    expect(groupLabel(CATALOGUE_KEY, "type", t)).toBe(
+      "catalogueRecordsGroupLabel",
+    );
   });
 });
 
