@@ -415,6 +415,18 @@ export function formatRange(min, max, unit = "") {
   return `${min} – ${max}${suffix}`;
 }
 
+// Depths arrive with float noise (0.079366 m): tenths of a metre near the
+// surface, whole metres below 10 m.
+export function formatDepthRange(min, max) {
+  const round = (value) =>
+    value === null || value === undefined
+      ? value
+      : Math.abs(value) < 10
+        ? Math.round(value * 10) / 10
+        : Math.round(value);
+  return formatRange(round(min), round(max), "m");
+}
+
 export function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {

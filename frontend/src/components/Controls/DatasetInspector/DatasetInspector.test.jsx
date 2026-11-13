@@ -167,7 +167,11 @@ describe("DatasetInspector", () => {
 
     await user.click(button);
     await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
-    expect(button).toHaveTextContent("Added");
+    expect(button).toHaveTextContent("In your download");
+    expect(button).toHaveAttribute(
+      "title",
+      expect.stringContaining("1 dataset selected"),
+    );
     expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
       "false",
     );
@@ -261,25 +265,48 @@ describe("DatasetInspector", () => {
     });
   });
 
-  it("links the source records under the title", async () => {
+  it("offers the source beside Add, naming its host on hover", async () => {
     await renderReady({
       dataset: { ...DATASET, ckan_url: "https://catalogue.cioos.ca/dataset/x" },
     });
-    expect(screen.getByRole("link", { name: "ERDDAP™" })).toHaveAttribute(
+    const source = screen.getByRole("link", { name: /^Open in ERDDAP™/ });
+    expect(source).toHaveAttribute(
       "href",
       "https://erddap.example/en/tabledap/foo.html",
     );
-    expect(screen.getByRole("link", { name: "Catalog" })).toHaveAttribute(
-      "href",
-      "https://catalogue.cioos.ca/en/dataset/x",
+    expect(source).toHaveAttribute(
+      "title",
+      expect.stringContaining("erddap.example"),
     );
+  });
+
+  it("links the CIOOS catalogue record beside Zoom when the dataset has one", async () => {
+    await renderReady({
+      dataset: { ...DATASET, ckan_url: "https://catalogue.cioos.ca/dataset/x" },
+    });
+    expect(
+      screen.getByRole("link", { name: "CIOOS catalogue" }),
+    ).toHaveAttribute("href", "https://catalogue.cioos.ca/en/dataset/x");
+  });
+
+  it("falls back to the catalogue record for a dataset with no server", async () => {
+    await renderReady({
+      dataset: {
+        ...DATASET,
+        erddap_url: null,
+        ckan_url: "https://catalogue.cioos.ca/dataset/x",
+      },
+    });
+    expect(
+      screen.getByRole("link", { name: /^Open in the CIOOS catalogue/ }),
+    ).toHaveAttribute("href", "https://catalogue.cioos.ca/en/dataset/x");
   });
 
   it("shows the no-features message once the (empty) feature list has loaded", async () => {
     await renderReady();
     await waitFor(() =>
       expect(
-        screen.getByText("No features match your search."),
+        screen.getByText("No records match your search."),
       ).toBeInTheDocument(),
     );
   });
@@ -306,9 +333,9 @@ describe("DatasetInspector", () => {
     const { user } = await renderReady();
     await openData();
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The features could not be loaded.");
+    expect(alert).toHaveTextContent("The records could not be loaded.");
     expect(
-      screen.queryByText("No features match your search."),
+      screen.queryByText("No records match your search."),
     ).not.toBeInTheDocument();
 
     failing = false;
@@ -333,11 +360,11 @@ describe("DatasetInspector", () => {
     expect(params.get("depthMax")).toBe("50");
   });
 
-  it("falls back to the generic Feature ID label when the dataset names no cf_role variable", async () => {
+  it("falls back to the generic Record ID label when the dataset names no cf_role variable", async () => {
     await renderReady();
     await waitFor(() =>
       expect(document.querySelector(".recordIdCaption")).toHaveTextContent(
-        "Feature ID",
+        "Record ID",
       ),
     );
   });
@@ -350,7 +377,7 @@ describe("DatasetInspector", () => {
 
     returnToList.mockClear();
     await openData();
-    await user.click(screen.getByPlaceholderText("Search table"));
+    await user.click(screen.getByPlaceholderText("Search records"));
     await user.keyboard("{Backspace}");
     expect(returnToList).not.toHaveBeenCalled();
   });
@@ -574,5 +601,123 @@ describe("DatasetInspector", () => {
       await renderReady({ dataset: { ...DATASET, source_type: "obis" } });
       expect(seenTips()).toEqual([]);
     });
+  });
+});
+
+describe("DatasetInspector facts sheet", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  const stubRecordsResponse = (body) => {
+    const fixtureFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) =>
+        String(input).includes("/datasetRecordsList?")
+          ? new Response(JSON.stringify(body), {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            })
+          : fixtureFetch(input),
+      ),
+    );
+  };
+
+  const factFor = (label) =>
+    screen.getByText(label, { selector: "dt" }).parentElement;
+
+  it("leads with the period and depth the records measured, rounded", async () => {
+    stubRecordsResponse({
+      time_min: "2007-09-28T22:39:49Z",
+      time_max: "2007-10-04T12:52:08Z",
+      depth_min: 1.9791,
+      depth_max: 691.5805,
+      profiles: [{ profile_id: "cast-1" }],
+    });
+    await renderReady({ dataset: { ...DATASET, days: 7 } });
+    await waitFor(() =>
+      expect(factFor("Time period")).toHaveTextContent(
+        "2007-09-28 – 2007-10-04",
+      ),
+    );
+    expect(factFor("Depth")).toHaveTextContent("2 – 692 m");
+    expect(factFor("Days of data")).toHaveTextContent("7 days");
+    expect(
+      screen.queryByText("from the catalogue record"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not read an OBIS dataset's all-zero depths as the surface", async () => {
+    stubRecordsResponse({
+      time_min: "2013-07-13T00:00:00Z",
+      time_max: "2024-11-04T00:00:00Z",
+      depth_min: 0,
+      depth_max: 0,
+      profiles: [{ profile_id: null }],
+    });
+    await renderReady({
+      dataset: { ...DATASET, source_type: "obis", dataset_id: "obis-uuid" },
+    });
+    await waitFor(() =>
+      expect(factFor("Time period")).toHaveTextContent("2013-07-13"),
+    );
+    expect(screen.queryByText("0 m")).not.toBeInTheDocument();
+  });
+
+  it("counts a trajectory's tracks, not the hex cells they cross", async () => {
+    await renderReady({
+      dataset: {
+        ...DATASET,
+        cdm_data_type: "Trajectory",
+        profiles_count: 36,
+        n_profiles: 1,
+      },
+    });
+    expect(factFor("Tracks")).toHaveTextContent("1 track");
+  });
+
+  it("names the stations a filter left out of the count", async () => {
+    await renderReady({
+      dataset: { ...DATASET, profiles_count: 3, n_profiles: 10 },
+    });
+    expect(factFor("Locations")).toHaveTextContent("3 of 10 locations");
+  });
+
+  it("leaves an unknown platform blank rather than stating it", async () => {
+    await renderReady({ dataset: { ...DATASET, platform: "unknown" } });
+    expect(factFor("Platform")).toHaveTextContent("—");
+  });
+
+  it("moves between the Metadata and Data tabs with the arrow keys", async () => {
+    const { user } = await renderReady();
+    const metadata = screen.getByRole("tab", { name: "Metadata" });
+    const data = screen.getByRole("tab", { name: "Data" });
+    expect(data).toHaveAttribute("tabindex", "-1");
+
+    metadata.focus();
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(data).toHaveAttribute("aria-selected", "true"));
+    expect(data).toHaveFocus();
+    expect(data).toHaveAttribute("tabindex", "0");
+
+    await user.keyboard("{Home}");
+    await waitFor(() =>
+      expect(metadata).toHaveAttribute("aria-selected", "true"),
+    );
+    expect(metadata).toHaveFocus();
+  });
+
+  it("explains a single unnamed series instead of promising record actions", async () => {
+    stubRecordsResponse({ profiles: [{ profile_id: null }] });
+    await renderReady();
+    await openData();
+    expect(
+      await screen.findByText(/a single unnamed series/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/"Show data" previews a record's data/),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".recordIdCaption")).toBeNull();
   });
 });

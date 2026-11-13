@@ -145,7 +145,7 @@
 .datasetCredit .metadataChip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   font-size: var(--cioos-font-size-xs);
@@ -157,14 +157,22 @@
   margin-top: 8px;
 }
 
-.metadataCitation {
-  font-size: var(--cioos-font-size-xs);
-  line-height: 1.4;
-  color: var(--cioos-ink-80);
+/* The citation card heads the Metadata tab, spaced like the abstract below. */
+.metadataCitationCard {
+  margin-bottom: 10px;
 }
 
-.metadataCardHeader .metadataIconButton {
-  margin-left: 0;
+.metadataCitation {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.45;
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+.metadataCitation a {
+  color: var(--cioos-primary-700);
+  font-weight: 600;
 }
 
 .metadataIconButton {
@@ -295,7 +303,7 @@
 
 .metadataResourceHost {
   font-size: var(--cioos-font-size-2xs);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 /* The fine print: one closed row until asked for. */
@@ -342,82 +350,6 @@
   font-family: inherit;
   color: var(--cioos-primary-700);
   cursor: pointer;
-}
-
-/* The citation's button sits in the action row; its popover spans the row's
-   width and floats over the page. */
-.citation {
-  margin-left: auto;
-}
-
-.citationButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 10px;
-  border: 1px dashed var(--cioos-primary);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  font-family: inherit;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  color: var(--cioos-primary-700);
-  cursor: pointer;
-}
-
-.citationButton:hover,
-.citationButton[aria-expanded="true"] {
-  background-color: var(--cioos-surface-2);
-}
-
-/* Still offered, so the absence is stated rather than left to be guessed. */
-.citationButton.missing {
-  border-color: var(--cioos-hairline);
-  color: var(--cioos-ink-60);
-}
-
-.citationButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-/* The padding bridges the gap to the button, so the pointer can travel from
-   one to the other without the hover ending. */
-.citationPopover {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 20;
-  padding-top: 4px;
-}
-
-.citationPopoverCard {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-float);
-}
-
-.citationPopoverCard .metadataCitation {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink);
-}
-
-.citationPopoverCard a {
-  color: var(--cioos-primary-700);
-  font-weight: 600;
-}
-
-.citationPopoverCard .metadataIconButton {
-  flex: 0 0 auto;
-  margin-left: 0;
 }
 
 /* A link value (license, sources) is one of the sheet's chips, made a link:

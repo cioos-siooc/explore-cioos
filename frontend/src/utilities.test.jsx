@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import {
+  formatDepthRange,
   abbreviateString,
   applyDatasetPKs,
   areaFromBounds,
@@ -775,5 +776,20 @@ describe("generateColorStops", () => {
       colorScale[6],
       colorScale[11],
     ]);
+  });
+});
+
+describe("formatDepthRange", () => {
+  it("drops float noise: tenths near the surface, whole metres below 10 m", () => {
+    expect(formatDepthRange(0.079366, 9701.095795)).toBe("0.1 – 9701 m");
+    expect(formatDepthRange(1.9791, 691.5805)).toBe("2 – 692 m");
+  });
+
+  it("collapses a range that rounds to one depth", () => {
+    expect(formatDepthRange(0, 0.02)).toBe("0 m");
+  });
+
+  it("has nothing to say without depths", () => {
+    expect(formatDepthRange(null, undefined)).toBeUndefined();
   });
 });

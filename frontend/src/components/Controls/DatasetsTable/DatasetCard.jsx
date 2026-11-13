@@ -331,6 +331,22 @@ export function DatasetPlatformIcon({
   );
 }
 
+// profiles_count counts matched features, and a trajectory's features are the
+// hex cells its tracks cross: its tracks are counted by n_profiles.
+export function locationsText(row, t) {
+  const count = Number(row.profiles_count);
+  const total = row.n_profiles == null ? undefined : Number(row.n_profiles);
+  if (
+    row.source_type !== "obis" &&
+    (row.cdm_data_type || "").includes("Trajectory")
+  ) {
+    return t("datasetCardTracks", { count: total ?? count });
+  }
+  return total !== undefined && count < total
+    ? t("datasetCardLocationsPartial", { shown: count, count: total })
+    : t("datasetCardLocations", { count });
+}
+
 function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
@@ -342,8 +358,6 @@ function DatasetCardMeta({ row, t, i18n }) {
     ? t("griddapTypeLabel")
     : cdmDataTypeLabel(row.cdm_data_type, t) || "";
   const gridSize = isGrid && formatGridSize(row.grid_dimensions);
-  const partial =
-    row.n_profiles != null && row.profiles_count !== row.n_profiles;
 
   return (
     <span className="datasetCardMeta">
@@ -373,12 +387,7 @@ function DatasetCardMeta({ row, t, i18n }) {
           title={t("datasetsTableHeaderLocationsText")}
         >
           <PinMapFill size={13} aria-hidden="true" />
-          {partial
-            ? t("datasetCardLocationsPartial", {
-                shown: Number(row.profiles_count),
-                count: Number(row.n_profiles),
-              })
-            : t("datasetCardLocations", { count: Number(row.profiles_count) })}
+          {locationsText(row, t)}
         </span>
       )}
       {row.days != null && (

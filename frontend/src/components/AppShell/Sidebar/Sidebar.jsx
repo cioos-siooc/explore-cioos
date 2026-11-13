@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Download,
-  FileEarmarkText,
   ListUl,
   PlusCircle,
   QuestionCircle,
@@ -170,10 +169,6 @@ export default function Sidebar() {
                 />
                 <span>{t("sidebarBackToDatasetsText")}</span>
               </button>
-              <span className="datasetsBannerMode">
-                <FileEarmarkText size={13} aria-hidden="true" />
-                {t("sidebarDatasetDetailsLabel")}
-              </span>
               <CloseButton
                 label={t("sidebarShowMapTitle")}
                 onClick={() => setSidebarOpen(false)}
@@ -240,7 +235,9 @@ export default function Sidebar() {
                 size={13}
                 aria-hidden="true"
               />
-              {addable.length > 0 && addable.length <= ADD_ALL_MAX ? (
+              {!inspecting &&
+              addable.length > 0 &&
+              addable.length <= ADD_ALL_MAX ? (
                 <button
                   type="button"
                   className="sidebarFooterAddAll"
@@ -253,7 +250,13 @@ export default function Sidebar() {
                   {t("sidebarAddAllText", { count: addable.length })}
                 </button>
               ) : (
-                <span>{t("sidebarSelectionHintText")}</span>
+                <span>
+                  {t(
+                    inspecting
+                      ? "sidebarDetailsSelectionHintText"
+                      : "sidebarSelectionHintText",
+                  )}
+                </span>
               )}
               <button
                 type="button"
