@@ -292,6 +292,46 @@ class TestNeverFilledVariables:
             get_profiles(two_station_dataset)
 
 
+class TestAltitude:
+    @pytest.fixture
+    def altitude_dataset(self, two_station_dataset):
+        dataset = two_station_dataset
+        dataset.variables_list = [
+            "altitude" if v == "depth" else v for v in dataset.variables_list
+        ]
+        answer = dataset.get_max_min.side_effect
+
+        def _get_max_min(variables):
+            if variables[-1] != "altitude":
+                return answer(variables)
+            return pd.DataFrame(
+                {
+                    "station_id": ["STATION_001", "STATION_002"],
+                    "altitude_min": [-50.0, -30.0],
+                    "altitude_max": [-2.0, 5.0],
+                }
+            ).set_index(variables[:-1])
+
+        dataset.get_max_min.side_effect = _get_max_min
+        return dataset
+
+    def test_altitude_becomes_depth(self, altitude_dataset):
+        result = get_profiles(altitude_dataset).set_index("timeseries_id")
+        assert result.loc["STATION_001", ["depth_min", "depth_max"]].tolist() == [2, 50]
+        assert result.loc["STATION_002", ["depth_min", "depth_max"]].tolist() == [-5, 30]
+        assert not result.columns.str.startswith("altitude").any()
+
+    def test_never_filled_altitude_keeps_the_dataset(self, altitude_dataset):
+        altitude_dataset.get_max_min.side_effect = (
+            lambda v, answer=altitude_dataset.get_max_min.side_effect: (
+                pd.DataFrame() if v[-1] == "altitude" else answer(v)
+            )
+        )
+        altitude_dataset.has_values.return_value = False
+        result = get_profiles(altitude_dataset)
+        assert (result[["depth_min", "depth_max"]] == 0).all(axis=None)
+
+
 class TestPerFeatureEovs:
     def test_eovs_column_present(self, two_station_dataset):
         result = get_profiles(two_station_dataset)

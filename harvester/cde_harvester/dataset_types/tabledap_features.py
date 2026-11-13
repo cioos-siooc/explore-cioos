@@ -563,14 +563,8 @@ def extract_features(dataset, handler):
     profiles["erddap_url"] = dataset.erddap_url
 
     if "altitude_min" in profiles:
-        profiles["altitude_min"] = -profiles["altitude_min"]
-        profiles["altitude_max"] = -profiles["altitude_max"]
-        profiles = profiles.rename(
-            {
-                "depth_min": "altitude_min",
-                "depth_max": "altitude_max",
-            }
-        )
+        profiles["depth_min"] = -profiles.pop("altitude_max")
+        profiles["depth_max"] = -profiles.pop("altitude_min")
 
     if "depth_min" not in profiles:
         profiles["depth_min"] = 0
