@@ -31,6 +31,10 @@ from cioos_downloader.source_metadata import save_source_metadata
 ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
 QUERY_SIZE_LIMIT = 5000 * ONE_MB
+# An OBIS export is read whole into memory, so it can't stop at a byte count
+# like an ERDDAP stream: cap its rows instead, at about DATASET_SIZE_LIMIT of
+# CSV (~160 B per occurrence row, ~120 B of it in memory).
+OBIS_ROW_LIMIT = DATASET_SIZE_LIMIT // 160
 CHUNK_SIZE = 1024**2
 # (connect, read): a hung server becomes a FAILED subset instead of a stalled job.
 REQUEST_TIMEOUT = (30, 600)
@@ -337,15 +341,23 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         row["status"] = COMPLETED if row["files"] else EMPTY
 
 
-def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
+def _download_obis(dataset, user_query, regions, fmt, row, folder: Path, budget):
     dataset_id = dataset["dataset_id"]
     url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
     row["download_url_list"] = [url]
+    if budget.exceeded():
+        row.update(status=IGNORED, reason_code=QUERY_SIZE_LIMIT_HIT, query_limit_hit=True)
+        return
     _stage(dataset, f"querying the OBIS export {url}")
 
-    files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
+    files, truncated = write_obis(
+        fmt, url, user_query, regions, folder / dataset_folder_name(dataset), OBIS_ROW_LIMIT
+    )
     row["files"] = files
-    row["status"] = COMPLETED if files else EMPTY
+    if truncated:
+        row.update(status=PARTIAL, reason_code=DATASET_SIZE_LIMIT_HIT, dataset_limit_hit=True)
+    else:
+        row["status"] = COMPLETED if files else EMPTY
 
 
 def download_dataset(dataset, user_query, regions, root: Path, budget):
@@ -365,7 +377,7 @@ def download_dataset(dataset, user_query, regions, root: Path, budget):
 
     try:
         if source_type == "obis":
-            _download_obis(dataset, user_query, regions, fmt, row, folder)
+            _download_obis(dataset, user_query, regions, fmt, row, folder, budget)
         else:
             _download_erddap(dataset, user_query, regions, fmt, row, folder, budget)
         row["files"] = _relative(row["files"], root)
