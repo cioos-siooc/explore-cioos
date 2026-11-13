@@ -24,7 +24,7 @@ def test_reload_top_requests_skips_non_regular_log_files(tmp_path, monkeypatch):
 
     redisFunctions.reloadTopRequests.fn()
 
-    assert warmed == [redisFunctions.CACHE_WARM_BASE_URL + "/api/datasets"]
+    assert warmed == [redisFunctions.CACHE_WARM_URL + "/datasets"]
 
 
 class _FakeRedis:
@@ -66,3 +66,45 @@ def test_clear_redis_cache_deletes_in_batches(monkeypatch):
 
     assert fake.keys == set()
     assert [len(call) for call in fake.unlink_calls] == [2, 2, 1]
+
+
+def _warm_with(monkeypatch, get):
+    monkeypatch.setattr(redisFunctions.glob, "glob", lambda _: [])
+    monkeypatch.setattr(
+        redisFunctions,
+        "default_view_routes",
+        lambda _: ["/api/datasets", *redisFunctions.SLOW_DEFAULT_ROUTES],
+    )
+    monkeypatch.setattr(redisFunctions, "get_run_logger", lambda: logging.getLogger())
+    monkeypatch.setattr(redisFunctions.requests, "get", get)
+    redisFunctions.reloadTopRequests.fn()
+
+
+_OK = type("R", (), {"raise_for_status": lambda self: None})()
+
+
+def test_slow_default_routes_warm_first_with_a_longer_timeout(monkeypatch):
+    calls = []
+    _warm_with(monkeypatch, lambda url, timeout, **_: calls.append((url, timeout)) or _OK)
+
+    url = redisFunctions.CACHE_WARM_URL
+    slow = redisFunctions.CACHE_WARM_SLOW_TIMEOUT_SECONDS
+    assert calls == [
+        (f"{url}/legend?metric=days", slow),
+        (f"{url}/coverageHistogram?groupBy=source&count=days&view=timeline&", slow),
+        (f"{url}/datasets", redisFunctions.CACHE_WARM_TIMEOUT_SECONDS),
+    ]
+
+
+def test_a_timed_out_slow_route_is_not_requested_again(monkeypatch):
+    calls = []
+
+    def get(url, timeout, **_):
+        calls.append(url)
+        if timeout == redisFunctions.CACHE_WARM_SLOW_TIMEOUT_SECONDS:
+            raise redisFunctions.requests.ReadTimeout("still computing")
+        return _OK
+
+    _warm_with(monkeypatch, get)
+
+    assert len(calls) == 3

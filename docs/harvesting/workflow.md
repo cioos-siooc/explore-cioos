@@ -266,3 +266,7 @@ requests re-warmed when the load re-harvested or pruned at least one dataset
 (or was a full reload). A run where every dataset was unchanged keeps the
 cache warm. OBIS has no change signal, so every OBIS run flushes. The flush
 keeps the proxied basemap tiles (EMODnet, NONNA), which no harvest changes.
+The re-warm requests web-api directly (`CACHE_WARM_URL`), bypassing nginx's
+60 s timeout. It starts with the default view's legend and coverage histogram,
+one at a time, since they take minutes under load; web-api then caches those
+two routes for a week instead of a day.
