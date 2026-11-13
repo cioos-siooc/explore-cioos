@@ -266,11 +266,11 @@ describe("FilterSearch", () => {
     expect(seen.search).toBe("");
   });
 
-  it("offers the wider search over descriptions and keywords second", async () => {
+  it("offers the wider search over all dataset text second", async () => {
     const { user, seen, box } = await renderPalette();
 
     await user.type(box, "argo");
-    await user.click(option("Titles, descriptions & keywords matching “argo”"));
+    await user.click(option("All dataset text matching “argo”"));
     expect(seen.search).toBe("argo");
     expect(seen.searchIn).toBe("all");
   });
@@ -431,7 +431,7 @@ describe("FilterSearch", () => {
     expect(labels.findIndex((l) => l.includes("Fundian Channel"))).toBeLessThan(
       firstText,
     );
-    expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
+    expect(labels.at(-1)).toContain("All dataset text");
   });
 
   it("shows four of a group, and the rest when asked", async () => {
@@ -603,7 +603,7 @@ describe("FilterSearch", () => {
     const { user, box } = await renderPalette();
     const help = screen.getByTestId("filter-search-help");
     for (const name of [
-      "Dataset titles, descriptions & keywords",
+      "Dataset titles or all their text",
       "Dates",
       "Depths",
       "Quick filters",

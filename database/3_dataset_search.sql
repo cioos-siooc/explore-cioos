@@ -5,11 +5,12 @@
 -- the configs and function below to exist first. Every path applies this file:
 -- the fresh-volume entrypoint, db_migrate and Rebuild Database. ADD COLUMN
 -- fills existing rows on the spot, so no re-harvest is needed. A change to
--- dataset_search_tsv() is NOT re-applied to stored rows: follow it with a
--- table rewrite (e.g. drop and re-add the column) in the same change.
+-- dataset_search_tsv() is NOT re-applied to stored rows: bump SEARCH_TSV_VERSION
+-- at the bottom so the guarded rewrite runs once.
 --
 -- Weights are the search scopes (ts_filter): A titles, B keywords/EOVs/
--- platform/organizations/projects, C abstracts, D variables and dataset_id.
+-- platform/organizations/contact organizations/projects, C abstracts,
+-- D variables and dataset_id.
 
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
@@ -41,6 +42,9 @@ CREATE OR REPLACE FUNCTION dataset_search_tsv(
          regexp_replace(array_to_string(eovs, ' '), '([a-z])([A-Z])', '\1 \2', 'g'),
          platform,
          array_to_string(organizations, ' '),
+         -- OBIS often names the lead institution only as a contact (e.g. Hakai)
+         (SELECT string_agg(DISTINCT c->>'organization', ' ') FROM jsonb_array_elements(
+            CASE jsonb_typeof(metadata->'contacts') WHEN 'array' THEN metadata->'contacts' END) c),
          (SELECT string_agg(p, ' ') FROM jsonb_array_elements_text(
             CASE jsonb_typeof(metadata->'projects') WHEN 'array' THEN metadata->'projects' END) p))), 'B')
     || setweight(to_tsvector('public.french_unaccent',
@@ -75,3 +79,22 @@ ALTER TABLE cde.datasets ADD COLUMN IF NOT EXISTS search_tsv tsvector
     table_variables, grid_variables)) STORED;
 
 CREATE INDEX IF NOT EXISTS datasets_search_tsv_gin ON cde.datasets USING gin (search_tsv);
+
+-- SEARCH_TSV_VERSION: the column comment records which dataset_search_tsv()
+-- the stored rows were built with; SET EXPRESSION rewrites them.
+DO $$
+DECLARE
+  version text := 'dataset_search_tsv v2: contact organizations';
+BEGIN
+  IF col_description('cde.datasets'::regclass,
+       (SELECT attnum FROM pg_attribute
+         WHERE attrelid = 'cde.datasets'::regclass AND attname = 'search_tsv'))
+     IS DISTINCT FROM version THEN
+    PERFORM set_config('lock_timeout', '5s', true);
+    ALTER TABLE cde.datasets ALTER COLUMN search_tsv SET EXPRESSION AS (
+      dataset_search_tsv(title, title_fr, metadata, eovs, platform,
+        organizations, dataset_id, table_variables, grid_variables));
+    EXECUTE format('COMMENT ON COLUMN cde.datasets.search_tsv IS %L', version);
+  END IF;
+END
+$$;

@@ -7,6 +7,7 @@ from cde_harvester.core.record_metadata import (
     from_ckan,
     from_erddap_globals,
     merge,
+    with_cited_organizations,
 )
 
 
@@ -259,3 +260,21 @@ def test_keywords_are_unescaped():
     assert from_cioos_record(record)["keywords"] == {
         "en": ["EARTH SCIENCE > ANIMALS/VERTEBRATES > FISH"],
     }
+
+
+def test_cited_contact_organizations_are_added_once():
+    metadata = {"contacts": [
+        {"organization": "Hakai Institute", "cited": True},
+        {"organization": "hakai institute", "cited": True},
+        {"organization": "NPAFC", "cited": True},
+        {"organization": "Distributor Inc.", "cited": False},
+        {"name": "No Org", "cited": True},
+    ]}
+    assert with_cited_organizations(["University of British Columbia", "NPAFC"], metadata) == [
+        "University of British Columbia", "NPAFC", "Hakai Institute",
+    ]
+
+
+def test_missing_metadata_keeps_organizations():
+    assert with_cited_organizations(["UBC"], float("nan")) == ["UBC"]
+    assert with_cited_organizations(None, {"contacts": None}) == []
