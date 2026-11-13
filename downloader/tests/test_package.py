@@ -7,6 +7,7 @@ import time
 import tomllib
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote, unquote
 
@@ -740,3 +741,18 @@ def test_the_readme_explains_each_file_and_how_to_open_the_formats_it_holds(tmp_
         assert f"`{name}`" in files
     assert "(#reproduce-this-download)" in files
     assert "[Files in this package](#files-in-this-package)" in readme[: readme.index("## Files in this package")]
+
+
+def test_a_failed_job_leaves_no_zip_or_working_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    def zip_then_fail(folder, zip_full_path):
+        Path(zip_full_path).write_bytes(b"half a zip")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(downloader_wrapper, "zip_folder", zip_then_fail)
+    with pytest.raises(OSError, match="disk full"):
+        _run(tmp_path, _query(_dataset("Good")))
+
+    assert list((tmp_path / "out").iterdir()) == []
+    assert not (tmp_path / "cde_download_pkg001").exists()
