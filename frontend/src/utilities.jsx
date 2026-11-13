@@ -38,6 +38,10 @@ export const toggleOptionExcluded = (option) => ({
 
 // Sizes come from /downloadEstimate, never a measured file, so every figure
 // carries its own tilde. A null size (no estimate, e.g. OBIS) is a dash, not 0.
+export function formatSize(size) {
+  return bytes(size, { unitSeparator: " " });
+}
+
 export function formatSizeEstimate(size) {
   return Number.isFinite(size) ? `~${bytes(size)}` : "—";
 }
@@ -347,22 +351,24 @@ export function generateColorStops(colorScale, range) {
       .domain([0, colors.length - 1])
       .range([lo, hi]);
   }
-  const colorStops = colors.map((color, index) => {
-    return {
-      // Not floored: log invert() lands a hair under the max (499.999... for 500).
-      stop: index === colors.length - 1 ? hi : Math.floor(scale(index)),
-      color,
-    };
+  // Counts are whole, so stops are floored; flooring the bottom of a log ramp
+  // lands two stops on the same integer (1, 1.9 -> 1, 1), so each stop is held
+  // one above the last rather than dropping a colour. Both branches leave room:
+  // log needs hi >= 100 * lo, and linear only fills every colour when the
+  // range has at least that many integers.
+  let previous = -Infinity;
+  return colors.map((color, index) => {
+    // The ends are taken as given: log invert() lands a hair under each
+    // (2.999... for 3, 499.999... for 500), which floors a whole step short.
+    const stop =
+      index === colors.length - 1
+        ? hi
+        : index === 0
+          ? Math.floor(lo)
+          : Math.max(Math.floor(scale(index)), previous + 1);
+    previous = stop;
+    return { stop, color };
   });
-  const result = [];
-  const map = new Map();
-  colorStops.forEach((colorStop) => {
-    if (!map.has(colorStop.stop)) {
-      map.set(colorStop.stop, true);
-      result.push(colorStop);
-    }
-  });
-  return result;
 }
 
 export function formatDatasetCount(filtered, total, locale) {
@@ -407,6 +413,18 @@ export function formatRange(min, max, unit = "") {
     return `${min}${suffix}`;
   }
   return `${min} – ${max}${suffix}`;
+}
+
+// Depths arrive with float noise (0.079366 m): tenths of a metre near the
+// surface, whole metres below 10 m.
+export function formatDepthRange(min, max) {
+  const round = (value) =>
+    value === null || value === undefined
+      ? value
+      : Math.abs(value) < 10
+        ? Math.round(value * 10) / 10
+        : Math.round(value);
+  return formatRange(round(min), round(max), "m");
 }
 
 export function useDebounce(value, delay) {

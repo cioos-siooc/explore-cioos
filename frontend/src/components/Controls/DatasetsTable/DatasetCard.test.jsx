@@ -3,11 +3,25 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { createInstance } from "i18next";
+
+import { resources } from "../../../locales/resources.js";
 import DatasetCard from "./DatasetCard.jsx";
 
 // DatasetCard takes t/i18n as props, so a stub translator needs no providers.
 const t = (key) => key;
 const i18n = { language: "en" };
+
+// The real bundles, for the strings whose plurals and units are under test.
+function realI18n(lng = "en") {
+  const instance = createInstance();
+  instance.init({
+    lng,
+    resources,
+    interpolation: { escapeValue: false },
+  });
+  return { t: instance.t, i18n: instance };
+}
 
 const ROW = {
   pk: 1,
@@ -93,7 +107,7 @@ describe("DatasetCard", () => {
     ).toBeDisabled();
   });
 
-  it("shows the griddap type label and grid size instead of profile counts for a Grid dataset", () => {
+  it("names the grid size as a grid, with no location count, for a Grid dataset", () => {
     const grid = {
       ...ROW,
       cdm_data_type: "Grid",
@@ -102,26 +116,46 @@ describe("DatasetCard", () => {
         { name: "latitude", n_values: 80 },
       ],
     };
-    render(<DatasetCard row={grid} t={t} i18n={i18n} />);
-    // "griddapTypeLabel" appears twice: the platform icon's SVG <title> and
-    // the meta row's own text — assert there are two, not one specific node.
-    expect(screen.getAllByText("griddapTypeLabel")).toHaveLength(2);
-    expect(screen.getByText("184×80")).toBeInTheDocument();
+    const { container } = render(<DatasetCard row={grid} {...realI18n()} />);
+    const meta = container.querySelector(".datasetCardMeta");
+    expect(meta).toHaveTextContent("184×80 grid");
+    expect(meta).not.toHaveTextContent(/location/);
+    expect(meta.querySelector(".bi-grid-3x3")).toBeInTheDocument();
+    expect(meta.querySelector(".bi-pin-map-fill")).not.toBeInTheDocument();
   });
 
-  it("shows profiles_count / n_profiles when they differ", () => {
+  it("names each meta figure with its unit, in either language", () => {
+    const row = { ...ROW, profiles_count: 1, n_profiles: 1, days: 1234 };
+    const { rerender } = render(<DatasetCard row={row} {...realI18n()} />);
+    expect(screen.getByTitle("Locations")).toHaveTextContent("1 location");
+    expect(screen.getByTitle("Days of data")).toHaveTextContent("1,234 days");
+
+    rerender(<DatasetCard row={row} {...realI18n("fr")} />);
+    expect(screen.getByTitle("Emplacements")).toHaveTextContent(
+      "1 emplacement",
+    );
+    expect(screen.getByTitle("Jours de données")).toHaveTextContent(
+      /^1\s234 jours$/,
+    );
+  });
+
+  it("shows how many of the dataset's locations the selection holds when that is fewer", () => {
     const partial = { ...ROW, profiles_count: 3, n_profiles: 10 };
-    render(<DatasetCard row={partial} t={t} i18n={i18n} />);
-    expect(screen.getByText("3 / 10")).toBeInTheDocument();
+    const { rerender } = render(<DatasetCard row={partial} {...realI18n()} />);
+    expect(screen.getByTitle("Locations")).toHaveTextContent(
+      "3 of 10 locations",
+    );
+    rerender(<DatasetCard row={partial} {...realI18n("fr")} />);
+    expect(screen.getByTitle("Emplacements")).toHaveTextContent(
+      "3 emplacements sur 10",
+    );
   });
 
   it("shows the dataset's days of data when the query carries them", () => {
     const { rerender } = render(
       <DatasetCard row={{ ...ROW, days: 1234 }} t={t} i18n={i18n} />,
     );
-    expect(screen.getByTitle("datasetsCardSortDaysText")).toHaveTextContent(
-      "1,234",
-    );
+    expect(screen.getByTitle("datasetsCardSortDaysText")).toBeInTheDocument();
     rerender(<DatasetCard row={{ ...ROW, days: null }} t={t} i18n={i18n} />);
     expect(
       screen.queryByTitle("datasetsCardSortDaysText"),

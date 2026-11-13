@@ -7,6 +7,7 @@ import {
   Download,
   ExclamationTriangle,
   PlusCircle,
+  Grid3x3,
   Grid3x3Gap,
   HexagonFill,
   Check2Circle,
@@ -57,6 +58,13 @@ export default function DatasetCard({
   const isObis = row.source_type === "obis";
   const erddapUrl = localizedErddapUrl(row, row.erddap_url, i18n.language);
   const ckanUrl = localizedCkanUrl(row.ckan_url, i18n.language);
+  const unappliedFilters = downloadLink?.unapplied.length
+    ? new Intl.ListFormat(i18n.language).format(
+        downloadLink.unapplied.map((filter) =>
+          t(`downloadFilterName_${filter}`),
+        ),
+      )
+    : "";
   // griddap is metadata-only, and in the modal a dataset is only selectable
   // when the CDE can deliver it (internalDownload).
   const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
@@ -260,15 +268,11 @@ export default function DatasetCard({
               <span
                 className="datasetCardFormatTag datasetCardUnapplied"
                 title={t("datasetCardUnappliedTitle", {
-                  filters: new Intl.ListFormat(i18n.language).format(
-                    downloadLink.unapplied.map((filter) =>
-                      t(`downloadFilterName_${filter}`),
-                    ),
-                  ),
+                  filters: unappliedFilters,
                 })}
               >
                 <ExclamationTriangle size={11} aria-hidden="true" />
-                {t("datasetCardUnappliedText")}
+                {t("datasetCardUnappliedText", { filters: unappliedFilters })}
               </span>
             )}
             {row.ckan_url && (
@@ -327,6 +331,22 @@ export function DatasetPlatformIcon({
   );
 }
 
+// profiles_count counts matched features, and a trajectory's features are the
+// hex cells its tracks cross: its tracks are counted by n_profiles.
+export function locationsText(row, t) {
+  const count = Number(row.profiles_count);
+  const total = row.n_profiles == null ? undefined : Number(row.n_profiles);
+  if (
+    row.source_type !== "obis" &&
+    (row.cdm_data_type || "").includes("Trajectory")
+  ) {
+    return t("datasetCardTracks", { count: total ?? count });
+  }
+  return total !== undefined && count < total
+    ? t("datasetCardLocationsPartial", { shown: count, count: total })
+    : t("datasetCardLocations", { count });
+}
+
 function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
@@ -337,11 +357,7 @@ function DatasetCardMeta({ row, t, i18n }) {
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
     : cdmDataTypeLabel(row.cdm_data_type, t) || "";
-  const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || "—"
-    : row.profiles_count !== row.n_profiles
-      ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count;
+  const gridSize = isGrid && formatGridSize(row.grid_dimensions);
 
   return (
     <span className="datasetCardMeta">
@@ -356,24 +372,31 @@ function DatasetCardMeta({ row, t, i18n }) {
         <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
         {typeLabel}
       </span>
-      <span
-        className="datasetCardMetaItem"
-        title={
-          isGrid
-            ? t("griddapGridSizeTooltip")
-            : t("datasetsTableHeaderLocationsText")
-        }
-      >
-        <PinMapFill size={13} aria-hidden="true" />
-        {locationsLabel}
-      </span>
+      {gridSize && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("griddapGridSizeTooltip")}
+        >
+          <Grid3x3 size={13} aria-hidden="true" />
+          {t("datasetCardGridSize", { size: gridSize })}
+        </span>
+      )}
+      {!isGrid && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("datasetsTableHeaderLocationsText")}
+        >
+          <PinMapFill size={13} aria-hidden="true" />
+          {locationsText(row, t)}
+        </span>
+      )}
       {row.days != null && (
         <span
           className="datasetCardMetaItem"
           title={t("datasetsCardSortDaysText")}
         >
           <CalendarCheck size={13} aria-hidden="true" />
-          {Number(row.days).toLocaleString(i18n.language)}
+          {t("datasetCardDays", { count: Number(row.days) })}
         </span>
       )}
 

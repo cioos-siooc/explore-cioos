@@ -19,6 +19,7 @@ import {
 import {
   colorScale,
   isMarkerTier,
+  hexFillOpacityAt,
   bathymetryPalettes,
   bathymetryLegendMinZoom,
   bathymetryScaleMin,
@@ -132,9 +133,9 @@ const GRIDDAP_ICON = (
       width="9"
       height="8"
       style={{
-        fill: "var(--cioos-primary)",
+        fill: "var(--cioos-grid)",
         fillOpacity: 0.15,
-        stroke: "var(--cioos-primary)",
+        stroke: "var(--cioos-grid)",
       }}
       strokeWidth="1.5"
       strokeDasharray="2 1.5"
@@ -146,7 +147,8 @@ const GRIDDAP_ICON = (
 const LAYER_ICONS = { griddap: GRIDDAP_ICON };
 
 // Evenly spaced subset, always keeping first and last, so labels don't overlap.
-function pickTickIndices(n, maxTicks = 5) {
+// Four by default: five collided ("396 1.5k") once the top value went compact.
+function pickTickIndices(n, maxTicks = 4) {
   if (maxTicks < 2) return [0];
   if (n <= maxTicks) return Array.from({ length: n }, (_, i) => i);
   const step = (n - 1) / (maxTicks - 1);
@@ -157,6 +159,8 @@ function pickTickIndices(n, maxTicks = 5) {
 
 // A group's label row carries the switch that hides the whole group, which is
 // why the marker keys sit with the hex ramp: same observations, other zooms.
+const MIN_BAR_OPACITY = 0.45;
+
 export default function Legend({
   // Point-tier range, read by the marker size key.
   currentRangeLevel,
@@ -227,7 +231,7 @@ export default function Legend({
         title={label}
         aria-label={label}
       >
-        <InfoCircle size={11} aria-hidden="true" />
+        <InfoCircle size={13} aria-hidden="true" />
       </button>
     );
   }
@@ -281,6 +285,11 @@ export default function Legend({
     );
   }
 
+  // As faint as the cells it keys, so a swatch matches the map. Floored: past
+  // the basemap hand-over the cells are a tint under their border, and a bar
+  // that faint couldn't be read at all.
+  const barOpacity = Math.max(hexFillOpacityAt(zoom), MIN_BAR_OPACITY);
+
   // Stops are spaced by scale index, not value: the counts are power/log scaled
   // and a linear-value axis would collapse into the dominant high-count colour.
   function renderColorBar(scale, rangeLevel, dimmed, maxTicks) {
@@ -299,13 +308,10 @@ export default function Legend({
     // web-api/routes/legend.js), so a clamped top tick isn't the real maximum.
     const clamped = rangeLevel?.[2] > rangeLevel?.[1];
     return (
-      <div
-        className={classNames({ legendDimmed: dimmed })}
-        title={hexRangeScaledToView ? t("legendScaledToView") : undefined}
-      >
+      <div className={classNames({ legendDimmed: dimmed })}>
         <div
           className="legendColorBar"
-          style={{ background: gradient }}
+          style={{ background: gradient, opacity: barOpacity }}
           aria-hidden="true"
         />
         <div className="legendColorBarTicks">
@@ -331,6 +337,13 @@ export default function Legend({
             );
           })}
         </div>
+        {/* Said, not only in a tooltip: the same shade means another count
+            after a zoom. */}
+        {hexRangeScaledToView && (
+          <div className="legendScaleNote" title={t("legendScaledToView")}>
+            {t("legendScaledToViewShort")}
+          </div>
+        )}
       </div>
     );
   }
@@ -473,37 +486,48 @@ export default function Legend({
             </span>
             {ramped && (
               <>
-                <span className="legendItemLabel">&lt;</span>
                 <span className="legendSwatch">
                   <span className="legendPointCircle large" />
+                </span>
+                <span className="legendItemLabel">
+                  {`≥ ${formatCount(hi, true)}`}
                 </span>
               </>
             )}
           </div>
         </div>
-        {platformSwatches.length > 0 && (
-          <div className={dimClass}>
-            {/* No icon: a grey filled circle read as the "Unknown" platform rather than
-                as a heading. */}
-            {renderSubCaption(t("legendPlatformType"))}
-            <div className="legendItems">
-              {platformSwatches.map((pc) => (
-                <div className="legendItem" key={pc.platform}>
-                  <CircleFill
-                    className="legendSwatch platformGlyph"
-                    size={10}
-                    fill={pc.color}
-                    aria-hidden="true"
-                  />
-                  <span className="legendItemLabel">
-                    {capitalizeFirstLetter(t(pc.platform))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {renderPlatformKey()}
       </>
+    );
+  }
+
+  function renderPlatformKey() {
+    if (!pointsOnMap || !platformSwatches.length) return null;
+    return (
+      <div
+        className={classNames("legendSubsection", {
+          legendDimmed: observationsHidden,
+        })}
+      >
+        {/* No icon: a grey filled circle read as the "Unknown" platform rather than
+            as a heading. */}
+        {renderSubCaption(t("legendPlatformType"))}
+        <div className="legendItems">
+          {platformSwatches.map((pc) => (
+            <div className="legendItem" key={pc.platform}>
+              <CircleFill
+                className="legendSwatch platformGlyph"
+                size={10}
+                fill={pc.color}
+                aria-hidden="true"
+              />
+              <span className="legendItemLabel">
+                {capitalizeFirstLetter(t(pc.platform))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -539,12 +563,14 @@ export default function Legend({
   const countStatus = renderCountStatus();
   const markerKeys = renderMarkerKeys();
   const hexEntry = renderHexEntry();
-  // The compact card keeps only the hex ramp: its days-of-data reading is the one
-  // key the map can't give. Four ticks fit a phone corner.
+  // The compact card keeps the keys the map can't give: the hex ramp's
+  // days-of-data reading and, at the marker tier, which hue is which platform.
+  // Four ticks fit a phone corner.
   const compactHexEntry = compact ? renderHexEntry(4) : null;
+  const compactPlatformKey = compact ? renderPlatformKey() : null;
   const observationsIcon = hexesOnMap ? HEX_ICON : undefined;
   const compactRamp =
-    compactHexEntry &&
+    (compactHexEntry || compactPlatformKey) &&
     renderGroup(
       "observations",
       renderMetricTitle(),
@@ -555,7 +581,10 @@ export default function Legend({
         // The dialog's copy of this switch is on screen at the same time.
         idSuffix: "-compact",
       },
-      compactHexEntry,
+      <>
+        {compactHexEntry}
+        {compactPlatformKey}
+      </>,
     );
   const trackKeys = renderTrackKeys();
   const bathymetryBar = renderBathymetryBar();

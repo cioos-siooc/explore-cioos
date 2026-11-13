@@ -118,6 +118,14 @@
   pointer-events: none;
 }
 
+/* A searched place names the area it applied; capped so a long name doesn't
+   push the row apart. */
+.quickFilterCaptionPlace {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Area control: the caption steps aside while its menu (hung where the
    caption sits) is open. */
 .quickFilterArea {

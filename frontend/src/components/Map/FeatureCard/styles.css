@@ -7,16 +7,12 @@
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   z-index: calc(var(--cioos-z-shell, 30) - 2);
 
-  /* The map's click-ring colour, shared with the pinned rows so the region,
-     this card and those rows read as one thing. */
-  border-top: 3px solid var(--cioos-map-click);
-
   /* The datasets column's width: the two take turns in this corner. */
   width: min(var(--cioos-sidebar-width), calc(100vw - 24px));
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
-  box-shadow: var(--cioos-shadow-float);
+  box-shadow: var(--cioos-shadow-3d);
   font-family: var(--cioos-font-body);
   color: var(--cioos-ink);
   overflow: hidden;
@@ -70,7 +66,7 @@
 .featureCardHeadingTitleRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--cioos-space-sm);
   min-width: 0;
 }
 
@@ -109,7 +105,7 @@
 
 .featureCardHeadingMeta {
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 /* Five rows before the list — not the card — starts scrolling, so a stack of
@@ -119,15 +115,30 @@
   max-height: 320px;
 }
 
+/* The one line that is about this spot rather than the whole dataset, so it
+   carries the header's goldenrod hex. */
 .featureCardHere {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
+  font-weight: 600;
+  color: var(--cioos-ink-80);
+}
+
+.featureCardHere::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 7px;
+  background-color: var(--cioos-map-click);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 }
 
 .featureCardMore {
   display: block;
   width: 100%;
-  padding: var(--cioos-space-xs) var(--cioos-space-md);
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
   border: none;
   border-top: 1px solid var(--cioos-hairline);
   background: transparent;
@@ -145,7 +156,6 @@
 @media (hover: hover) {
   .featureCardMore:hover {
     background-color: var(--cioos-surface-2);
-    outline: none;
   }
 }
 
@@ -153,7 +163,7 @@
   margin: 0;
   padding: var(--cioos-space-md);
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 /* Phones: a full-width bottom sheet capped at 45vh so the map stays visible.

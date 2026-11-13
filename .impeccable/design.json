@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T18:33:22+00:00",
+  "generatedAt": "2026-11-06T04:28:24+00:00",
   "title": "Design System: CIOOS Data Explorer",
   "extensions": {
     "colorMeta": {
@@ -213,6 +213,96 @@
           "#f4c150",
           "#ffe678"
         ]
+      },
+      "track-violet-deep": {
+        "role": "data",
+        "displayName": "Track Violet Deep",
+        "canonical": "#543a90",
+        "tonalRamp": [
+          "#15003e",
+          "#2d0460",
+          "#492b83",
+          "#674da8",
+          "#886fcd",
+          "#aa92f4",
+          "#ceb7ff",
+          "#f4dcff"
+        ]
+      },
+      "track-violet-surface": {
+        "role": "data",
+        "displayName": "Track Violet Surface",
+        "canonical": "#efeaf8",
+        "tonalRamp": [
+          "#15003e",
+          "#2d0460",
+          "#492b83",
+          "#674da8",
+          "#886fcd",
+          "#aa92f4",
+          "#ceb7ff",
+          "#f4dcff"
+        ]
+      },
+      "grid-amber-deep": {
+        "role": "data",
+        "displayName": "Grid Amber Deep",
+        "canonical": "#c77f14",
+        "tonalRamp": [
+          "#280000",
+          "#4a0d00",
+          "#6c2f00",
+          "#8f5100",
+          "#b37300",
+          "#d9962a",
+          "#ffba56",
+          "#ffe07d"
+        ]
+      },
+      "grid-amber-surface": {
+        "role": "data",
+        "displayName": "Grid Amber Surface",
+        "canonical": "#fdf1dc",
+        "tonalRamp": [
+          "#280000",
+          "#4a0d00",
+          "#6c2f00",
+          "#8f5100",
+          "#b37300",
+          "#d9962a",
+          "#ffba56",
+          "#ffe07d"
+        ]
+      },
+      "click-goldenrod-surface": {
+        "role": "data",
+        "displayName": "Click Goldenrod Surface",
+        "canonical": "#fbf1d9",
+        "tonalRamp": [
+          "#230000",
+          "#431600",
+          "#643600",
+          "#865700",
+          "#a97900",
+          "#ce9c20",
+          "#f4c150",
+          "#ffe678"
+        ]
+      },
+      "backdrop": {
+        "role": "neutral",
+        "displayName": "Backdrop",
+        "canonical": "rgb(21 47 55 / 45%)",
+        "tonalRamp": [
+          "#152F37",
+          "#1D3E43",
+          "#244F4F",
+          "#2B5F5C",
+          "#3C8277",
+          "#55A598",
+          "#8DC4BC",
+          "#C6E3DF"
+        ]
       }
     },
     "typographyMeta": {
@@ -318,12 +408,20 @@
         "value": "992px"
       },
       {
+        "name": "beside-sidebar",
+        "value": "1000px"
+      },
+      {
         "name": "laptop",
         "value": "1200px"
       },
       {
-        "name": "desktop-sidebar",
+        "name": "wide-screen",
         "value": "1400px"
+      },
+      {
+        "name": "clear-of-time-bar",
+        "value": "1944px"
       }
     ]
   },
@@ -399,6 +497,30 @@
       "description": "A raised instrument resting on the map (brand card, legend, sidebar).",
       "html": "<section class=\"ds-panel\"><h3 class=\"ds-panel-label\">Legend</h3><p class=\"ds-panel-body\">Days of data</p><div class=\"ds-ramp\"></div></section>",
       "css": ".ds-panel{width:200px;padding:12px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius-lg, 16px);background:#fff;box-shadow:var(--cioos-shadow-3d, 0 1px 2px rgb(21 47 55 / 14%), 0 4px 8px rgb(21 47 55 / 16%), 0 10px 20px rgb(21 47 55 / 18%));transform:var(--cioos-perspective, perspective(800px) translateZ(0));font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);color:var(--cioos-ink, #152f37)}.ds-panel-label{margin:0 0 6px;font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cioos-ink-80, rgb(21 47 55 / 82%))}.ds-panel-body{margin:0 0 6px;font-size:12px}.ds-ramp{height:8px;border-radius:2px;background:linear-gradient(90deg,#C6E3DF,#6EB5AA,#3C8277,#244F4F,#152F37)}"
+    },
+    {
+      "name": "Gridded Products Row",
+      "kind": "custom",
+      "refersTo": "group-row",
+      "description": "Folds the gridded datasets into one sticky row ahead of the in-situ cards; open, it takes the shallows fill.",
+      "html": "<button class=\"ds-group\"><svg class=\"ds-group-caret\" width=\"12\" height=\"12\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M6 3l5 5-5 5z\"/></svg><svg class=\"ds-group-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M1 1h4v4H1zM6 1h4v4H6zM11 1h4v4h-4zM1 6h4v4H1zM6 6h4v4H6zM11 6h4v4h-4zM1 11h4v4H1zM6 11h4v4H6zM11 11h4v4h-4z\"/></svg><span class=\"ds-group-title\">Gridded products</span><span class=\"ds-group-count\">29</span></button>",
+      "css": ".ds-group{display:flex;align-items:center;gap:6px;width:380px;max-width:100%;min-height:32px;padding:0 6px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius, 8px);background:#fff;font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:12px;font-weight:600;color:var(--cioos-ink, #152f37);cursor:pointer;transition:border-color .15s ease-out,background-color .15s ease-out}.ds-group:hover{border-color:var(--cioos-primary, #52a79b)}.ds-group:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-group:active{border-color:var(--cioos-primary, #52a79b);background:var(--cioos-teal-light, #c6e3df);color:var(--cioos-primary-800, #295f57)}.ds-group-caret{color:var(--cioos-primary, #52a79b)}.ds-group-icon{color:var(--cioos-grid-700, #c77f14)}.ds-group-title{flex:1;text-align:left}.ds-group-count{padding:0 7px;border-radius:999px;background:var(--cioos-surface-2, #eef6f4);font-size:11px}"
+    },
+    {
+      "name": "Clear Selection Pill",
+      "kind": "button",
+      "refersTo": "pill-clear-selection",
+      "description": "Floats bottom-centre over the map while a click or dataset selection is active; goldenrod ties it to the map ring, coral on hover.",
+      "html": "<button class=\"ds-clear\"><span class=\"ds-clear-x\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 4l8 8M12 4l-8 8\"/></svg></span>Clear selection</button>",
+      "css": ".ds-clear{display:inline-flex;align-items:center;gap:8px;padding:6px 16px 6px 8px;border:1px solid var(--cioos-map-click, #daa520);border-radius:999px;background:#fff;box-shadow:var(--cioos-shadow-3d-sm, 0 3px 6px rgb(21 47 55 / 16%));font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:14px;font-weight:600;color:var(--cioos-ink, #152f37);cursor:pointer;transition:background-color .15s ease-out,border-color .15s ease-out,color .15s ease-out}.ds-clear-x{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--cioos-map-click, #daa520);color:var(--cioos-ink, #152f37)}.ds-clear:hover{border-color:var(--cioos-error, #e25563);background:var(--cioos-error-bg, #fbe3e6);color:var(--cioos-error-700, #b3263a)}.ds-clear:hover .ds-clear-x{background:var(--cioos-error-700, #b3263a);color:#fff}.ds-clear:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}"
+    },
+    {
+      "name": "Compact Dataset Card",
+      "kind": "card",
+      "refersTo": "card-dataset-compact",
+      "description": "The density toggle's two-line row; the meta line never wraps and fades out at the edge.",
+      "html": "<article class=\"ds-compact\"><button class=\"ds-compact-title\"><span class=\"ds-dot\"></span>Long-term oceanic observatories moorings data in the Beaufort Sea</button><div class=\"ds-compact-meta\"><span>Amundsen Science</span><span>Time series</span><span>13 of 18 locations</span><span>1,591 days</span></div></article>",
+      "css": ".ds-compact{display:flex;flex-direction:column;gap:2px;width:360px;max-width:100%;padding:5px 10px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius, 8px);background:#fff;box-shadow:var(--cioos-shadow-card, 0 2px 8px rgb(21 47 55 / 8%));font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);color:var(--cioos-ink, #152f37);transition:border-color .15s ease-out,background-color .15s ease-out}.ds-compact:hover{border-color:var(--cioos-primary, #52a79b);background:var(--cioos-surface-2, #eef6f4)}.ds-compact:has(.ds-compact-title:focus-visible){border-color:var(--cioos-primary, #52a79b);box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-compact-title{display:flex;gap:7px;align-items:center;padding:0;border:0;background:none;font-family:var(--cioos-font-display, Sora, sans-serif);font-weight:600;font-size:14px;color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;cursor:pointer}.ds-compact-title:focus-visible{outline:none}.ds-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:#f28e2b}.ds-compact-meta{display:flex;gap:12px;overflow:hidden;font-size:11px;color:var(--cioos-ink-80, rgb(21 47 55 / 82%));-webkit-mask-image:linear-gradient(to left,transparent,#000 24px);mask-image:linear-gradient(to left,transparent,#000 24px)}.ds-compact-meta span{flex:0 0 auto;white-space:nowrap}"
     }
   ],
   "narrative": {
@@ -424,6 +546,11 @@
         "section": "colors"
       },
       {
+        "name": "The White-On-Teal Rule",
+        "body": "Text on a teal fill is white, never navy, including the base brand teal. This knowingly trades AA contrast on the base fill for the brand look; do not flag or \"fix\" it.",
+        "section": "colors"
+      },
+      {
         "name": "The Navy-Tinted Rule",
         "body": "Neutrals are navy at reduced alpha or navy-tinted tints. Pure grey (`#888`) and pure black never appear.",
         "section": "colors"
@@ -439,6 +566,11 @@
         "section": "typography"
       },
       {
+        "name": "The Open-Water Rule",
+        "body": "First load shows the map uncovered at every size: the sidebar, tips and cards wait to be asked for (or for an action that needs them, such as drawing an area on a wide screen).",
+        "section": "layout"
+      },
+      {
         "name": "The Raised-Over-Map Rule",
         "body": "Only surfaces that rest directly on the map get the 3D lift. Anything nested inside them is flat with hairlines. A 3D shadow inside a panel is a bug.",
         "section": "elevation"
@@ -450,22 +582,22 @@
       }
     ],
     "dos": [
-      "**Do** reference `var(--cioos-*)` tokens from `frontend/src/components/theme.css` for every colour, radius, shadow and size; no hardcoded hex in component stylesheets.",
-      "**Do** keep coastal teal the only interactive accent, and deepen it to coastal teal deep for hover and for teal text on light grounds.",
-      "**Do** give a new map layer one hue and use that exact hue in its legend swatch and its control, defined as a paired token in `theme.css` plus its `config.js` counterpart.",
-      "**Do** use the raised 3D shadow only on surfaces resting on the map, and hairlines inside them.",
-      "**Do** draw focus and state emphasis as box-shadow rings (`--cioos-focus`) so nothing reflows.",
-      "**Do** size every surface for the French strings first; fixed widths must hold \"Jeux de données\" and \"EXPLORATEUR\".",
-      "**Do** use an existing breakpoint rung (600 / 700 / 900 / 992 / 1200 / 1400)."
+      "Do reference `var(--cioos-*)` tokens from `frontend/src/components/theme.css` for every colour, radius, shadow and size; no hardcoded hex in component stylesheets.",
+      "Do keep coastal teal the only interactive accent, and deepen it to coastal teal deep for hover and for teal text on light grounds.",
+      "Do give a new map layer one hue and use that exact hue in its legend swatch and its control, defined as a paired token in `theme.css` plus its `config.js` counterpart.",
+      "Do use the raised 3D shadow only on surfaces resting on the map, and hairlines inside them.",
+      "Do draw focus and state emphasis as box-shadow rings (`--cioos-focus`) so nothing reflows.",
+      "Do size every surface for the French strings first; fixed widths must hold \"Jeux de données\" and \"EXPLORATEUR\".",
+      "Do use an existing breakpoint rung (600 / 700 / 900 / 992 / 1000 / 1200 / 1400 / 1944)."
     ],
     "donts": [
-      "**Don't** drift toward a generic Bootstrap admin look: grey cards, blue buttons, stock form chrome, default outlines.",
-      "**Don't** introduce a second accent colour in the chrome, or reuse a data hue (violet, amber, goldenrod, platform colours) decoratively.",
-      "**Don't** add a second colour ramp for coverage; density is darkness on the one teal-to-navy ramp.",
-      "**Don't** use pure grey or pure black; neutrals are navy-tinted.",
-      "**Don't** set a font-size in px outside the token ladder, or use Quicksand outside the logo.",
-      "**Don't** fade a primary button to show it is disabled; switch it to the surface wash with ink-60 text.",
-      "**Don't** carry meaning by colour alone; pair a data hue with a label, icon or tooltip."
+      "Don't drift toward a generic Bootstrap admin look: grey cards, blue buttons, stock form chrome, default outlines.",
+      "Don't introduce a second accent colour in the chrome, or reuse a data hue (violet, amber, goldenrod, platform colours) decoratively.",
+      "Don't add a second colour ramp for coverage; density is darkness on the one teal-to-navy ramp.",
+      "Don't use pure grey or pure black; neutrals are navy-tinted.",
+      "Don't set a font-size in px outside the token ladder, or use Quicksand outside the logo.",
+      "Don't fade a primary button to show it is disabled; switch it to the surface wash with ink-60 text.",
+      "Don't carry meaning by colour alone; pair a data hue with a label, icon or tooltip."
     ]
   }
 }

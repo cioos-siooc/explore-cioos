@@ -55,6 +55,7 @@
 }
 
 .filtersModal .filtersModalTitleHeading {
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-weight: 600;
   font-size: var(--cioos-font-size-lg);
@@ -89,9 +90,6 @@
 
 .filtersModal .filtersModalTitleSubtitle {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-sm);
   font-weight: 400;
@@ -171,6 +169,7 @@
 }
 
 .downloadModalTitleHeading {
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-weight: 600;
   font-size: var(--cioos-font-size-lg);

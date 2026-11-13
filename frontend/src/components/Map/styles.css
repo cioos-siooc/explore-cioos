@@ -129,7 +129,8 @@
 /* Rests on the map like the legend, so it takes the small 3D lift. A label,
    not a target: clicks fall through to the map, so the content needs it too
    (MapLibre sets pointer-events: auto there). Translucent so the seafloor it
-   names stays visible; the blur keeps the text legible over busy imagery. */
+   names still shows; at 35% the small source line fell under 4.5:1 over dark
+   imagery, so the face is mostly white and the blur does the rest. */
 .depthProbePopup,
 .depthProbePopup .maplibregl-popup-content {
   pointer-events: none;
@@ -138,13 +139,13 @@
 .depthProbePopup .maplibregl-popup-content {
   padding: 0;
   border-radius: var(--cioos-radius);
-  background: rgb(255 255 255 / 35%);
+  background: rgb(255 255 255 / 72%);
   box-shadow: var(--cioos-shadow-3d-sm);
   backdrop-filter: blur(6px);
 }
 
 .depthProbePopup .maplibregl-popup-tip {
-  border-top-color: rgb(255 255 255 / 35%);
+  border-top-color: rgb(255 255 255 / 72%);
 }
 
 .depthProbe {
@@ -205,12 +206,6 @@
 
 .mapChipLine:not(:first-child) {
   opacity: 0.85;
-}
-
-@media (max-width: 900px) {
-  .map {
-    min-width: auto;
-  }
 }
 
 /* Centred on the map and click-through; the disc is .cioosSpinnerDisc. */

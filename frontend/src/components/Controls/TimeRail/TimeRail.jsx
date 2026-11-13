@@ -186,8 +186,6 @@ export default function TimeRail({
     () => ({
       min: axis.minMs,
       max: axis.maxMs,
-      minText: axis.minIso,
-      maxText: axis.maxIso,
       toPos: axis.toPos,
       toValue: axis.toMs,
     }),

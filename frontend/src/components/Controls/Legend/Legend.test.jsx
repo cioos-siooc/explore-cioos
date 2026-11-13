@@ -297,4 +297,19 @@ describe("Legend", () => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
   });
+
+  it("draws the ramp as faint as the cells it keys", () => {
+    const { rerender } = renderLegend({ zoom: 4 });
+    const bar = () => document.querySelector(".legendColorBar");
+    const hexOpacity = Number(bar().style.opacity);
+    rerender(<Legend {...BASE_PROPS} zoom={8} />);
+    expect(Number(bar().style.opacity)).toBeLessThan(hexOpacity);
+  });
+
+  it("on a phone at the marker tier, keeps the platform hues on the card", () => {
+    setViewportWidth(MOBILE_WIDTH);
+    renderLegend({ zoom: 12 });
+    const card = document.querySelector(".legendCompactRamp");
+    expect(card).toHaveTextContent("Mooring");
+  });
 });

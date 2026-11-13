@@ -1,4 +1,5 @@
-export const smallCircleSize = 2.75;
+// A smaller dot can't carry a platform hue.
+export const smallCircleSize = 3.5;
 export const largeCircleSize = 6;
 
 // Log because the count range spans orders of magnitude: linear would leave

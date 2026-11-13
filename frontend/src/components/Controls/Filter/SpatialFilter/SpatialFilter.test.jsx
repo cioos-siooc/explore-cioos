@@ -136,7 +136,19 @@ describe("SpatialFilter place search", () => {
       "Draw area: Bay of Fundy",
     );
 
+    // A copy of the same ring is still the place (the draw control hands
+    // back copies); moving a vertex is an edit.
     act(() => seen.setPolygon([...seen.ring]));
+    expect(
+      screen.getByTestId("spatial-filter-place-record"),
+    ).toBeInTheDocument();
+    act(() =>
+      seen.setPolygon(
+        seen.ring.map(([lon, lat], i) =>
+          i === 1 ? [lon + 0.1, lat] : [lon, lat],
+        ),
+      ),
+    );
     expect(screen.queryByTestId("spatial-filter-place-record")).toBeNull();
   });
 

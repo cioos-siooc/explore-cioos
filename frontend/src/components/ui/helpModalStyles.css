@@ -56,6 +56,7 @@
 }
 
 .helpModalTitleHeading {
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-weight: 600;
   font-size: var(--cioos-font-size-lg);

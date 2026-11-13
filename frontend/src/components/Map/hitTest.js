@@ -145,11 +145,22 @@ export function trackItemsIn(hits) {
   return tracks;
 }
 
+// The grids whose box holds the point, from the /griddapCoverage collection.
+// A single-point grid covers no area, so it is only ever clicked on.
+export const gridsCovering = (coverage, lngLat) => {
+  const point = helpers.point([lngLat.lng, lngLat.lat]);
+  return (coverage?.features ?? []).filter(
+    (feature) =>
+      feature.geometry?.type !== "Point" &&
+      turfPointsWithinPolygon(point, feature).features.length > 0,
+  );
+};
+
 // Returns null when the click landed on empty water.
 export const buildFeatureQuery = (
   lngLat,
   hits,
-  { zoom, queryRendered, language, gridGeometry },
+  { zoom, queryRendered, language, gridGeometry, gridsAt = () => [] },
 ) => {
   if (hits.length === 0) return null;
 
@@ -275,6 +286,17 @@ export const buildFeatureQuery = (
 
   const items = [...tracks, ...observations.values(), ...grids];
   if (items.length === 0) return null;
+  // With their layer off the grids under a hex or marker still belong to what
+  // is here; listed, but not outlined over a map that doesn't draw them.
+  if (grids.length === 0) {
+    dedupeGriddapByPk(gridsAt(lngLat)).forEach((feature) => {
+      items.push({
+        kind: "grid",
+        pk: Number(feature.properties.pk),
+        title: griddapTitle(feature, language),
+      });
+    });
+  }
 
   // Areas are outlined, markers ringed; only areas can be framed. Stacked grid
   // rectangles would compound the translucent fill, while painting only their

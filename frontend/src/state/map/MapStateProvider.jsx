@@ -118,7 +118,7 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
 
   // Derived during render, not mirrored by an effect, which would paint one
   // frame with the previous zoom's domain.
-  const currentRangeLevel = useMemo(
+  const globalRangeLevel = useMemo(
     () => getCurrentRangeLevel(rangeLevels, zoom),
     [rangeLevels, zoom],
   );
@@ -141,11 +141,20 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
     );
   }, []);
 
+  // Map.jsx's marker radius domain, measured like viewportHexRange.
+  const [viewportPointRange, setViewportPointRangeState] = useState();
+  const setViewportPointRange = useCallback((range) => {
+    setViewportPointRangeState((previous) =>
+      rangesEqual(previous, range) ? previous : range,
+    );
+  }, []);
+  const currentRangeLevel = viewportPointRange || globalRangeLevel;
+
   // Below the marker tier every cell kind is summed into the hexes layer; at
   // the marker tier only coverage cells remain, with their own tier.
   const globalHexRangeLevel = isMarkerTier(zoom)
     ? currentCoverageRangeLevel
-    : currentRangeLevel;
+    : globalRangeLevel;
 
   // The visible extent wins: a catalogue-wide domain paints a zoomed-in view
   // in one flat shade. Global is the fallback before the first measurement or
@@ -168,6 +177,7 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
       // Lets the legend explain why its numbers move with the camera.
       hexRangeScaledToView: Boolean(viewportHexRange),
       setViewportHexRange,
+      setViewportPointRange,
       setLoadingLayers,
     }),
     [
@@ -183,6 +193,7 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
       hexRangeLevel,
       viewportHexRange,
       setViewportHexRange,
+      setViewportPointRange,
     ],
   );
 
@@ -306,6 +317,14 @@ export default function MapStateProvider({ children }) {
   // mode is 'box', 'polygon', 'clear', or 'shape' with a ready-made `ring`
   // (a region picked by name); the nonce lets the same mode be re-requested.
   const [drawRequest, setDrawRequest] = useState();
+  // Map.jsx reports tiles it gave up retrying; the banner's Retry asks it to
+  // try them again.
+  const [tilesFailed, setTilesFailed] = useState(false);
+  const [tileRetryRequest, setTileRetryRequest] = useState(0);
+  const requestTileRetry = useCallback(
+    () => setTileRetryRequest((n) => n + 1),
+    [],
+  );
   // For a caller with no click to give (the tips tour). Answered once the map
   // has settled, so a camera move requested alongside it lands first.
   const [featureQueryRequest, setFeatureQueryRequest] = useState();
@@ -460,9 +479,9 @@ export default function MapStateProvider({ children }) {
     loadLegend(mapQueryString);
   }, [mapQueryString, loadLegend]);
 
-  // Data is kept when toggled off so re-showing it is instant.
+  // Fetched with the layer off too: a map click lists the grids over it, and
+  // re-showing the layer is instant. Tens of boxes, so it costs little.
   useEffect(() => {
-    if (!griddapCoverageVisible) return;
     const controller = new AbortController();
     fetch(`${server}/griddapCoverage?${mapQueryString}`, {
       signal: controller.signal,
@@ -475,7 +494,7 @@ export default function MapStateProvider({ children }) {
         reportError("griddap coverage fetch failed", error);
       });
     return () => controller.abort();
-  }, [mapQueryString, griddapCoverageVisible]);
+  }, [mapQueryString]);
 
   const value = {
     rangeLevels,
@@ -517,6 +536,10 @@ export default function MapStateProvider({ children }) {
     zoomToGeometry,
     drawRequest,
     requestDraw,
+    tilesFailed,
+    setTilesFailed,
+    tileRetryRequest,
+    requestTileRetry,
     featureQueryRequest,
     requestFeatureQueryAt,
     pendingDatasetZoom,

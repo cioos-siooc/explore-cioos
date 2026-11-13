@@ -125,8 +125,23 @@
   font-size: var(--cioos-font-size-md);
   font-weight: 600;
   line-height: 1.3;
-  letter-spacing: -0.01em;
+
+  /* Sora's word space is narrow; across a wrapped multi-line title it read
+     as missing. */
+  word-spacing: 0.08em;
   color: var(--cioos-ink);
+
+  /* A long title would push the facts below the fold; the full one is in the
+     title attribute and in the widened view. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.datasetInspector.wide .datasetTitle {
+  display: block;
 }
 
 .datasetTitleLive {
@@ -151,8 +166,17 @@
   gap: 6px;
 }
 
-/* Also styles the button ZoomToDataset renders into this row. */
-.datasetTitleAction,
+.datasetTitleActions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* One button style for the whole row, ZoomToDataset's button included;
+   Citation matches it from its own stylesheet. */
+.datasetAction,
 .datasetTitleActions .zoomToDatasetButton {
   display: inline-flex;
   align-items: center;
@@ -165,6 +189,7 @@
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   line-height: 1.3;
+  text-decoration: none;
   white-space: nowrap;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
@@ -172,13 +197,13 @@
   color: var(--cioos-primary-700);
   cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
 }
 
-.datasetTitleAction:hover,
-.datasetTitleAction:focus-visible,
+.datasetAction:hover,
+.datasetAction:focus-visible,
 .datasetTitleActions .zoomToDatasetButton:hover,
 .datasetTitleActions .zoomToDatasetButton:focus-visible {
   background-color: var(--cioos-sand);
@@ -186,14 +211,43 @@
   outline: none;
 }
 
-.datasetTitleAction:focus-visible,
+.datasetAction:focus-visible,
 .datasetTitleActions .zoomToDatasetButton:focus-visible {
   box-shadow: var(--cioos-focus);
 }
 
-.datasetTitleAction:active,
+.datasetAction:active,
 .datasetTitleActions .zoomToDatasetButton:active {
   transform: translateY(1px);
+}
+
+.datasetAction.active {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.datasetAction.active:hover,
+.datasetAction.active:focus-visible {
+  border-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-700);
+}
+
+/* Not faded (DESIGN.md): the surface wash with ink-60 text. */
+.datasetAction:disabled {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
+  cursor: not-allowed;
+}
+
+/* Already framed: still focusable, so its title can say why. */
+.datasetTitleActions .zoomToDatasetButton:disabled,
+.datasetTitleActions .zoomToDatasetButton[aria-disabled="true"] {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
+  cursor: default;
+  transform: none;
 }
 
 .datasetNotInResults {
@@ -229,30 +283,6 @@
 .datasetNotInResultsBack:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
-}
-
-.datasetTitleAction:disabled {
-  color: var(--cioos-ink-60);
-  background-color: var(--cioos-surface-2);
-  cursor: not-allowed;
-}
-
-.datasetTitleAction:disabled:hover {
-  border-color: var(--cioos-hairline);
-  background-color: var(--cioos-surface-2);
-}
-
-.datasetTitleAction.active {
-  background-color: var(--cioos-primary);
-  border-color: var(--cioos-primary);
-  color: var(--cioos-on-primary);
-}
-
-.datasetTitleAction.active:hover,
-.datasetTitleAction.active:focus-visible {
-  background-color: var(--cioos-primary-700);
-  border-color: var(--cioos-primary-700);
-  color: var(--cioos-white);
 }
 
 .metadataLabel {
@@ -310,6 +340,13 @@
   margin: 0;
 }
 
+/* Marks a value taken from the catalogue record because nothing was measured. */
+.metadataProvenance {
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 500;
+  color: var(--cioos-ink-80);
+}
+
 .metadataFact {
   font-size: var(--cioos-font-size-base);
   font-weight: 500;
@@ -318,11 +355,16 @@
 }
 
 /* Tags and links share .filterButton's pill box. */
+.datasetMetaSheet .metadataChip[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 .datasetMetaSheet .metadataChip {
   display: inline-flex;
   align-items: center;
   margin: 0;
-  padding: 2px 12px;
+  padding: 3px 12px;
   text-align: left;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
@@ -364,7 +406,7 @@
   font-size: var(--cioos-font-size-2xs);
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .gridNodeOperator {

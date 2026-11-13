@@ -79,9 +79,9 @@ export default function DownloadPanel() {
         setSubmissionState={setSubmissionState}
       >
         {/* Passed as children because the submission state lives in this
-            panel's providers; DownloadDetails sets it beside the script. */}
-        <div className="downloadDeliveryOption downloadSubmit">
-          <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
+            panel's providers. */}
+        <div className="downloadSubmit">
+          <label className="downloadOptionTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}
           </label>
           <div className="downloadSubmitRow">

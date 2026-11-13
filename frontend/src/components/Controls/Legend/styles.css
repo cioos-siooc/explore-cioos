@@ -16,8 +16,10 @@
 
   /* Stops a long key list short of the centred top bar. */
   --legend-top-reserve: 108px;
-  --cioos-font-size-3xs: calc(10px + var(--legend-grow) / 400);
-  --cioos-font-size-2xs: calc(10px + var(--legend-grow) / 400);
+
+  /* 11px floor: the ticks and group labels are what the ramp is read by. */
+  --cioos-font-size-3xs: calc(11px + var(--legend-grow) / 400);
+  --cioos-font-size-2xs: calc(11px + var(--legend-grow) / 400);
   --cioos-font-size-xs: calc(11px + var(--legend-grow) / 400);
 
   position: fixed;
@@ -113,7 +115,7 @@
 }
 
 /* Upper case against sentence-case sub-captions: two uppercase levels read as
-   one at 10px. */
+   one at 11px. */
 .legendGroupLabel {
   /* Shrinks to its words so the ⓘ after it reads as belonging to it. */
   flex: 0 1 auto;
@@ -135,11 +137,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1px;
+  padding: 3px;
+  margin: -2px 0;
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-60);
   cursor: pointer;
 }
 
@@ -318,6 +321,19 @@
   transform: translateX(-100%);
 }
 
+.legendScaleNote {
+  margin-top: 2px;
+  font-size: var(--cioos-font-size-2xs);
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--cioos-ink-80);
+}
+
+/* Separates the two size/value pairs of the marker key. */
+.legendSizeKey .legendItemLabel + .legendSwatch {
+  margin-left: 6px;
+}
+
 /* These stand in their group's label row (see renderGroup), so they shrink to
    their words like a group label does. */
 .legendLayerItems {
@@ -471,7 +487,9 @@
   --legend-grow: 0px;
 
   min-width: 96px;
-  max-width: 136px;
+
+  /* Fits "Days of data" at the 11px floor on two lines. */
+  max-width: 152px;
 }
 
 .legendCompact .legendHeader {

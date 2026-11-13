@@ -78,6 +78,21 @@ test("getRecordsList toggles the records CTE and its join together", async () =>
   assert.doesNotMatch(without.sql, /records\.profiles/);
 });
 
+test("the records list carries the dataset's measured footprint; the datasets list does not", async () => {
+  const withList = await build({});
+  assert.match(withList.sql, /min\(p\.time_min\) AS time_min/);
+  assert.match(withList.sql, /max\(p\.depth_max\) AS depth_max/);
+  // A grid's union arm fills its bounds with infinities and zero depths.
+  assert.match(withList.sql, /nullif\(p\.time_min, '-infinity'\)/);
+  assert.match(
+    withList.sql,
+    /WHEN d\.cdm_data_type <> 'Grid' THEN p\.depth_min/,
+  );
+
+  const without = await build({}, { getRecordsList: false });
+  assert.doesNotMatch(without.sql, /min\(p\.time_min\)/);
+});
+
 test("doEstimate toggles the size estimate and its bindings together", async () => {
   const est = await build({
     timeMin: "2020-01-01",

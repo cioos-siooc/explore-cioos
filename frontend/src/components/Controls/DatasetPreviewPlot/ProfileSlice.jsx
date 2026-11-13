@@ -74,12 +74,10 @@ export default function ProfileSlice({ profiles, step, setStep }) {
     return {
       min: first,
       max: steps.length,
-      minText: first === ALL ? t("previewProfileSliceAll") : timeText(steps[0]),
-      maxText: timeText(steps[steps.length - 1]),
       toPos: (value) => (span > 0 ? (value - first) / span : 0),
       toValue: (position) => first + position * span,
     };
-  }, [steps, first, t]);
+  }, [steps, first]);
 
   // One profile and the "All" stop draw the same rows, so there is nothing to
   // step through — which is what hides this for Profile, TimeSeries, Trajectory

@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { useSelection } from "../selection/SelectionProvider.jsx";
 import { usePersistentState } from "../usePersistentState.js";
 import { useUI } from "../ui/UIProvider.jsx";
 import useTourStages from "./useTourStages.js";
@@ -70,7 +71,11 @@ export default function TipsProvider({ children }) {
   const [firstVisit] = useState(showIntroModal);
   const shownThisLoad = useRef(false);
 
-  const modalOpen =
+  // A tip waits behind a modal, and while the results of a filter change are
+  // loading, so it doesn't land on top of what the reader is waiting to see.
+  const { selectionLoading } = useSelection();
+  const held =
+    selectionLoading ||
     showIntroModal ||
     showFiltersModal ||
     showDownloadModal ||
@@ -78,24 +83,24 @@ export default function TipsProvider({ children }) {
     showSelectionHelpModal;
   // offerTip is called from map handlers registered once, so it reads state
   // through a ref. Seeded because children's mount effects run first.
-  const gate = useRef({ tipsEnabled, seenTips, modalOpen, touring });
+  const gate = useRef({ tipsEnabled, seenTips, held, touring });
   useEffect(() => {
-    gate.current = { tipsEnabled, seenTips, modalOpen, touring };
-  }, [tipsEnabled, seenTips, modalOpen, touring]);
+    gate.current = { tipsEnabled, seenTips, held, touring };
+  }, [tipsEnabled, seenTips, held, touring]);
 
   // Offers the first unseen of the given keys. One tip per visit, each once
-  // ever, never behind a modal: an offer made while one is up waits for it to
-  // close, and the latest wins.
+  // ever: an offer made while held waits for the hold to lift, and the latest
+  // wins.
   const pendingTip = useRef();
   const offerTip = useCallback(
     (keys) => {
-      const { tipsEnabled, seenTips, modalOpen, touring } = gate.current;
+      const { tipsEnabled, seenTips, held, touring } = gate.current;
       if (firstVisit || shownThisLoad.current || !tipsEnabled || touring) {
         return;
       }
       const key = [keys].flat().find((k) => !seenTips.includes(k));
       if (!key) return;
-      if (modalOpen) {
+      if (held) {
         pendingTip.current = key;
         return;
       }
@@ -107,11 +112,11 @@ export default function TipsProvider({ children }) {
   );
 
   useEffect(() => {
-    if (modalOpen || !pendingTip.current) return;
+    if (held || !pendingTip.current) return;
     const key = pendingTip.current;
     pendingTip.current = undefined;
     offerTip(key);
-  }, [modalOpen, offerTip]);
+  }, [held, offerTip]);
 
   // Undefined, not false, so React drops the attribute.
   const tipHighlight = useCallback(

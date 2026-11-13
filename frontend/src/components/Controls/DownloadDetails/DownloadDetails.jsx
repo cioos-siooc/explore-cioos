@@ -10,11 +10,12 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useDownload } from "../../../state/download/DownloadProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
 import {
   applyDatasetPKs,
   createDataFilterQueryString,
-  formatSizeEstimate,
+  formatSize,
   useChanged,
   sumSizeEstimates,
 } from "../../../utilities.jsx";
@@ -31,7 +32,6 @@ import {
 } from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
-import Spinner from "../../ui/Spinner.jsx";
 
 // Note: datasets and points are interchangeable terminology here.
 export default function DownloadDetails({
@@ -53,6 +53,7 @@ export default function DownloadDetails({
   children,
 }) {
   const { t } = useTranslation();
+  const { areaPlace } = useSelection();
   const { packageFormat } = useDownload();
   const [selectAll, setSelectAll] = useState(true);
   const [pointsData, setPointsData] = useState(
@@ -284,8 +285,72 @@ export default function DownloadDetails({
     [linkableDatasets, linkByPk],
   );
 
+  // Restates where and when the files are cut to, so the order can be checked
+  // against what was meant before it is sent.
+  const summaryLimits = [
+    polygonFiltered &&
+      t("downloadSummaryPlace", {
+        place: areaPlace?.name ?? t("downloadSummaryAreaUnnamed"),
+      }),
+    timeFilterActive &&
+      filterDownloadByTime &&
+      t("downloadSummaryDates", { start: query.startDate, end: query.endDate }),
+  ].filter(Boolean);
+
+  const sizeFiltered =
+    dataTotal.filteredSize !== dataTotal.unfilteredSize &&
+    Number.isFinite(dataTotal.unfilteredSize);
+
   return (
     <div className="container downloadDetails">
+      <p className="downloadSummary" data-testid="download-summary">
+        <strong>
+          {estimatesLoading || selectedCount === pointsData.length
+            ? t("downloadSummaryDatasets", { count: pointsData.length })
+            : t("downloadSummaryDatasetsOf", {
+                count: selectedCount,
+                total: pointsData.length,
+              })}
+        </strong>
+        <span aria-hidden="true">{" · "}</span>
+        {estimatesLoading ? (
+          <span className="downloadSummaryMuted">
+            {t("downloadSummaryEstimating")}
+          </span>
+        ) : Number.isFinite(dataTotal.filteredSize) ? (
+          <>
+            <strong
+              title={
+                dataTotal.filteredPartial || dataTotal.unfilteredPartial
+                  ? t("downloadSizePartialTitle")
+                  : undefined
+              }
+            >
+              {t("downloadSummarySize", {
+                size: `${formatSize(dataTotal.filteredSize)}${dataTotal.filteredPartial ? "+" : ""}`,
+              })}
+            </strong>
+            {sizeFiltered && (
+              <span className="downloadSummaryMuted">
+                {" "}
+                {t("downloadSummarySizeFull", {
+                  size: `${formatSize(dataTotal.unfilteredSize)}${dataTotal.unfilteredPartial ? "+" : ""}`,
+                })}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="downloadSummaryMuted">
+            {t("downloadSizeUnavailableTitle")}
+          </span>
+        )}
+        {summaryLimits.map((limit) => (
+          <React.Fragment key={limit}>
+            <span aria-hidden="true">{" · "}</span>
+            {limit}
+          </React.Fragment>
+        ))}
+      </p>
       <div className="downloadBandRow">
         <FilterDownloadToggles
           query={query}
@@ -321,83 +386,17 @@ export default function DownloadDetails({
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
             downloadLinkByPk={linkByPk}
-            pagerExtra={
-              <div className="downloadSummary">
-                {/* Both stats wait for the estimates, which decide how many
-                    stay selected. */}
-                <div className="downloadSummaryStat">
-                  {estimatesLoading ? (
-                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
-                  ) : (
-                    <span className="downloadSummaryValue">
-                      {selectedCount}
-                      <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
-                    </span>
-                  )}
-                  <span className="downloadSummaryLabel">
-                    {t("downloadDetailsDownloadInfoDatasets")}
-                  </span>
-                </div>
-                <div className="downloadSummaryDivider" aria-hidden="true" />
-                <div className="downloadSummaryStat">
-                  {estimatesLoading ? (
-                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
-                  ) : downloadSizeEstimates ? (
-                    <span
-                      className="downloadSummaryValue"
-                      title={
-                        dataTotal.filteredPartial || dataTotal.unfilteredPartial
-                          ? t("downloadSizePartialTitle")
-                          : undefined
-                      }
-                    >
-                      {formatSizeEstimate(dataTotal.filteredSize)}
-                      {dataTotal.filteredPartial && "+"}
-                      <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
-                        dataTotal.unfilteredSize,
-                      )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
-                    </span>
-                  ) : (
-                    <span
-                      className="downloadSummaryValue downloadSummaryValueMuted"
-                      title={t("downloadSizeUnavailableTitle")}
-                    >
-                      {t("downloadSizeUnavailable")}
-                    </span>
-                  )}
-                  <span className="downloadSummaryLabel">
-                    {t("downloadDetailsDownloadInfoDownloadSize")}
-                  </span>
-                </div>
-              </div>
-            }
           />
         </div>
       </div>
 
       <div className="downloadFooter">
-        {/* Two ways to the data, so they share one section. */}
-        <div className="downloadFooterSection downloadDelivery">
-          <div className="downloadDeliveryHeading">
-            <span className="downloadFooterTitle">
-              {t("downloadDeliveryTitle")}
-            </span>
-            <p className="downloadDeliveryIntro">
-              {t("downloadDeliveryIntro")}
-            </p>
-          </div>
-          <div className="downloadDeliveryOptions">
-            {children}
-            <span className="downloadDeliveryOr" aria-hidden="true">
-              {t("downloadDeliveryOr")}
-            </span>
-            <DownloadLinks
-              count={linkableDatasets.length}
-              links={links}
-              polygonFiltered={polygonFiltered}
-            />
-          </div>
-        </div>
+        {children}
+        <DownloadLinks
+          count={linkableDatasets.length}
+          links={links}
+          polygonFiltered={polygonFiltered}
+        />
       </div>
     </div>
   );

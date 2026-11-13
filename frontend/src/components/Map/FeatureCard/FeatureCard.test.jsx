@@ -1,6 +1,7 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { screen, waitFor, act, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -308,10 +309,34 @@ describe("FeatureCard", () => {
 
     // Fixture: pk 7 -> 1115, pk 8 -> 5, pk 9 -> 1.
     await waitFor(() =>
-      expect(cardFor(a)).toHaveTextContent("1,115 day(s) of data"),
+      expect(cardFor(a)).toHaveTextContent("1,115 days of data"),
     );
-    expect(cardFor(b)).toHaveTextContent("5 day(s) of data");
-    expect(cardFor(c)).toHaveTextContent("1 day(s) of data");
+    expect(cardFor(b)).toHaveTextContent("5 days of data");
+    expect(cardFor(c)).toHaveTextContent("1 day of data");
+  });
+
+  // Listed under the cell means records there; zero days means undated ones.
+  it("says a dataset's records here are undated rather than '0 days'", async () => {
+    await renderReady();
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input, init) => {
+      const url = new URL(typeof input === "string" ? input : input.url);
+      if (url.pathname.endsWith("/tiles/datasets")) {
+        return Promise.resolve(Response.json([{ pk: 7, count: 0 }]));
+      }
+      return realFetch(input, init);
+    });
+    const row = pointQueryFixture[0];
+    click({
+      nonce: 15,
+      items: [{ kind: "observation", pk: row.pk, aggregate: true }],
+      buckets: { hexPks: [970], pointPks: [], source: "main", z: 6 },
+    });
+
+    await waitFor(() =>
+      expect(cardFor(row)).toHaveTextContent("records without dates"),
+    );
+    expect(cardFor(row)).not.toHaveTextContent("0 days");
   });
 
   // A coverage hex at marker zoom lists the stations inside it too. Those are
@@ -343,9 +368,9 @@ describe("FeatureCard", () => {
     });
 
     await waitFor(() =>
-      expect(cardFor(markerRow)).toHaveTextContent("4 day(s) of data"),
+      expect(cardFor(markerRow)).toHaveTextContent("4 days of data"),
     );
-    expect(cardFor(hexRow)).toHaveTextContent("30 day(s) of data");
+    expect(cardFor(hexRow)).toHaveTextContent("30 days of data");
     const asked = globalThis.fetch.mock.calls
       .map(([input]) => new URL(input).searchParams)
       .filter((params) => params.has("source"));
@@ -364,7 +389,7 @@ describe("FeatureCard", () => {
       // No buckets: nothing to ask about, so no figure is claimed.
       buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
     });
-    expect(cardFor(row)).not.toHaveTextContent("day(s) of data");
+    expect(cardFor(row)).not.toHaveTextContent(/days? of data/);
   });
 
   describe("tips", () => {
@@ -403,5 +428,57 @@ describe("FeatureCard", () => {
       openOn(pointQueryFixture[0]);
       await waitFor(() => expect(seenTips()).toEqual(["speciesName"]));
     });
+  });
+});
+
+describe("FeatureCard with grids under the click", () => {
+  const GRID_ROW = {
+    ...pointQueryFixture[0],
+    pk: 99001,
+    dataset_id: "sst_grid",
+    title: "SST grid",
+    title_translated: { en: "SST grid", fr: "SST grid" },
+    cdm_data_type: "Grid",
+    grid_dimensions: [],
+  };
+  beforeEach(() => {
+    installMockFetch();
+    const mocked = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (!url.includes("/pointQuery")) return mocked(input);
+        const response = await mocked(input);
+        const rows = await response.json();
+        return new Response(JSON.stringify([...rows, GRID_ROW]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+  });
+
+  it("folds them into one row ahead of the stations, opened on demand", async () => {
+    await renderReady();
+    await waitFor(() =>
+      expect(
+        latestSelection.filteredDatasets.some((row) => row.pk === GRID_ROW.pk),
+      ).toBe(true),
+    );
+    const station = pointQueryFixture[0];
+    click({
+      items: [
+        { kind: "observation", pk: station.pk },
+        { kind: "grid", pk: GRID_ROW.pk, title: "SST grid" },
+      ],
+    });
+    const header = await screen.findByTestId("grid-group-header");
+    expect(header).toHaveTextContent("1");
+    expect(cardRows()).toHaveLength(1);
+
+    await userEvent.click(within(header).getByRole("button"));
+    expect(cardRows()[0]).toHaveTextContent("SST grid");
+    expect(cardRows()).toHaveLength(2);
   });
 });

@@ -175,160 +175,63 @@
   min-height: 0;
 }
 
-/* --- Order footer: the package, by email or by script and links. --- */
+/* --- The sentence the user commits to, above everything it summarises --- */
+.downloadSummary {
+  margin: 0;
+  padding: 12px 16px 4px;
+  background-color: var(--cioos-sand);
+  font-size: var(--cioos-font-size-md);
+  line-height: 1.4;
+  color: var(--cioos-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.downloadSummary strong {
+  font-weight: 700;
+  color: var(--cioos-navy);
+}
+
+.downloadSummaryMuted {
+  color: var(--cioos-ink-60);
+}
+
+.downloadVariablesNote {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.4;
+  color: var(--cioos-ink-80);
+}
+
+/* --- Order footer: two equal routes to the data, side by side --- */
 .downloadFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   flex: 0 0 auto;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-sand);
 }
 
-.downloadFooterSection {
+.downloadSubmit,
+.directLinks {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
-  padding: 10px 16px;
+  padding: 12px 16px;
 }
 
-/* Wraps, unlike the other captions here: the French for "Email download link
-   to" is half as long again as the English. */
-.downloadFooterTitle {
-  display: flex;
-  flex-wrap: wrap;
-
-  /* Centred, not baseline-aligned: an svg's baseline is its bottom edge, which
-     pushed the links caption out of step with the other two. */
-  align-items: center;
-  align-content: flex-start;
-  gap: 4px;
-  min-height: 20px;
-  max-width: 100%;
-  font-family: var(--cioos-font-display);
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 600;
-  line-height: 1.25;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--cioos-ink-60);
-}
-
-.downloadFooterTitle svg {
-  flex: 0 0 auto;
-}
-
-.downloadFooter .helpIcon {
-  margin: 0;
-}
-
-/* --- Selection totals, in the list's pager row --- */
-.downloadSummary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  padding-left: 10px;
+.directLinks {
   border-left: 1px solid var(--cioos-hairline);
 }
 
-.downloadSummaryDivider {
-  width: 1px;
-  height: 14px;
-  background-color: var(--cioos-hairline);
-}
-
-.downloadSummaryStat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.downloadSummaryValue {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--cioos-navy);
-}
-
-.downloadSummaryValueMuted {
+.downloadOptionTitle {
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-base);
   font-weight: 600;
-  color: var(--cioos-ink-60);
-}
-
-.downloadSummaryLabel {
-  color: var(--cioos-ink-60);
-}
-
-.downloadDetails .datasetSizeTotalSpinner {
-  opacity: 0.3;
-}
-
-/* --- The package: format, then email or script as two cards --- */
-.downloadDelivery {
-  gap: 8px;
-}
-
-.downloadDeliveryHeading {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.downloadDeliveryIntro {
-  margin: 0;
-  font-size: var(--cioos-font-size-sm);
   line-height: 1.3;
-  color: var(--cioos-ink-80);
-}
-
-/* The package takes the room; the dataset list is one button, so a side column. */
-.downloadDeliveryOptions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(220px, 280px);
-  align-items: stretch;
-  gap: 0 10px;
-  width: 100%;
-}
-
-.downloadDeliveryOption {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  background-color: var(--cioos-white);
-}
-
-/* Sentence case under the section's caption: options, not sections. */
-.downloadDeliveryOption .downloadFooterTitle {
-  font-family: var(--cioos-font-body);
-  font-size: var(--cioos-font-size-sm);
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--cioos-ink);
-}
-
-.downloadDeliveryOr {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--cioos-ink-60);
-}
-
-.downloadDeliveryOr::before,
-.downloadDeliveryOr::after {
-  content: "";
-  flex: 1 1 auto;
-  width: 1px;
-  background-color: var(--cioos-hairline);
+  color: var(--cioos-navy);
 }
 
 .downloadSubmitRow {
@@ -447,6 +350,8 @@
 }
 
 .directLinksCount {
+  display: block;
+  margin-top: 4px;
   font-size: var(--cioos-font-size-sm);
   font-weight: 400;
   text-transform: none;
@@ -454,43 +359,36 @@
   color: var(--cioos-ink-60);
 }
 
+/* Styled as the email request's button: the two routes are equals. */
 .directLinksButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  width: 100%;
   height: 36px;
-  padding: 0 14px;
+  padding: 0 16px;
+  border: none;
   border-radius: var(--cioos-radius-sm);
-  border: 1px solid var(--cioos-hairline);
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
   font-weight: 600;
-  font-size: var(--cioos-font-size-sm);
   white-space: nowrap;
-  transition:
-    background-color var(--cioos-transition-fast),
-    border-color var(--cioos-transition-fast);
+  transition: background-color var(--cioos-transition-fast);
 }
 
 .directLinksButton svg {
-  color: var(--cioos-primary-700);
   flex: 0 0 auto;
 }
 
 .directLinksButton:hover:not(:disabled) {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
+  background-color: var(--cioos-primary-700);
 }
 
 .directLinksButton:disabled {
-  color: var(--cioos-ink-40);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
   cursor: not-allowed;
-}
-
-.directLinksButton:disabled svg {
-  color: var(--cioos-ink-40);
 }
 
 .directLinksNotes {
@@ -507,25 +405,18 @@
   display: none;
 }
 
-/* The cards stack, "or" between them. */
 @media (max-width: 900px) {
-  .downloadDeliveryOptions {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
-
-  .downloadDeliveryOr {
-    flex-direction: row;
-  }
-
-  .downloadDeliveryOr::before,
-  .downloadDeliveryOr::after {
-    width: auto;
-    height: 1px;
-  }
-
   .downloadDetails.container {
     max-width: 100%;
+  }
+
+  .downloadFooter {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .directLinks {
+    border-top: 1px solid var(--cioos-hairline);
+    border-left: none;
   }
 }
 

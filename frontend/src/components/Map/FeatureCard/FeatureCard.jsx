@@ -12,8 +12,10 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import useCellDatasetDays from "./useCellDatasetDays.js";
+import useListSort from "../../../state/useListSort.js";
 import { pinnedPksOf, sortDatasets } from "../../../state/datasetSort.js";
 import DatasetCard from "../../Controls/DatasetsTable/DatasetCard.jsx";
+import GridGroupHeader from "../../Controls/DatasetsTable/GridGroupHeader.jsx";
 import "../../Controls/DatasetsTable/styles.css";
 import "./styles.css";
 
@@ -25,11 +27,9 @@ const VISIBLE_ROWS = 5;
 
 export default function FeatureCard() {
   const { t, i18n } = useTranslation();
-  const { featureQuery, setFeatureQuery, dataLayers, griddapCoverageVisible } =
-    useMapState();
+  const { featureQuery, setFeatureQuery, dataLayers } = useMapState();
   const {
     filteredDatasets,
-    listSort,
     inspectDataset,
     setInspectDataset,
     selectTrajectoryFromMap,
@@ -37,10 +37,12 @@ export default function FeatureCard() {
     selectedPks,
     combinedQueries,
   } = useSelection();
+  const [listSort] = useListSort();
   const { sidebarOpen, compactList } = useUI();
   const { offerTip, tipHighlight } = useTips();
 
   const [expanded, setExpanded] = useState(false);
+  const [gridsOpen, setGridsOpen] = useState(false);
 
   // The card slides off screen, but dismissing clears `featureQuery` at once;
   // this holds the last answer so the card doesn't blank halfway out.
@@ -55,7 +57,10 @@ export default function FeatureCard() {
 
   // A fresh query is a fresh card: collapse any "show all" the last one was
   // left in.
-  if (useChanged(query?.nonce)) setExpanded(false);
+  if (useChanged(query?.nonce)) {
+    setExpanded(false);
+    setGridsOpen(false);
+  }
 
   useEffect(() => {
     if (!featureQuery) return undefined;
@@ -90,15 +95,22 @@ export default function FeatureCard() {
   const rows = sortDatasets(
     filteredDatasets.filter((row) => pinnedPks.has(Number(row.pk))),
     listSort,
-    { gridFirst: griddapCoverageVisible, t, language: i18n.language },
+    { t, language: i18n.language },
   );
   const itemsByPk = groupBy(query.items || [], "pk");
   const tracksOf = (row) =>
     (itemsByPk[row.pk] || []).filter((item) => item.kind === "track");
 
   const empty = rows.length === 0;
-  const shown = expanded ? rows : rows.slice(0, VISIBLE_ROWS);
-  const hidden = rows.length - shown.length;
+  // As in the datasets list, the grids over the click fold into one row ahead
+  // of the rest, unless they are all the click found.
+  const gridRows = rows.filter((row) => row.cdm_data_type === "Grid");
+  const otherRows = rows.slice(gridRows.length);
+  const foldGrids = gridRows.length > 0 && otherRows.length > 0;
+  const listed = foldGrids ? otherRows : rows;
+  const shownListed = expanded ? listed : listed.slice(0, VISIBLE_ROWS);
+  const hidden = listed.length - shownListed.length;
+  const shown = [...(foldGrids && gridsOpen ? gridRows : []), ...shownListed];
   const tipTarget = shown.find((row) => row.cdm_data_type !== "Grid");
 
   // A single track under the click opens on that track; otherwise the
@@ -114,19 +126,23 @@ export default function FeatureCard() {
   };
 
   const countLabel = (value) =>
-    t("mapHexCountDays", {
-      total: Number(value || 0).toLocaleString(i18n.language),
-    });
+    t("mapHexCountDays", { count: Number(value || 0) });
 
   // What the click found of this dataset, beside its catalogue-wide meta.
   const hereLine = (row) => {
     const items = itemsByPk[row.pk] || [];
     const count = datasetDays.get(Number(row.pk));
+    let days = null;
+    // No figure yet (or the request failed): show none rather than a number
+    // that isn't this dataset's.
+    if (count !== undefined) {
+      // The cell lists the dataset, so it has records here; 0 days means
+      // none of them carry a date (e.g. OBIS occurrences without eventDate).
+      days = Number(count) > 0 ? countLabel(count) : t("featureCardUndated");
+    }
     return [
       ...tracksOf(row).map((item) => item.trajectoryId),
-      // No figure yet (or the request failed): show none rather than a number
-      // that isn't this dataset's.
-      count === undefined ? null : countLabel(count),
+      days,
       items.some((item) => item.aggregate) ? t("featureCardNearby") : null,
     ]
       .filter(Boolean)
@@ -184,6 +200,13 @@ export default function FeatureCard() {
               compact: compactList,
             })}
           >
+            {foldGrids && (
+              <GridGroupHeader
+                count={gridRows.length}
+                open={gridsOpen}
+                onToggle={() => setGridsOpen((value) => !value)}
+              />
+            )}
             {shown.map((row) => {
               const here = hereLine(row);
               return (

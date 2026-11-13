@@ -62,6 +62,19 @@ export const hexOutlineColor = "#FFFFFF";
 // Must stay in step with --cioos-map-click in components/theme.css.
 export const clickHighlightColor = "#DAA520";
 
+// Griddap footprints at rest (base) and hovered (deep). Must stay in step with
+// --cioos-grid and --cioos-grid-700 in components/theme.css.
+export const gridCoverageColor = "#FBB03B";
+export const gridCoverageDeepColor = "#C77F14";
+
+// Features outside the focused dataset. Navy-tinted like every neutral, and
+// paler than the "unknown" platform's slate so a dimmed marker can't pass for
+// one.
+export const dimmedFeatureColor = "#C9D4D6";
+
+// The ramp's navy end: rings that must read over pale cells and pale markers.
+export const mapInkColor = "#152F37";
+
 // Days is the only count that means one thing across all sources. Must match
 // web-api/utils/hexMetric.js; the API defaults to 'records' when ?metric= is
 // absent, so this is written into every tile and /legend URL explicitly.
@@ -83,6 +96,34 @@ export const basemapHandoffEndZoom = 10;
 // swap doesn't start on whatever parent tiles are cached, while keeping tiles
 // off the wire at world zooms.
 export const basemapPrewarmZoom = 9;
+
+// Fill opacity of the count hexes by zoom: the main hexes up to the marker
+// tier, the coverage cells from there. Below the tier the floor stays high so
+// a one-day cell reads as data, not as the water tint; at the tier the white
+// edges mark each cell and the fill steps back for the markers; across the
+// basemap hand-over it thins to a tint as the border takes over. Shared with
+// the legend, whose bar is drawn as faint as the cells it keys.
+export const MARKER_FADE_END_ZOOM = MARKER_MIN_ZOOM + 0.15;
+export const HEX_FILL_OPACITY_STOPS = [
+  [0, 0.85],
+  [MARKER_MIN_ZOOM, 0.7],
+  [MARKER_FADE_END_ZOOM, 0.45],
+  [basemapHandoffStartZoom, 0.4],
+  [basemapHandoffEndZoom, 0.2],
+];
+export function hexFillOpacityAt(zoom) {
+  const z = Number(zoom);
+  const stops = HEX_FILL_OPACITY_STOPS;
+  if (!Number.isFinite(z) || z <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i++) {
+    const [z1, o1] = stops[i];
+    if (z <= z1) {
+      const [z0, o0] = stops[i - 1];
+      return o0 + ((z - z0) / (z1 - z0)) * (o1 - o0);
+    }
+  }
+  return stops[stops.length - 1][1];
+}
 
 // Own names so the raster layers and their legend entry cannot drift apart.
 export const bathymetryFadeInZoom = basemapHandoffStartZoom;

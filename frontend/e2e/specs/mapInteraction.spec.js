@@ -76,7 +76,7 @@ const openCard = (page) => page.locator('[data-testid="feature-card"].open');
 
 const expectHexCard = async (page) => {
   const card = openCard(page);
-  await expect(card).toContainText("18 day(s) of data");
+  await expect(card).toContainText("18 days of data");
   await expect(card).toContainText("Bulk and Size-Fractionated Chlorophyll");
   await expect(card).toContainText(
     "Water Property Measurements from Conductivity-Temperature-Depth",
@@ -91,7 +91,7 @@ test.describe("pointing at the map", () => {
     await expect(async () => {
       await page.mouse.move(x + 1, y);
       await page.mouse.move(x, y);
-      await expect(page.locator(".mapChip")).toHaveText("18 day(s) of data", {
+      await expect(page.locator(".mapChip")).toHaveText("18 days of data", {
         timeout: 1_000,
       });
     }).toPass({ timeout: 20_000 });
@@ -114,7 +114,7 @@ test.describe("pointing at the map", () => {
     await expect(async () => {
       await page.mouse.move(x + 1, y);
       await page.mouse.move(x, y);
-      await expect(page.locator(".mapChip")).toHaveText("18 day(s) of data", {
+      await expect(page.locator(".mapChip")).toHaveText("18 days of data", {
         timeout: 1_000,
       });
     }).toPass({ timeout: 20_000 });
@@ -204,7 +204,7 @@ test.describe("pointing at markers and tracks", () => {
   test("hovering a marker names its days of data", async ({ page }) => {
     await openScene(page);
     await hoverUntil(page, LONE_MARKER.at, () =>
-      expect(chip(page)).toHaveText("12 day(s) of data", { timeout: 1_000 }),
+      expect(chip(page)).toHaveText("12 days of data", { timeout: 1_000 }),
     );
   });
 
@@ -241,7 +241,7 @@ test.describe("pointing at markers and tracks", () => {
       expect(openCard(page)).toBeVisible({ timeout: 1_000 }),
     );
     const card = openCard(page);
-    await expect(card).toContainText("40 day(s) of data");
+    await expect(card).toContainText("40 days of data");
     await expect(card.getByTestId("dataset-card")).toHaveCount(2);
     // A marker is a place, not a neighbourhood: no "nearby" qualifier.
     await expect(card).not.toContainText("nearby");
@@ -269,7 +269,7 @@ test.describe("pointing at markers and tracks", () => {
   }) => {
     await openScene(page);
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toHaveText("5 day(s) of data", { timeout: 1_000 }),
+      expect(chip(page)).toHaveText("5 days of data", { timeout: 1_000 }),
     );
   });
 
@@ -323,7 +323,7 @@ test.describe("pointing at gridded coverage", () => {
   test("a marker keeps the hover over a grid", async ({ page }) => {
     await openScene(page, "&griddap=true");
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toHaveText("5 day(s) of data", { timeout: 1_000 }),
+      expect(chip(page)).toHaveText("5 days of data", { timeout: 1_000 }),
     );
   });
 
