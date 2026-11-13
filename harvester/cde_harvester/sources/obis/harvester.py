@@ -16,7 +16,7 @@ from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.harvest_warnings import OCCURRENCES_DROPPED, HarvestWarnings
 from cde_harvester.core.obis_cells import merge_cell_partials
 from cde_harvester.core.observability import run_logger
-from cde_harvester.core.record_metadata import from_cioos_record
+from cde_harvester.core.record_metadata import from_cioos_record, with_cited_organizations
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -352,6 +352,7 @@ class OBISHarvester(BaseHarvester):
             if not df_datasets.empty:
                 df_datasets = self._enrich_with_ckan(df_datasets)
                 df_datasets = self._enrich_with_conversion(df_datasets)
+                df_datasets = self._add_cited_organizations(df_datasets)
 
             return HarvestResult(
                 profiles=df_profiles,
@@ -409,6 +410,17 @@ class OBISHarvester(BaseHarvester):
         self.logger.info(
             "Converted OBIS metadata for %d / %d datasets without a CKAN record", converted, total,
         )
+        return df_datasets
+
+    def _add_cited_organizations(self, df_datasets):
+        # A union, not CKAN-first like ERDDAP: the IYS CKAN records cite NPAFC
+        # and NOAA but not the Hakai Institute that OBIS lists as an institute.
+        df_datasets["organizations"] = [
+            with_cited_organizations(organizations, metadata)
+            for organizations, metadata in zip(
+                df_datasets["organizations"], df_datasets["metadata"], strict=True
+            )
+        ]
         return df_datasets
 
     def convert_metadata(self, dataset_id):

@@ -66,6 +66,15 @@ def _unique(values):
     return out
 
 
+def with_cited_organizations(organizations, metadata):
+    """``organizations`` plus the organization of every contact the citation names."""
+    contacts = metadata.get("contacts") or [] if isinstance(metadata, dict) else []
+    return _unique([
+        *(organizations or []),
+        *(c.get("organization") for c in contacts if c.get("cited")),
+    ])
+
+
 def _doi_url(value):
     match = _DOI.search(_text(value) or "")
     return f"https://doi.org/{match.group(1)}" if match else None

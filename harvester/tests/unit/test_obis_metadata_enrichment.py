@@ -164,3 +164,16 @@ def test_dataset_row_carries_the_dwca_archive(harvester):
 def test_dataset_row_without_an_archive_stores_null(harvester):
     row = harvester.build_dataset_row(MATCHED, {}, cells=[])
     assert row.loc[0, "archive_url"] is None
+
+
+def test_organizations_add_cited_contacts_to_obis_institutes(harvester):
+    datasets = pd.DataFrame([
+        {"dataset_id": MATCHED, "organizations": ["Hakai Institute"],
+         "metadata": {"contacts": [{"organization": "NPAFC", "cited": True}]}},
+        {"dataset_id": UNMATCHED, "organizations": [],
+         "metadata": {"contacts": [{"organization": "Hakai Institute", "cited": True}]}},
+        {"dataset_id": "unconverted", "organizations": ["DFO"], "metadata": None},
+    ])
+    assert harvester._add_cited_organizations(datasets)["organizations"].tolist() == [
+        ["Hakai Institute", "NPAFC"], ["Hakai Institute"], ["DFO"],
+    ]
