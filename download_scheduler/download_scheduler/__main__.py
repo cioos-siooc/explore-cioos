@@ -3,6 +3,7 @@ import time
 from loguru import logger
 
 from download_scheduler.download_scheduler import (
+    delete_abandoned_job_folders,
     delete_expired_downloads,
     forget_expired_emails,
     poll_once,
@@ -21,6 +22,8 @@ if __name__ == "__main__":
         if time.monotonic() - last_sweep >= RETENTION_SWEEP_INTERVAL:
             forget_expired_emails()
             delete_expired_downloads()
+            # Safe here: jobs run on this thread, so none is running now.
+            delete_abandoned_job_folders()
             last_sweep = time.monotonic()
         serving = poll_once()
         time.sleep(POLL_INTERVAL if serving else ERROR_BACKOFF)
