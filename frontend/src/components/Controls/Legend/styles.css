@@ -16,6 +16,7 @@
 
   /* Stops a long key list short of the centred top bar. */
   --legend-top-reserve: 108px;
+
   /* 11px floor: the ticks and group labels are what the ramp is read by. */
   --cioos-font-size-3xs: calc(11px + var(--legend-grow) / 400);
   --cioos-font-size-2xs: calc(11px + var(--legend-grow) / 400);
@@ -486,6 +487,7 @@
   --legend-grow: 0px;
 
   min-width: 96px;
+
   /* Fits "Days of data" at the 11px floor on two lines. */
   max-width: 152px;
 }

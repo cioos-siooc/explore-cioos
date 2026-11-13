@@ -154,7 +154,7 @@
   {
     "identifier": "11",
     "label_en": "fixed benthic node",
-    "label_fr": "platform benthique fixe",
+    "label_fr": "plateforme benthique fixe",
     "category": "land or seafloor",
     "definition_en": "A collection of oceanographic instruments mounted at a fixed position on the seabed (e.g. POL Monitoring Platform, seabed ADCP).",
     "definition_fr": "Ensemble d'instruments océanographiques positionné de manière fixe sur le fond marin (par exemple, plateforme de surveillance POL, ADCP du fond marin)."

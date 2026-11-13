@@ -97,99 +97,105 @@ export default function CoverageHistogramPlot({ histogram }) {
   const countLabel = t(COUNT_LABELS[histogram.count] || COUNT_LABELS.datasets);
   const seasonal = histogram.view === "seasonal";
 
-  const { traces, binCenters, binWidths, legendSide } = useMemo(() => {
-    const { timeBinEdges, series, cells } = histogram;
-    const edgesMs = timeBinEdges.map((edge) => Date.parse(edge));
-    const numBins = edgesMs.length - 1;
+  const { traces, binCenters, binWidths, legendSide, peakTotal } =
+    useMemo(() => {
+      const { timeBinEdges, series, cells } = histogram;
+      const edgesMs = timeBinEdges.map((edge) => Date.parse(edge));
+      const numBins = edgesMs.length - 1;
 
-    const centers = Array.from(
-      { length: numBins },
-      (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
-    );
-    const widths = Array.from(
-      { length: numBins },
-      (_, i) => edgesMs[i + 1] - edgesMs[i],
-    );
-    const labels = Array.from({ length: numBins }, (_, i) =>
-      formatPeriod(edgesMs[i], edgesMs[i + 1], locale, seasonal),
-    );
+      const centers = Array.from(
+        { length: numBins },
+        (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
+      );
+      const widths = Array.from(
+        { length: numBins },
+        (_, i) => edgesMs[i + 1] - edgesMs[i],
+      );
+      const labels = Array.from({ length: numBins }, (_, i) =>
+        formatPeriod(edgesMs[i], edgesMs[i + 1], locale, seasonal),
+      );
 
-    const top = series.slice(0, MAX_SERIES);
-    const counts = new Map(top.map((s) => [s.key, new Array(numBins).fill(0)]));
-    const other = new Array(numBins).fill(0);
-    let hasOther = series.length > MAX_SERIES;
+      const top = series.slice(0, MAX_SERIES);
+      const counts = new Map(
+        top.map((s) => [s.key, new Array(numBins).fill(0)]),
+      );
+      const other = new Array(numBins).fill(0);
+      let hasOther = series.length > MAX_SERIES;
 
-    cells.forEach(([binIndex, key, count]) => {
-      const bucket = counts.get(key);
-      if (bucket) bucket[binIndex - 1] += count;
-      else {
-        other[binIndex - 1] += count;
-        hasOther = true;
-      }
-    });
-
-    const platformColor = (s) =>
-      s.kind === "platform" &&
-      platformColors.find(({ platform }) => platform === s.key)?.color;
-    let nextSlot = 0;
-    const built = top.map((s) => ({
-      name: seriesLabel(s.key, s.kind, i18n.language, t),
-      color: platformColor(s) || SERIES_COLORS[nextSlot++],
-      y: counts.get(s.key),
-    }));
-    if (hasOther) {
-      built.push({
-        name: t("coverageOtherSeries"),
-        color: OTHER_COLOR,
-        y: other,
+      cells.forEach(([binIndex, key, count]) => {
+        const bucket = counts.get(key);
+        if (bucket) bucket[binIndex - 1] += count;
+        else {
+          other[binIndex - 1] += count;
+          hasOther = true;
+        }
       });
-    }
 
-    // The floating legend sits over whichever outer third the bars leave
-    // emptiest.
-    const totals = new Array(numBins).fill(0);
-    built.forEach(({ y }) => y.forEach((value, i) => (totals[i] += value)));
-    const peak = (values) => values.reduce((max, v) => Math.max(max, v), 0);
-    const end = Math.max(1, Math.round(numBins / 3));
-    const side =
-      peak(totals.slice(0, end)) <= peak(totals.slice(-end)) ? "left" : "right";
+      const platformColor = (s) =>
+        s.kind === "platform" &&
+        platformColors.find(({ platform }) => platform === s.key)?.color;
+      let nextSlot = 0;
+      const built = top.map((s) => ({
+        name: seriesLabel(s.key, s.kind, i18n.language, t),
+        color: platformColor(s) || SERIES_COLORS[nextSlot++],
+        y: counts.get(s.key),
+      }));
+      if (hasOther) {
+        built.push({
+          name: t("coverageOtherSeries"),
+          color: OTHER_COLOR,
+          y: other,
+        });
+      }
 
-    // Plotly parses hover labels as HTML and names are harvested strings, so
-    // they're escaped.
-    const format = (n) => n.toLocaleString(locale);
-    const hoverText = built.map((_, hovered) =>
-      labels.map((label, bin) => {
-        const rows = built
-          .map(({ name, color, y }, index) => ({
-            name,
-            color,
-            index,
-            count: y[bin],
-          }))
-          .filter(({ count }) => count > 0)
-          .reverse()
-          .map(({ name, color, index, count }) => {
-            const row = `<span style="color:${color}">■</span> ${escapeHtml(name)}: ${format(count)}`;
-            return index === hovered ? `<b>${row}</b>` : row;
-          });
-        return (
-          `<b>${label}</b><br>` +
-          `${countLabel}: ${format(totals[bin])}<br>` +
-          rows.join("<br>")
-        );
-      }),
-    );
+      // The floating legend sits over whichever outer third the bars leave
+      // emptiest.
+      const totals = new Array(numBins).fill(0);
+      built.forEach(({ y }) => y.forEach((value, i) => (totals[i] += value)));
+      const peak = (values) => values.reduce((max, v) => Math.max(max, v), 0);
+      const end = Math.max(1, Math.round(numBins / 3));
+      const side =
+        peak(totals.slice(0, end)) <= peak(totals.slice(-end))
+          ? "left"
+          : "right";
 
-    return {
-      traces: built.map((trace, index) => ({
-        ...trace,
-        hoverText: hoverText[index],
-      })),
-      binCenters: centers,
-      binWidths: widths,
-      legendSide: side,
-    };
-  }, [histogram, locale, i18n.language, t, countLabel, seasonal]);
+      // Plotly parses hover labels as HTML and names are harvested strings, so
+      // they're escaped.
+      const format = (n) => n.toLocaleString(locale);
+      const hoverText = built.map((_, hovered) =>
+        labels.map((label, bin) => {
+          const rows = built
+            .map(({ name, color, y }, index) => ({
+              name,
+              color,
+              index,
+              count: y[bin],
+            }))
+            .filter(({ count }) => count > 0)
+            .reverse()
+            .map(({ name, color, index, count }) => {
+              const row = `<span style="color:${color}">■</span> ${escapeHtml(name)}: ${format(count)}`;
+              return index === hovered ? `<b>${row}</b>` : row;
+            });
+          return (
+            `<b>${label}</b><br>` +
+            `${countLabel}: ${format(totals[bin])}<br>` +
+            rows.join("<br>")
+          );
+        }),
+      );
+
+      return {
+        traces: built.map((trace, index) => ({
+          ...trace,
+          hoverText: hoverText[index],
+        })),
+        binCenters: centers,
+        binWidths: widths,
+        legendSide: side,
+        peakTotal: peak(totals),
+      };
+    }, [histogram, locale, i18n.language, t, countLabel, seasonal]);
 
   const outlined = plotWidth / binCenters.length >= MIN_OUTLINED_BAR_PX;
   // A narrow plot has no empty third to float the legend over: it would hide
@@ -237,6 +243,8 @@ export default function CoverageHistogramPlot({ histogram }) {
             gridcolor: "#DCE8E5",
             zeroline: false,
             rangemode: "tozero",
+            // Counts are whole days or records: a short axis would tick 0.5.
+            ...(peakTotal <= 5 && { dtick: 1 }),
           },
           legend: {
             ...(stackedLegend
