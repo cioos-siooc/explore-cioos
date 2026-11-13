@@ -327,7 +327,8 @@ def write_obis(format_key, url, user_query, regions, out_base: Path):
         "time_max": _epoch_ms(user_query.get("time_max")),
     }
     # The same columns the harvester reads; reliably present across OBIS
-    # exports. date_start/date_end are epoch milliseconds.
+    # exports. date_start/date_end are epoch milliseconds. Absences and
+    # records OBIS dropped are excluded, as OBIS's own examples do.
     query = """
         SELECT
             _id                              AS id,
@@ -339,7 +340,8 @@ def write_obis(format_key, url, user_query, regions, out_base: Path):
             interpreted.minimumDepthInMeters AS minimumDepthInMeters,
             interpreted.maximumDepthInMeters AS maximumDepthInMeters
         FROM read_parquet($url)
-        WHERE interpreted.decimalLatitude  BETWEEN $lat_min AND $lat_max
+        WHERE dropped IS NOT TRUE AND absence IS NOT TRUE
+          AND interpreted.decimalLatitude  BETWEEN $lat_min AND $lat_max
           AND interpreted.decimalLongitude BETWEEN $lon_min AND $lon_max
           AND ($depth_max IS NULL OR coalesce(interpreted.minimumDepthInMeters, 0) <= $depth_max)
           AND ($depth_min IS NULL OR coalesce(interpreted.maximumDepthInMeters, 0) >= $depth_min)
