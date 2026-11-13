@@ -423,10 +423,16 @@ def extract_features(dataset, handler):
             profile_min_max = dataset.get_max_min(variables)
 
             if profile_min_max.empty:
-                raise EmptyVariableError(
-                    f"orderByMinMax of {llat_variable} per feature returned no "
-                    f"rows: {llat_variable} is never filled"
-                )
+                if dataset.has_values(llat_variable):
+                    raise EmptyVariableError(
+                        f"{llat_variable} has values, but none on a row where "
+                        f"{', '.join(profile_variable_list)} is filled"
+                    )
+                if llat_variable not in vertical_variables:
+                    raise EmptyVariableError(f"{llat_variable} is never filled")
+                # e.g. a surface wave buoy: harvested as if it had no depth.
+                logger.info(f"{llat_variable} is never filled, ignoring it")
+                continue
 
         profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
 
@@ -556,15 +562,9 @@ def extract_features(dataset, handler):
     profiles["dataset_id"] = dataset.id
     profiles["erddap_url"] = dataset.erddap_url
 
-    if "altitude" in dataset.variables_list:
-        profiles["altitude_min"] = -profiles["altitude_min"]
-        profiles["altitude_max"] = -profiles["altitude_max"]
-        profiles = profiles.rename(
-            {
-                "depth_min": "altitude_min",
-                "depth_max": "altitude_max",
-            }
-        )
+    if "altitude_min" in profiles:
+        profiles["depth_min"] = -profiles.pop("altitude_max")
+        profiles["depth_max"] = -profiles.pop("altitude_min")
 
     if "depth_min" not in profiles:
         profiles["depth_min"] = 0
