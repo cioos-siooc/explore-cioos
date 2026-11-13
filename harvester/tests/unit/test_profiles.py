@@ -248,12 +248,36 @@ class TestNeverFilledVariables:
     """A declared variable with no values is a provider data problem: an
     error, not a NO_PROFILES_FOUND skip."""
 
-    def test_never_filled_time_raises(self, two_station_dataset):
-        answer = two_station_dataset.get_max_min.side_effect
-        two_station_dataset.get_max_min.side_effect = (
-            lambda v: pd.DataFrame() if v[-1] == "time" else answer(v)
+    @staticmethod
+    def _no_rows_per_feature(dataset, variable, has_values):
+        answer = dataset.get_max_min.side_effect
+        dataset.get_max_min.side_effect = (
+            lambda v: pd.DataFrame() if v[-1] == variable else answer(v)
         )
+        dataset.has_values.return_value = has_values
+
+    def test_never_filled_time_raises(self, two_station_dataset):
+        self._no_rows_per_feature(two_station_dataset, "time", has_values=False)
         with pytest.raises(EmptyVariableError, match="time is never filled"):
+            get_profiles(two_station_dataset)
+
+    def test_time_filled_only_without_a_feature_id_raises(self, two_station_dataset):
+        self._no_rows_per_feature(two_station_dataset, "time", has_values=True)
+        with pytest.raises(
+            EmptyVariableError, match="time has values, but none on a row where station_id"
+        ):
+            get_profiles(two_station_dataset)
+
+    def test_never_filled_depth_keeps_the_dataset(self, two_station_dataset):
+        """A surface wave buoy legitimately has a depth variable but no depths."""
+        self._no_rows_per_feature(two_station_dataset, "depth", has_values=False)
+        result = get_profiles(two_station_dataset)
+        assert len(result) == 2
+        assert (result[["depth_min", "depth_max"]] == 0).all(axis=None)
+
+    def test_depth_filled_only_without_a_feature_id_raises(self, two_station_dataset):
+        self._no_rows_per_feature(two_station_dataset, "depth", has_values=True)
+        with pytest.raises(EmptyVariableError, match="depth has values, but none"):
             get_profiles(two_station_dataset)
 
     def test_never_filled_lat_lon_raises(self, two_station_dataset):
