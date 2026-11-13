@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoCircle, X } from 'react-bootstrap-icons'
+import { Megaphone, X } from 'react-bootstrap-icons'
 
 import './styles.css'
 
@@ -24,37 +24,60 @@ export default function VersionBanner() {
 
   return (
     <div className='versionBanner' role='status'>
-      <InfoCircle className='versionBannerIcon' aria-hidden='true' />
       <div className='versionBannerBody'>
-        <span>
-          {t('versionBannerMessage')} {t('versionBannerSubscribe')}
-        </span>
-        {submitted ? (
-          <span className='versionBannerThanks'>
-            {t('versionBannerSubscribed')}
-          </span>
-        ) : (
-          <form
-            className='versionBannerForm'
-            action={newsletterAction}
-            method='post'
-            target='_blank'
-            // defer so the form is still mounted when the browser submits it
-            onSubmit={() => setTimeout(() => setSubmitted(true))}
-          >
-            <input
-              type='email'
-              name='EMAIL'
-              required
-              placeholder='email@email.com'
-              aria-label={t('versionBannerEmailLabel')}
+        <p className='versionBannerHeadline'>
+          <strong>
+            <Megaphone
+              className='versionBannerIcon'
+              size={20}
+              aria-hidden='true'
             />
-            <div className='versionBannerHoneypot' aria-hidden='true'>
-              <input type='text' name={honeypotName} tabIndex='-1' defaultValue='' />
-            </div>
-            <button type='submit'>{t('versionBannerSubscribeButton')}</button>
-          </form>
-        )}
+            {t('versionBannerMessage')}
+          </strong>
+          <br />
+          {t('versionBannerTryIt')}{' '}
+          <a
+            href='https://beta.explore.cioos.ca'
+            target='_blank'
+            rel='noopener noreferrer'
+          >
+            beta.explore.cioos.ca
+          </a>
+        </p>
+        <div className='versionBannerNewsletter'>
+          <span>{t('versionBannerSubscribe')}</span>
+          {submitted ? (
+            <span className='versionBannerThanks'>
+              {t('versionBannerSubscribed')}
+            </span>
+          ) : (
+            <form
+              className='versionBannerForm'
+              action={newsletterAction}
+              method='post'
+              target='_blank'
+              // defer so the form is still mounted when the browser submits it
+              onSubmit={() => setTimeout(() => setSubmitted(true))}
+            >
+              <input
+                type='email'
+                name='EMAIL'
+                required
+                placeholder='email@email.com'
+                aria-label={t('versionBannerEmailLabel')}
+              />
+              <div className='versionBannerHoneypot' aria-hidden='true'>
+                <input
+                  type='text'
+                  name={honeypotName}
+                  tabIndex='-1'
+                  defaultValue=''
+                />
+              </div>
+              <button type='submit'>{t('versionBannerSubscribeButton')}</button>
+            </form>
+          )}
+        </div>
       </div>
       <button
         type='button'

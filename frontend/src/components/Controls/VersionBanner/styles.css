@@ -6,33 +6,57 @@
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 2px;
   width: max-content;
   max-width: calc(100% - 20px);
-  padding: 8px 8px 8px 14px;
+  padding: 12px 4px 12px 6px;
   background-color: #fff;
   border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
   pointer-events: all;
 }
 
 .versionBannerIcon {
-  flex-shrink: 0;
+  margin-right: 8px;
+  vertical-align: -3px;
   color: #52a79b;
 }
 
-/* text on the left, form on the right; stacks when there's no room */
+/* announcement on top, newsletter signup underneath */
 .versionBannerBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 460px;
+  text-align: center;
+}
+
+.versionBannerHeadline {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.versionBannerHeadline a {
+  color: #2f7d72;
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.versionBannerHeadline a:hover {
+  color: #1f5c54;
+}
+
+.versionBannerNewsletter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 16px;
-  min-width: 0;
-}
-
-.versionBannerBody > span {
-  flex: 1 1 260px;
-  max-width: 420px;
+  justify-content: center;
+  gap: 6px 12px;
+  font-size: 0.9rem;
 }
 
 .versionBannerForm {
@@ -73,6 +97,8 @@
 
 .versionBannerClose {
   flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: -6px;
   display: flex;
   padding: 4px;
   border: none;
