@@ -38,7 +38,7 @@ export default function FeatureCard() {
     combinedQueries,
   } = useSelection();
   const [listSort] = useListSort();
-  const { sidebarOpen, compactList } = useUI();
+  const { sidebarOpen } = useUI();
   const { offerTip, tipHighlight } = useTips();
 
   const [expanded, setExpanded] = useState(false);
@@ -195,11 +195,7 @@ export default function FeatureCard() {
         <p className="featureCardEmptyText">{t("featureCardEmpty")}</p>
       ) : (
         <>
-          <div
-            className={classNames("datasetsCardList featureCardList", {
-              compact: compactList,
-            })}
-          >
+          <div className="datasetsCardList featureCardList compact">
             {foldGrids && (
               <GridGroupHeader
                 count={gridRows.length}

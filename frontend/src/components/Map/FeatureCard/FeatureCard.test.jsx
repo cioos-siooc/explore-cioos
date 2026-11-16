@@ -274,8 +274,8 @@ describe("FeatureCard", () => {
     expect(cardRows().map((card) => card.dataset.datasetPk)).toEqual(byDays);
   });
 
-  it("follows the datasets list's density, with no toggle of its own", async () => {
-    window.localStorage.setItem("cde.listDensity", '"compact"');
+  it("is always compact, whatever the datasets list's density", async () => {
+    window.localStorage.setItem("cde.listDensity", '"full"');
     await renderReady();
     const row = pointQueryFixture[0];
     click({ nonce: 14, items: [{ kind: "observation", pk: row.pk }] });
@@ -284,8 +284,9 @@ describe("FeatureCard", () => {
     expect(
       screen.queryByTestId("datasets-density-toggle"),
     ).not.toBeInTheDocument();
+    act(() => latestUI.setListDensity("compact"));
     act(() => latestUI.setListDensity("full"));
-    expect(list).not.toHaveClass("compact");
+    expect(list).toHaveClass("compact");
   });
 
   // The tile carries one `count` for the whole cell; each dataset needs its
