@@ -9,7 +9,13 @@
   /* A definite height, not max-height: the plot sizes from this container, so a
    * content-sized modal would grow in visible steps (plot -> modal -> budget).
    * Definite all the way down, so the plot's pane row can use it as a % basis. */
-  height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
+  height: min(1100px, calc(100vh - 2 * var(--cioos-space-lg, 16px)));
+}
+
+/* Wider than the shared .modal-xl (1140px): the plot shares its row with the
+   parameters pane. */
+.dataPreviewModal .modal-dialog {
+  max-width: min(1600px, calc(100vw - 2 * var(--cioos-space-lg, 16px)));
 }
 
 .dataPreviewModal .modal-body {
