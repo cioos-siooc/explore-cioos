@@ -51,7 +51,7 @@
   font-size: var(--cioos-font-size-base);
   font-weight: 700;
   line-height: 1.3;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 /* Level with the title's first line (CloseButton centres itself by default). */
@@ -81,7 +81,7 @@
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.01em;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -111,8 +111,8 @@
   }
 
   .datasetMapCardButton.primary:hover {
-    border-color: var(--cioos-primary-700);
-    background-color: var(--cioos-primary-700);
+    border-color: var(--cioos-primary-800);
+    background-color: var(--cioos-primary-800);
   }
 }
 

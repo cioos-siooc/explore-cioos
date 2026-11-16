@@ -4,7 +4,7 @@
 .notice {
   --notice-bg: var(--cioos-white);
   --notice-fg: var(--cioos-ink);
-  --notice-link: var(--cioos-primary-700);
+  --notice-link: var(--cioos-primary-800);
   --notice-accent: currentcolor;
 
   display: flex;

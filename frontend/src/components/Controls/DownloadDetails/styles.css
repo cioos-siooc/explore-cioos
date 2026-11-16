@@ -143,7 +143,7 @@
 }
 
 .filterDownloadToggle.active button .filterToggleIcon {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .filterDownloadToggle:hover button {
@@ -266,7 +266,7 @@
 }
 
 .submitRequestButton:hover:not(:disabled) {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 .submitRequestButton:disabled {
@@ -314,7 +314,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -381,7 +381,7 @@
 }
 
 .directLinksButton:hover:not(:disabled) {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 .directLinksButton:disabled {

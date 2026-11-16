@@ -78,7 +78,7 @@
 }
 
 .metadataMarkdown a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-weight: 600;
 }
 
@@ -130,7 +130,7 @@
 
 .metadataCard a,
 .datasetCredit a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-weight: 600;
 }
 
@@ -171,7 +171,7 @@
 }
 
 .metadataCitation a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-weight: 600;
 }
 
@@ -186,7 +186,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
@@ -279,7 +279,7 @@
 
 .metadataResourceName {
   font-weight: 600;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .metadataResourceFormat {
@@ -348,7 +348,7 @@
   border-color: var(--cioos-hairline);
   background-color: var(--cioos-white);
   font-family: inherit;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 

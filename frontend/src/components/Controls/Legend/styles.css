@@ -450,7 +450,7 @@
 }
 
 .legendCredits .maplibregl-ctrl-attrib a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: underline;
 }
 

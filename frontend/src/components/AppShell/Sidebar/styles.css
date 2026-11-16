@@ -189,7 +189,7 @@
   font: inherit;
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -199,7 +199,7 @@
 
 .datasetsBackButton:hover {
   background-color: var(--cioos-white);
-  border-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-800);
 }
 
 .datasetsBackButtonIcon {
@@ -270,7 +270,7 @@
   background: none;
   font: inherit;
   font-weight: 600;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -281,7 +281,7 @@
 }
 
 .sidebarFooterAddAll:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
+  outline: 2px solid var(--cioos-primary-800);
   outline-offset: 2px;
   border-radius: var(--cioos-radius-sm);
 }
@@ -293,7 +293,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
@@ -312,7 +312,7 @@
   gap: 8px;
   flex-shrink: 0;
   padding: 6px 14px;
-  border: 1px solid var(--cioos-primary-700);
+  border: 1px solid var(--cioos-primary-800);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-primary);
   font: inherit;
@@ -323,7 +323,7 @@
 }
 
 .sidebarDownloadButton:hover:not(:disabled) {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 /* A washed-out fill instead of a faded one: the teal at 45% left its white

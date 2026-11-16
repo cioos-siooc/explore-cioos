@@ -135,14 +135,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .helpModalLink:hover {
-  color: var(--cioos-primary-800);
+  text-decoration-thickness: 2px;
 }
 
 .helpModalLink:focus-visible {

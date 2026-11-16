@@ -26,7 +26,7 @@
   /* No --cioos-radius-circle token; circles draw their own, as .brandMinorItem. */
   border-radius: 50%;
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   box-shadow: var(--cioos-shadow-float);
   transition:
@@ -37,7 +37,6 @@
 
 .quickFilterButton:hover {
   background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary-800);
 }
 
 /* Same raised treatment as .topBarButton.active. Icons draw with currentColor,
@@ -53,7 +52,7 @@
 }
 
 .quickFilterButton.applied:hover {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
   color: var(--cioos-white);
 }
 

@@ -108,7 +108,7 @@
   font: inherit;
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 

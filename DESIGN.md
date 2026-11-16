@@ -3,8 +3,7 @@ name: CIOOS Data Explorer
 description: Canada's ocean data on one map; calm instruments laid over a chart.
 colors:
   coastal-teal: "#52a79b"
-  coastal-teal-deep: "#2f6f65"
-  coastal-teal-deeper: "#295f57"
+  coastal-teal-deep: "#295f57"
   shallows: "#c6e3df"
   deep-water-navy: "#152f37"
   beach-sand: "#f3f0ec"
@@ -92,7 +91,7 @@ components:
     padding: "4px 10px"
   tab-segment-applied:
     backgroundColor: "{colors.shallows}"
-    textColor: "{colors.coastal-teal-deeper}"
+    textColor: "{colors.coastal-teal-deep}"
   tab-segment-active:
     backgroundColor: "{colors.coastal-teal}"
     textColor: "{colors.white}"
@@ -126,7 +125,7 @@ components:
     height: "32px"
   group-row-open:
     backgroundColor: "{colors.shallows}"
-    textColor: "{colors.coastal-teal-deeper}"
+    textColor: "{colors.coastal-teal-deep}"
   pill-clear-selection:
     backgroundColor: "{colors.white}"
     textColor: "{colors.deep-water-navy}"
@@ -174,8 +173,7 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 
 ### Primary
 - **Coastal Teal** (`coastal-teal`): the one interactive accent. Primary buttons, the open tab segment, focus rings (at 55% alpha), toggle tracks, icons in the tab strip, the selected card border. As a fill it carries white text (`--cioos-on-primary`). White on it is 2.85:1, below AA; that is a deliberate brand choice, navy (4.9:1) was tried and rejected. It is too light to be text itself.
-- **Coastal Teal Deep** (`coastal-teal-deep`, `--cioos-primary-700`): hover and pressed for teal fills (white text at 5.9:1); link text and teal text on white, sand, surface wash and the translucent teal washes (all ≥4.5:1). Text hovers deepen to deeper rather than lightening to the base teal.
-- **Coastal Teal Deeper** (`coastal-teal-deeper`, `--cioos-primary-800`): teal text on the shallows wash (applied tab, active pager page, success pills), where deep is 4.3:1; the hover of teal text; the open row in the Filters list.
+- **Coastal Teal Deep** (`coastal-teal-deep`, `--cioos-primary-800`): the one dark teal. Hover and pressed for teal fills (white text at 7.3:1); link text and all teal text, on white, sand, surface wash, the translucent teal washes and shallows (all ≥4.5:1); the open row in the Filters list. Teal-text hovers change the background or underline, not the text colour.
 - **Shallows** (`shallows`): the "has a value" wash. Applied tab segments, active filter chips, the success background, and the pale head of the hex ramp.
 
 ### Neutral
@@ -286,7 +284,7 @@ Calm at rest, solid only when it matters.
 The Datasets / Time coverage / Filters segments welded to the brand card's base.
 - **Rest:** a translucent teal wash (14%) with coastal-teal-deep 600-weight text and teal icons; hairline welds between segments.
 - **Hover:** wash deepens to 24%.
-- **Applied** (a value set, UI closed): shallows fill, coastal-teal-deeper text.
+- **Applied** (a value set, UI closed): shallows fill, coastal-teal-deep text.
 - **Active** (its panel open): solid coastal teal, white text and icon, a white inner ring and the small 3D lift, so two adjacent active segments still read as separate buttons.
 - Labels wrap, never truncate; French uses a non-breaking space so "Jeux / de données" breaks cleanly.
 
@@ -304,7 +302,7 @@ The Datasets / Time coverage / Filters segments welded to the brand card's base.
 - **Compact density:** a toolbar toggle drops each card to two lines (title, then meta in body-small at the xs rung) with 5px 10px padding. The meta line never wraps; it fades out at the right edge instead.
 
 ### Group rows
-- **Gridded products:** grids fold into one sticky 32px row ahead of the in-situ cards: white with a hairline, an amber-deep grid glyph, the title, and a count pill. Hover borders it teal; open, it takes the shallows fill with coastal-teal-deeper text. When the last map click found some of them, a goldenrod swatch and "N here" ride beside the count. Grouping the list by a dimension uses the same row.
+- **Gridded products:** grids fold into one sticky 32px row ahead of the in-situ cards: white with a hairline, an amber-deep grid glyph, the title, and a count pill. Hover borders it teal; open, it takes the shallows fill with coastal-teal-deep text. When the last map click found some of them, a goldenrod swatch and "N here" ride beside the count. Grouping the list by a dimension uses the same row.
 
 ### "What's here" card
 - The left-corner card a map click opens: a pin icon, the Display title, a goldenrod swatch tying it to the ring on the map, a navy count pill, and the cell's days of data beneath. It lists the same dataset cards as the sidebar, each with a "here" line led by a small goldenrod hex (days of data at this spot, "records without dates" when none of them carry one, "nearby" for clustered markers), and folds grids the same way.
@@ -318,7 +316,7 @@ The Datasets / Time coverage / Filters segments welded to the brand card's base.
 
 ### Modals
 - White, 16px corners, float shadow, over the navy backdrop. The header is an icon, a Sora `h2` title and a subtitle that wraps rather than truncates, with a hairline beneath. Footers sit on a light wash. At 700px and below they go full-screen with a drag handle.
-- **Filters:** a left rail of filter pages under small uppercase group labels (What / From / When & where / Biodiversity); the open page is a coastal-teal-deeper row with white text. The footer holds the live dataset count and a primary "Show results".
+- **Filters:** a left rail of filter pages under small uppercase group labels (What / From / When & where / Biodiversity); the open page is a coastal-teal-deep row with white text. The footer holds the live dataset count and a primary "Show results".
 - **Download:** a summary of what the files are cut to, the format choice, then the dataset cards with their source links. Each card carries a size pill: shallows with a check for "Under 1 GB" (emailed as a package), coral-error-bg with a × for "Over 1 GB" (get it from the source).
 
 ### Legend

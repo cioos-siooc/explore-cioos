@@ -63,7 +63,7 @@
   height: 12px;
   margin: -6px 0 0 -6px;
   border-radius: 50%;
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
   box-shadow: var(--cioos-shadow-sm);
   z-index: 1;
 }

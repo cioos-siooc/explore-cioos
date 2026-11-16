@@ -14,10 +14,9 @@
   --cioos-primary: #52a79b;
 
   /* White on the brand teal is 2.85:1 — a deliberate brand choice over the
-     AA navy. -700 is the hover fill and teal text on white or the teal
-     washes (≥4.5:1); -800 is teal text on shallows. */
+     AA navy. -800 is the hover fill and all teal text, on white, the teal
+     washes or shallows (≥4.5:1). */
   --cioos-on-primary: var(--cioos-white);
-  --cioos-primary-700: #2f6f65;
   --cioos-primary-800: #295f57;
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
@@ -299,7 +298,7 @@ button {
 }
 
 a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: none;
 }
 

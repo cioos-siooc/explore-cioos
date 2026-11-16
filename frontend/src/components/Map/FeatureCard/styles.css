@@ -142,7 +142,7 @@
   border: none;
   border-top: 1px solid var(--cioos-hairline);
   background: transparent;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-size: var(--cioos-font-size-xs);
   text-align: left;
   cursor: pointer;

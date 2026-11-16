@@ -185,7 +185,7 @@
   background-color: rgb(82 167 155 / 14%);
   font: inherit;
   font-weight: 600;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
@@ -247,7 +247,7 @@
 }
 
 .topBarButton.applied svg {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 /* Two adjacent active segments would read as one block, so each gets a ring

@@ -29,7 +29,7 @@
   font-family: inherit;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -92,7 +92,7 @@
   margin: 0 0 10px;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .datasetView .recordSection .cardList {
@@ -194,7 +194,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
@@ -229,8 +229,8 @@
 
 .datasetAction.active:hover,
 .datasetAction.active:focus-visible {
-  border-color: var(--cioos-primary-700);
-  background-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-800);
+  background-color: var(--cioos-primary-800);
 }
 
 /* Not faded (DESIGN.md): the surface wash with ink-60 text. */
@@ -275,7 +275,7 @@
   border: 0;
   background: none;
   font: inherit;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -519,7 +519,7 @@
 }
 
 .viewToggle button[aria-pressed="true"] {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
   color: var(--cioos-on-primary);
 }
 
@@ -551,7 +551,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   cursor: pointer;
@@ -702,7 +702,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   white-space: nowrap;
@@ -793,7 +793,7 @@
 
 .listCardTagsMore {
   border: 1px solid var(--cioos-hairline);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
