@@ -769,13 +769,21 @@ describe("generateColorStops", () => {
     expect(stops.at(-1).stop).toBe(hi);
   });
 
-  it("samples the ramp across a range narrower than its colours", () => {
+  it("samples the upper two thirds of the ramp across a narrow range", () => {
+    const last = colorScale.length - 1;
+    const first = Math.round(last / 3);
     const stops = generateColorStops(colorScale, [1, 3]);
     expect(stops.map((s) => s.stop)).toEqual([1, 2, 3]);
     expect(stops.map((s) => s.color)).toEqual([
-      colorScale[0],
-      colorScale[Math.round((colorScale.length - 1) / 2)],
-      colorScale.at(-1),
+      colorScale[first],
+      colorScale[Math.round((first + last) / 2)],
+      colorScale[last],
+    ]);
+  });
+
+  it("gives a one-value range the top colour", () => {
+    expect(generateColorStops(colorScale, [4, 4])).toEqual([
+      { stop: 4, color: colorScale.at(-1) },
     ]);
   });
 });

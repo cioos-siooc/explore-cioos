@@ -313,6 +313,9 @@ export function createDataFilterQueryString(query) {
 // log instead of linear.
 const LOG_SCALE_MIN_RATIO = 100;
 
+// A narrow range keeps to the darker two thirds of the ramp.
+const NARROW_RAMP_START = 1 / 3;
+
 export function generateColorStops(colorScale, range) {
   // Absent while /legend is in flight, [null, null] when filters match nothing.
   if (!range || !Number.isFinite(range[1]) || range[1] <= 0) return [];
@@ -331,10 +334,12 @@ export function generateColorStops(colorScale, range) {
       .range([0, colors.length - 1]);
     scale = (index) => logScale.invert(index);
   } else {
-    // Fewer values than colors: sample across the whole ramp, not a prefix,
-    // or a 1..3 range would sit entirely in the pale end and read as nothing.
-    // A one-value range takes the middle of the ramp.
+    // Fewer values than colors: sample the upper part of the ramp, not a
+    // prefix, or a 1..3 range would sit entirely in the pale end and read as
+    // nothing. A one-value range takes the top colour.
     const span = Math.floor(hi) - Math.floor(lo) + 1;
+    const last = colorScale.length - 1;
+    const first = Math.round(last * NARROW_RAMP_START);
     colors =
       span < colorScale.length
         ? Array.from(
@@ -342,7 +347,7 @@ export function generateColorStops(colorScale, range) {
             (_, i) =>
               colorScale[
                 Math.round(
-                  (span === 1 ? 0.5 : i / (span - 1)) * (colorScale.length - 1),
+                  first + (span === 1 ? 1 : i / (span - 1)) * (last - first),
                 )
               ],
           )
