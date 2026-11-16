@@ -18,14 +18,13 @@
 
 .datasetsCardToolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 
-/* Wraps to a second row rather than truncating its value to "Ti…". */
+/* The toolbar stays one row; on a narrow sidebar the values truncate. */
 .datasetsCardToolbar .selectPill {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 .datasetsCardToolbar .selectPillLabel {
