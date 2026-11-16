@@ -299,8 +299,9 @@ export default function Legend({
             .map((cs, i) => `${cs.color} ${((i / denom) * 100).toFixed(1)}%`)
             .join(", ")})`;
     const tickIndices = pickTickIndices(n, maxTicks);
-    // /legend clamps the top to a high percentile (rampRange in
-    // web-api/routes/legend.js), so a clamped top tick isn't the real maximum.
+    // The ramp top is a high percentile (rampRange in web-api/routes/legend.js,
+    // viewportCountRange for the view), so a clamped top tick isn't the real
+    // maximum.
     const clamped = rangeLevel?.[2] > rangeLevel?.[1];
     return (
       <div className={classNames({ legendDimmed: dimmed })}>

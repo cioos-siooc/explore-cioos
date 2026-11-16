@@ -23,6 +23,7 @@ import {
   sumSizeEstimates,
   polygonToWkt,
   quantizeCountRange,
+  viewportCountRange,
   rangesEqual,
   rangeLevelHasData,
   revealOffset,
@@ -791,5 +792,21 @@ describe("formatDepthRange", () => {
 
   it("has nothing to say without depths", () => {
     expect(formatDepthRange(null, undefined)).toBeUndefined();
+  });
+});
+
+describe("viewportCountRange", () => {
+  it("ramps to the 99th percentile and keeps the true max for the legend", () => {
+    const counts = [...Array.from({ length: 199 }, (_, i) => i + 1), 1e9];
+    // p99 of 200 cells is the 198th smallest (198), snapped up to 200.
+    expect(viewportCountRange(counts)).toEqual([1, 200, 1e9]);
+  });
+
+  it("is the plain min/max when too few cells to clamp", () => {
+    expect(viewportCountRange([40, 7, 900])).toEqual([7, 1000, 900]);
+  });
+
+  it("has no range without counts", () => {
+    expect(viewportCountRange([])).toBeUndefined();
   });
 });

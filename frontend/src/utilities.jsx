@@ -543,6 +543,21 @@ export function quantizeCountRange(range) {
   return [Math.min(lo, hi), hi];
 }
 
+// Same clamp as /legend (RAMP_MAX_PERCENTILE in web-api/routes/legend.js):
+// one runaway cell in view would otherwise push every neighbour into the pale
+// end. [min, rampMax, trueMax], so the legend can still mark the top "+".
+const VIEWPORT_RAMP_PERCENTILE = 0.99;
+
+export function viewportCountRange(counts) {
+  if (!counts.length) return undefined;
+  const sorted = Float64Array.from(counts).sort();
+  // percentile_disc, so the top is always a count some cell really has.
+  const rampMax =
+    sorted[Math.ceil(VIEWPORT_RAMP_PERCENTILE * sorted.length) - 1];
+  const range = quantizeCountRange([sorted[0], rampMax]);
+  return range && [...range, sorted[sorted.length - 1]];
+}
+
 export function rangesEqual(a, b) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
