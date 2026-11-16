@@ -37,21 +37,23 @@ export const defaultQuery = {
 // The one hex ramp for every hexagon at every zoom, so darkness means the
 // same thing everywhere; colour is reserved for "how much". Twelve stops so
 // interpolation reads as one wash, fully opaque because the layer opacity is
-// applied once (hexOpacity in Map.jsx). CIOOS tokens teal-light -> primary ->
-// navy at even L* steps (~6.4); a paler head washed out over the basemap.
+// applied separately (HEX_FILL_OPACITY_STOPS). CIOOS teal-light -> primary ->
+// navy, then past navy so the top counts stand out, resampled cmocean-style
+// at even lightness in CAM02-UCS (L* 88 -> 4). A paler head washed out over
+// the basemap.
 export const colorScale = [
   "#C6E3DF", // teal-light
-  "#AAD3CD",
-  "#8DC4BC",
-  "#6EB5AA",
-  "#55A598",
-  "#469387",
-  "#3C8277",
-  "#347069",
-  "#2B5F5C",
-  "#244F4F",
-  "#1D3E43",
-  "#152F37", // navy
+  "#A5CFC9",
+  "#84BDB5",
+  "#60ACA1",
+  "#4D9890",
+  "#44847F",
+  "#3B706F",
+  "#315C5E",
+  "#26494E",
+  "#1A373E",
+  "#09252D",
+  "#001219",
 ];
 
 // White separates cells against every part of the ramp; a mid-ramp teal vanished.
@@ -73,7 +75,7 @@ export const gridCoverageColor = "#152F37";
 // one.
 export const dimmedFeatureColor = "#C9D4D6";
 
-// The ramp's navy end: rings that must read over pale cells and pale markers.
+// CIOOS navy: rings that must read over pale cells and pale markers.
 export const mapInkColor = "#152F37";
 
 // Days is the only count that means one thing across all sources. Must match
