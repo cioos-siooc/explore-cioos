@@ -4,7 +4,7 @@ import { withAlpha } from "../../utilities";
 // shade and solidity on purpose: a merely pale sparse cell would still hide
 // the coastline as completely as a busy one. Not lower: the palest stops are
 // close to the basemap's water tint, and a fainter one-day cell read as none.
-export const HEX_RAMP_MIN_ALPHA = 0.7;
+export const HEX_RAMP_MIN_ALPHA = 0.85;
 
 // Alpha is baked into the stops rather than a data-driven fill-opacity, so
 // nothing is evaluated per feature per frame or recomputed while panning.

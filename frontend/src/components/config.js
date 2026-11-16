@@ -35,25 +35,26 @@ export const defaultQuery = {
 };
 
 // The one hex ramp for every hexagon at every zoom, so darkness means the
-// same thing everywhere; colour is reserved for "how much". Twelve stops so
-// interpolation reads as one wash, fully opaque because the layer opacity is
-// applied separately (HEX_FILL_OPACITY_STOPS). CIOOS teal-light -> primary ->
-// navy, then past navy so the top counts stand out, resampled cmocean-style
-// at even lightness in CAM02-UCS (L* 88 -> 4). A paler head washed out over
-// the basemap.
+// same thing everywhere; colour is reserved for "how much". Thirteen stops so
+// interpolation reads as one wash and the middle one is a teal, fully opaque
+// because the layer opacity is applied separately (HEX_FILL_OPACITY_STOPS).
+// CIOOS teal-light -> primary -> navy, resampled cmocean-style at even
+// lightness in CAM02-UCS (J' 89 -> 20). A white head vanished over pale water;
+// going past navy read as black.
 export const colorScale = [
   "#C6E3DF", // teal-light
-  "#A5CFC9",
-  "#84BDB5",
-  "#60ACA1",
-  "#4D9890",
-  "#44847F",
-  "#3B706F",
-  "#315C5E",
-  "#26494E",
-  "#1A373E",
-  "#09252D",
-  "#001219",
+  "#ADD4CE",
+  "#93C5BD",
+  "#78B7AE",
+  "#5AAA9F", // ~primary
+  "#4D9A91",
+  "#468A84", // centre
+  "#3F7A77",
+  "#386A6A",
+  "#305B5D",
+  "#284C51",
+  "#1F3E44",
+  "#152F37", // navy
 ];
 
 // White separates cells against every part of the ramp; a mid-ramp teal vanished.

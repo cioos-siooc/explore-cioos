@@ -773,8 +773,8 @@ describe("generateColorStops", () => {
     expect(stops.map((s) => s.stop)).toEqual([1, 2, 3]);
     expect(stops.map((s) => s.color)).toEqual([
       colorScale[0],
-      colorScale[6],
-      colorScale[11],
+      colorScale[Math.round((colorScale.length - 1) / 2)],
+      colorScale.at(-1),
     ]);
   });
 });
