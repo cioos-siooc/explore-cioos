@@ -344,7 +344,7 @@
    (same specificity, loaded later), whose 30px line box breaks wrapped labels. */
 .filtersPanel .filterOptionsBody .optionButton {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   line-height: 1.35;
   padding: 6px 8px;
@@ -553,7 +553,7 @@
   .filtersPanel .filterOptionsBody .optionButton {
     min-height: 44px;
     padding: 6px 8px;
-    margin: 0;
+    margin: 0 0 4px;
   }
 
   .filtersPanel .filterOptionsBody {
