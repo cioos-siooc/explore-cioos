@@ -40,7 +40,7 @@ async function renderReady(url) {
   return result;
 }
 
-const toggle = () => screen.getByRole("button", { name: /^Arrows/ });
+const toggle = () => screen.getByRole("button", { name: /prior$/ });
 
 async function renderOpened() {
   const result = await renderReady();
@@ -67,16 +67,17 @@ describe("TrajectoryDate", () => {
 
   it("tells the default story in its summary", async () => {
     await renderReady();
-    expect(toggle()).toHaveAccessibleName(
+    expect(toggle()).toHaveAccessibleName("Today· 90 days prior");
+    expect(toggle()).toHaveAccessibleDescription(
       "Arrows: platform positions today. Lines: tracks over the 90 days before",
     );
-    expect(toggle()).toHaveTextContent("Today· 90 days prior");
   });
 
   it("states a linked date in the summary while staying folded", async () => {
     const { user } = await renderReady("/?scrubTime=2020-06-01");
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
-    expect(toggle()).toHaveAccessibleName(
+    expect(toggle()).toHaveAccessibleName(/^Jun 1, 2020/);
+    expect(toggle()).toHaveAccessibleDescription(
       /^Arrows: platform positions on Jun 1, 2020\./,
     );
     await user.click(toggle());
@@ -86,7 +87,10 @@ describe("TrajectoryDate", () => {
   it("states a linked track window in the summary while staying folded", async () => {
     await renderReady("/?trail=30");
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
-    expect(toggle()).toHaveAccessibleName(/tracks over the 30 days before$/);
+    expect(toggle()).toHaveAccessibleName(/30 days prior$/);
+    expect(toggle()).toHaveAccessibleDescription(
+      /tracks over the 30 days before$/,
+    );
   });
 
   it("opens for the trajectory tip, which points at the date", async () => {
@@ -122,6 +126,9 @@ describe("TrajectoryDate", () => {
     const { user } = await renderOpened();
     await user.selectOptions(screen.getByLabelText("Track window"), "30");
     await waitFor(() => expect(latest.trailingDays).toBe(30));
-    expect(toggle()).toHaveAccessibleName(/tracks over the 30 days before$/);
+    expect(toggle()).toHaveAccessibleName(/30 days prior$/);
+    expect(toggle()).toHaveAccessibleDescription(
+      /tracks over the 30 days before$/,
+    );
   });
 });

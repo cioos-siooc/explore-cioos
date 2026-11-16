@@ -25,6 +25,7 @@ export default function TrajectoryDate() {
     useMapState();
   const { activeTip, tipHighlight } = useTips();
   const controlsId = useId();
+  const storyId = useId();
 
   const maxIso = todayIso();
   const axis = useMemo(() => createTimeAxis(tracksMinDate, maxIso), [maxIso]);
@@ -69,19 +70,21 @@ export default function TrajectoryDate() {
         type="button"
         className="trajectoryDateToggle"
         title={(open ? story : [...story, t("trajectoryEdit")]).join("\n")}
-        aria-label={story.join(". ")}
+        // The visible summary names the button (WCAG 2.5.3); the story describes it.
+        aria-describedby={storyId}
         aria-expanded={open}
         aria-controls={controlsId}
         onClick={() => setOpen(!open)}
       >
         <TrackHeadIcon className="legendSwatch" />
-        <span aria-hidden="true">
-          {value === maxIso ? t("trajectoryToday") : dateLabel}
-        </span>
-        <span className="trajectorySummaryTrail" aria-hidden="true">
+        <span>{value === maxIso ? t("trajectoryToday") : dateLabel}</span>
+        <span className="trajectorySummaryTrail">
           {t("trajectoryTrailPrior", { window: trailLabel(trailingDays) })}
         </span>
       </button>
+      <span id={storyId} className="sr-only">
+        {story.join(". ")}
+      </span>
       {open && (
         <div id={controlsId}>
           <div className="legendItem trajectoryDateRow">
