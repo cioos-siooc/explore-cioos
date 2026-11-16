@@ -129,9 +129,11 @@ export function hexFillOpacityAt(zoom) {
   return stops[stops.length - 1][1];
 }
 
+// NONNA arrives two zooms ahead of the imagery hand-off, drawn over EMODnet.
 // Own names so the raster layers and their legend entry cannot drift apart.
-export const bathymetryFadeInZoom = basemapHandoffStartZoom;
-export const bathymetryFullZoom = basemapHandoffEndZoom;
+export const bathymetryFadeInZoom = 7.5;
+export const bathymetryFullZoom = 8;
+export const bathymetryPrewarmZoom = 7;
 // At the fade-in zoom the raster is still invisible; claim the ramp only once
 // it is at least half opaque.
 export const bathymetryLegendMinZoom =
