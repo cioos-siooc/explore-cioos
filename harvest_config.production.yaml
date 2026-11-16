@@ -11,6 +11,7 @@ erddap_urls:
   - https://data.ceotr.ca/erddap
   - https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/
   - https://salishsea.eos.ubc.ca/erddap
+  - https://erddap.oceantrack.org/erddap
 
 # cache ERDDAP data responses for 12h on the harvester_cache volume (useful on
 # dev, where redeploys interrupt harvests)
