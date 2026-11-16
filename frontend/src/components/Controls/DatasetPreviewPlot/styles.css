@@ -26,7 +26,7 @@
 
 /* The parameters pane. Its width is state — the divider writes it, so it is set
    inline — and only the bounds live here. max-width is the backstop for a narrow
-   modal (.modal-xl is calc(100vw - 32px)), where the measured clamp can be a
+   modal (calc(100vw - 32px), DatasetPreview/styles.css), where the measured clamp can be a
    frame stale; if CSS wins, the figure simply measures what is really left.
    Nothing in here needs to escape sideways: the dropdown menus, the colour
    picker and the tooltips all portal to document.body. */
@@ -59,15 +59,21 @@
 
 @media (prefers-reduced-motion: reduce) {
   .datasetPreviewParamsPane,
-  .datasetPreviewParamsPane.isCollapsed {
+  .datasetPreviewParamsPane.isCollapsed,
+  .paneCollapseToggle {
     transition: none;
   }
 }
 
+/* Floats over the pane's top-right corner, beside the first caption, so the
+   controls keep the pane's whole width; the inline left follows the pane's
+   width (and its max-width backstop), and slides with it. */
 .paneCollapseToggle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
   display: flex;
-  flex: 0 0 auto;
-  align-self: flex-start;
   align-items: center;
   justify-content: center;
   width: 24px;
@@ -78,6 +84,11 @@
   background-color: var(--cioos-white);
   color: var(--cioos-ink-60);
   cursor: pointer;
+  transition: left 200ms ease;
+}
+
+.datasetPreviewPlotPanes.isResizing .paneCollapseToggle {
+  transition: none;
 }
 
 /* Mid-slide the figure keeps its old size, so it can be briefly wider than
@@ -90,13 +101,6 @@
    over the corner, beside the profile title when there is one. */
 .datasetPreviewPlotPanes.isPaneHidden {
   gap: 0;
-}
-
-.isPaneHidden .paneCollapseToggle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
 }
 
 .isPaneHidden .previewProfileHeader {
@@ -589,6 +593,19 @@
 .resetPlotButton:disabled {
   color: var(--cioos-ink-60);
   cursor: default;
+}
+
+/* Beside the plot every control spans the pane, these two included; the
+   settings dialog portals out of .datasetPreviewPlotPanes and keeps them
+   compact. */
+.datasetPreviewPlotPanes .labelEditorToggle,
+.datasetPreviewPlotPanes .resetPlotButton {
+  align-self: stretch;
+  justify-content: space-between;
+}
+
+.datasetPreviewPlotPanes .resetPlotButton {
+  justify-content: center;
 }
 
 .labelEditor {

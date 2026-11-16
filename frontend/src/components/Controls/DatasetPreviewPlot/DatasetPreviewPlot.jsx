@@ -898,6 +898,11 @@ export default function DatasetPreviewPlot() {
             aria-controls={PARAMS_PANE_ID}
             aria-label={t(paneToggleKey)}
             title={t(paneToggleKey)}
+            style={
+              paneCollapsed
+                ? undefined
+                : { left: `calc(min(${paneWidth}px, 60%) - 24px)` }
+            }
             onClick={togglePane}
           >
             {paneCollapsed ? (
