@@ -228,7 +228,7 @@ describe("DatasetPreviewPlot", () => {
     expect(document.querySelector(".pinnedAxis")).not.toBeNull();
 
     await user.click(variableSearch("X axis"));
-    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
+    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
 
     await waitFor(() => expect(traceCount()).toBe(2));
     expect(rowCaptioned("X axis")).toHaveTextContent("time");
@@ -437,7 +437,7 @@ describe("DatasetPreviewPlot", () => {
 
     // X holds two, so picking on Y replaces its one variable.
     await user.click(variableSearch("Y axis"));
-    await user.click(screen.getByRole("option", { name: "time ( UTC )" }));
+    await user.click(screen.getByRole("option", { name: "time (UTC)" }));
 
     await waitFor(() =>
       expect(rowCaptioned("Y axis")).toHaveTextContent("time"),
@@ -476,7 +476,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     await plotted();
     await user.click(variableSearch("Y axis"));
-    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
+    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
 
     await waitFor(() => expect(traceCount()).toBe(2));
     expect(rowCaptioned("Y axis")).toHaveTextContent("depth");
@@ -488,11 +488,11 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     await plotted();
     await user.click(variableSearch());
-    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
+    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
     await waitFor(() => expect(traceCount()).toBe(2));
   });
 
-  it("tags the variables the record leaves empty, in their usual place", async () => {
+  it("tags the variables the record leaves empty and lists them last", async () => {
     const user = open("/", DATASET, {
       ...TABLE,
       columnNames: [...TABLE.columnNames, "oxygen"],
@@ -503,8 +503,12 @@ describe("DatasetPreviewPlot", () => {
     await plotted();
     await user.click(variableSearch());
     expect(
-      screen.getAllByRole("option").map((option) => option.textContent),
-    ).toEqual(["salinity ( PSU )", "oxygen ( ml/l )no data", "time ( UTC )"]);
+      screen
+        .getAllByRole("option")
+        .map((option) => option.getAttribute("aria-label")),
+    ).toEqual(["salinity (PSU)", "time (UTC)", "oxygen (ml/l), no data"]);
+    expect(screen.getByText("no data")).toBeInTheDocument();
+    expect(document.querySelectorAll(".variableSelect__group")).toHaveLength(2);
   });
 
   it("shows a removable pill per picked variable", async () => {
@@ -552,12 +556,27 @@ describe("DatasetPreviewPlot", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("lists each variable as its column name, then its unit and long_name", async () => {
+    const user = open("/", DATASET, {
+      ...TABLE,
+      columnMeta: [null, null, { long_name: "Sea Water Salinity" }, null],
+    });
+    await plotted();
+    await user.click(variableSearch());
+    const option = screen.getByRole("option", {
+      name: "salinity (PSU) Sea Water Salinity",
+    });
+    expect(within(option).getByText("salinity")).toHaveClass(
+      "variableOptionColumn",
+    );
+  });
+
   it("filters the variable list by what is typed", async () => {
     const user = open("/?pvars=temperature");
     await plotted();
     await user.type(variableSearch(), "sal");
     expect(
-      screen.getByRole("option", { name: "salinity ( PSU )" }),
+      screen.getByRole("option", { name: "salinity (PSU)" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("option", { name: /^time/ }),
@@ -616,7 +635,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     await plotted();
     await user.click(variableSearch("Color by"));
-    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
+    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
     await waitFor(() =>
       expect(screen.getByText("Color scale")).toBeInTheDocument(),
     );
@@ -640,7 +659,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     await plotted();
     await user.click(variableSearch("Color by"));
-    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
+    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
 
     const legend = await waitFor(() => {
       const found = document.querySelector(".colorScaleLegend");

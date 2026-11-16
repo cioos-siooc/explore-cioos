@@ -32,6 +32,20 @@ import {
 
 const columnNameOf = (variable) => variable.columnName;
 
+// The columns the preview leaves empty sink below a rule, as an unlabelled
+// second group, so the drawable ones are what the list leads with.
+function withDataFirst(choices) {
+  const withData = choices.filter(hasData);
+  const empty = choices.filter((variable) => !hasData(variable));
+  return {
+    ordered: [...withData, ...empty],
+    options:
+      withData.length && empty.length
+        ? [{ options: withData }, { options: empty }]
+        : choices,
+  };
+}
+
 // The menu portals to document.body (the pane scrolls and the modal clips), so
 // it needs the dropdown layer to show above the dialog. It may grow past the
 // control so long variable names stay readable, but never off-screen.
@@ -40,8 +54,8 @@ const STYLES = {
     ...base,
     zIndex: "var(--cioos-z-dropdown, 1060)",
     width: "max-content",
-    minWidth: base.width,
-    maxWidth: `min(480px, calc(100vw - ${base.left}px - 16px))`,
+    minWidth: `max(${base.width}px, min(320px, calc(100vw - ${base.left}px - 16px)))`,
+    maxWidth: `min(640px, calc(100vw - ${base.left}px - 16px))`,
   }),
 };
 
@@ -76,6 +90,57 @@ export function NoDataMarker() {
       <SlashCircle size={10} aria-hidden="true" />
       {t("datasetPreviewPlotNoDataMarker")}
     </span>
+  );
+}
+
+// A menu entry reads `column (unit) long name`: the ERDDAP name leads, since
+// it is what tells near-identical long names apart.
+const longNameOf = (variable) =>
+  variable.longName && variable.longName !== variable.columnName
+    ? variable.longName
+    : null;
+
+function VariableOption({ variable, query }) {
+  const longName = longNameOf(variable);
+  return (
+    <span className="variableOption">
+      <span className="variableOptionColumn">
+        <MatchHighlight text={variable.columnName} query={query} />
+      </span>
+      {(longName || variable.unit) && (
+        <span className="variableOptionDetail">
+          {variable.unit && ` (${variable.unit})`}
+          {longName && (
+            <>
+              {" "}
+              <MatchHighlight text={longName} query={query} />
+            </>
+          )}
+        </span>
+      )}
+      {!hasData(variable) && <NoDataMarker />}
+    </span>
+  );
+}
+
+// The visible text as one string, the no-data tag set off from it.
+function Option(props) {
+  const { t } = useTranslation();
+  const { columnName, unit } = props.data;
+  const longName = longNameOf(props.data);
+  const label = [columnName, unit && `(${unit})`, longName]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <components.Option
+      {...props}
+      innerProps={{
+        ...props.innerProps,
+        "aria-label": hasData(props.data)
+          ? label
+          : `${label}, ${t("datasetPreviewPlotNoDataMarker")}`,
+      }}
+    />
   );
 }
 
@@ -157,6 +222,7 @@ export default function VariablePicker({
 }) {
   const { t } = useTranslation();
   const menuOpen = React.useRef(false);
+  const { ordered, options: grouped } = withDataFirst(choices);
   const selectable = Math.min(choices.length, maxSelected);
   const atCap = isMulti && selected.length >= maxSelected;
   const allSelected = selected.length === selectable;
@@ -221,7 +287,7 @@ export default function VariablePicker({
           isMulti={isMulti}
           className="variableSelect"
           classNamePrefix="variableSelect"
-          options={choices}
+          options={grouped}
           value={isMulti ? options : (options[0] ?? null)}
           onChange={(picked) =>
             onChange(
@@ -236,10 +302,7 @@ export default function VariablePicker({
           getOptionLabel={labelFor}
           formatOptionLabel={(variable, { context, inputValue }) =>
             context === "menu" ? (
-              <>
-                <MatchHighlight text={labelFor(variable)} query={inputValue} />
-                {!hasData(variable) && <NoDataMarker />}
-              </>
+              <VariableOption variable={variable} query={inputValue} />
             ) : (
               shortLabelFor(variable)
             )
@@ -282,6 +345,7 @@ export default function VariablePicker({
           reorderable={reorderable}
           components={{
             MenuList,
+            Option,
             DropdownIndicator,
             MultiValue: SortableMultiValue,
             IndicatorSeparator: null,
@@ -304,7 +368,7 @@ export default function VariablePicker({
                 onChange(
                   allSelected
                     ? []
-                    : choices.slice(0, selectable).map(columnNameOf),
+                    : ordered.slice(0, selectable).map(columnNameOf),
                 ),
             }
           }

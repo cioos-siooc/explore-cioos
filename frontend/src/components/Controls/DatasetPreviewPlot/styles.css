@@ -247,6 +247,19 @@
   cursor: default;
 }
 
+.variableOption {
+  overflow-wrap: anywhere;
+}
+
+.variableOptionColumn {
+  font-weight: 700;
+}
+
+.variableOptionDetail {
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-xs);
+}
+
 .noDataMarker {
   display: inline-flex;
   align-items: center;
@@ -261,6 +274,18 @@
   font-weight: 600;
   white-space: nowrap;
   vertical-align: middle;
+}
+
+.variableSelect__menu-portal .variableSelect__group {
+  padding: 0;
+}
+
+.variableSelect__menu-portal .variableSelect__group-heading:empty {
+  display: none;
+}
+
+.variableSelect__menu-portal .variableSelect__group + .variableSelect__group {
+  border-top: 1px solid var(--cioos-hairline);
 }
 
 .variableSelectBulk {
