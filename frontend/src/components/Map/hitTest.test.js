@@ -345,7 +345,7 @@ describe("buildFeatureQuery", () => {
     });
   });
 
-  it("lists stacked grids once each, outlined apart and filled as one", () => {
+  it("lists stacked grids once each, outlined apart and never filled", () => {
     const title = (en) => ({ en });
     const grids = [
       feature(
@@ -372,7 +372,6 @@ describe("buildFeatureQuery", () => {
     expect(query.highlight.features.map((f) => f.properties.role)).toEqual([
       "outline",
       "outline",
-      "fill",
     ]);
     expect(query.observationCount).toBe(0);
   });
@@ -384,10 +383,7 @@ describe("buildFeatureQuery", () => {
       [feature(GRID, { pk: 5 }, square(0, 0, 1, 1))],
       context({ gridGeometry: (pk) => (pk === 5 ? whole : undefined) }),
     );
-    expect(query.highlight.features.map((f) => f.geometry)).toEqual([
-      whole,
-      whole,
-    ]);
+    expect(query.highlight.features.map((f) => f.geometry)).toEqual([whole]);
   });
 
   it("lists a single-point grid and keeps its dot out of the area fill", () => {
@@ -417,7 +413,6 @@ describe("buildFeatureQuery", () => {
     ).toEqual([
       ["Point", "outline"],
       ["Polygon", "outline"],
-      ["Polygon", "fill"],
     ]);
   });
 

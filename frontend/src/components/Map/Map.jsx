@@ -2558,15 +2558,6 @@ export default function CreateMap({
     // The focused grid answers in the click goldenrod, like every selection.
     map.current.addLayer(
       {
-        id: "griddap-highlight-fill",
-        type: "fill",
-        source: "griddap-highlight",
-        paint: { "fill-color": clickHighlightColor, "fill-opacity": 0.1 },
-      },
-      "points-highlighted",
-    );
-    map.current.addLayer(
-      {
         id: "griddap-highlight-line",
         type: "line",
         source: "griddap-highlight",
@@ -2582,8 +2573,7 @@ export default function CreateMap({
         filter: ["==", ["geometry-type"], "Point"],
         paint: {
           "circle-radius": 7,
-          "circle-color": clickHighlightColor,
-          "circle-opacity": 0.1,
+          "circle-opacity": 0,
           "circle-stroke-color": clickHighlightColor,
           "circle-stroke-width": 2.5,
         },
@@ -2630,9 +2620,7 @@ export default function CreateMap({
       id: "click-highlight-fill",
       type: "fill",
       source: "click-highlight",
-      // Excludes the individual grid rectangles; the merged shape fills for
-      // them so a stack's opacity doesn't compound (see `role` in
-      // buildFeatureQuery).
+      // Grid rectangles are outlined only (see `role` in buildFeatureQuery).
       filter: [
         "all",
         ["!=", ["geometry-type"], "Point"],
@@ -2649,12 +2637,7 @@ export default function CreateMap({
       id: "click-highlight-glow",
       type: "line",
       source: "click-highlight",
-      // Excludes the fill-only merged grid shape — see click-highlight-fill.
-      filter: [
-        "all",
-        ["!=", ["geometry-type"], "Point"],
-        ["!=", ["get", "role"], "fill"],
-      ],
+      filter: ["!=", ["geometry-type"], "Point"],
       paint: {
         "line-color": clickHighlightColor,
         "line-width": 10,
@@ -2679,13 +2662,7 @@ export default function CreateMap({
       id: "click-highlight-line",
       type: "line",
       source: "click-highlight",
-      // Excludes the fill-only merged grid shape, whose outline would duplicate
-      // the boxes' outer envelope.
-      filter: [
-        "all",
-        ["!=", ["geometry-type"], "Point"],
-        ["!=", ["get", "role"], "fill"],
-      ],
+      filter: ["!=", ["geometry-type"], "Point"],
       paint: {
         "line-color": clickHighlightColor,
         "line-width": 2.5,

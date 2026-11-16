@@ -268,26 +268,8 @@ export const buildFeatureQuery = (
     });
   }
 
-  // Areas are outlined, markers ringed; only areas can be framed. Stacked grid
-  // rectangles would compound the translucent fill, while painting only their
-  // union loses the nested boxes' borders. So the union feeds the fill only
-  // ('fill'), the rectangles the outline/glow only ('outline'), the rest all
-  // ('both').
-  const gridAreas = gridFeatures.filter(
-    (feature) => feature.geometry.type !== "Point",
-  );
-  let mergedGrid = gridAreas[0] || null;
-  for (let i = 1; turfUnion && i < gridAreas.length; i++) {
-    try {
-      // One FeatureCollection per call — see the hex fragment union above.
-      mergedGrid =
-        turfUnion(helpers.featureCollection([mergedGrid, gridAreas[i]])) ||
-        mergedGrid;
-    } catch {
-      // A degenerate polygon fails to union; keep what merged so far.
-    }
-  }
-
+  // Grids are outlined only: the stacked boxes are many and large, and a
+  // fill buries the hexes beneath them.
   // A GeoJSONFeature's `geometry` is a prototype getter, so spreading a
   // feature silently drops it; hence (feature, role) pairs, not tagged copies.
   const highlightFeature = ({ feature, role }) => ({
@@ -304,7 +286,6 @@ export const buildFeatureQuery = (
   const areaHighlights = [
     ...cellFeatures.map((feature) => ({ feature, role: "both" })),
     ...gridFeatures.map((feature) => ({ feature, role: "outline" })),
-    ...(mergedGrid ? [{ feature: mergedGrid, role: "fill" }] : []),
   ].map(highlightFeature);
 
   const highlight = {
