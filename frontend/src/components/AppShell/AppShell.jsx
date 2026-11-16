@@ -57,15 +57,13 @@ function Splash() {
 }
 
 function CameraLegend(props) {
-  const { zoom, currentRangeLevel, hexRangeLevel, hexRangeScaledToView } =
-    useMapView();
+  const { zoom, currentRangeLevel, hexRangeLevel } = useMapView();
   return (
     <Legend
       {...props}
       zoom={zoom}
       currentRangeLevel={currentRangeLevel}
       hexRangeLevel={hexRangeLevel}
-      hexRangeScaledToView={hexRangeScaledToView}
     />
   );
 }

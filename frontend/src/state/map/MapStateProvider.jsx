@@ -174,8 +174,6 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
       zoom,
       currentRangeLevel,
       hexRangeLevel,
-      // Lets the legend explain why its numbers move with the camera.
-      hexRangeScaledToView: Boolean(viewportHexRange),
       setViewportHexRange,
       setViewportPointRange,
       setLoadingLayers,
@@ -191,7 +189,6 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
       zoom,
       currentRangeLevel,
       hexRangeLevel,
-      viewportHexRange,
       setViewportHexRange,
       setViewportPointRange,
     ],

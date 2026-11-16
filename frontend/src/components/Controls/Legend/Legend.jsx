@@ -163,7 +163,6 @@ export default function Legend({
   // The one domain every hexagon is coloured over (see MapStateProvider).
   hexRangeLevel,
   // The domain is the on-screen hexes' extent, so the ticks move with the camera.
-  hexRangeScaledToView = false,
   loading,
   zoom,
   platformsAvailable = [],
@@ -333,13 +332,6 @@ export default function Legend({
             );
           })}
         </div>
-        {/* Said, not only in a tooltip: the same shade means another count
-            after a zoom. */}
-        {hexRangeScaledToView && (
-          <div className="legendScaleNote" title={t("legendScaledToView")}>
-            {t("legendScaledToViewShort")}
-          </div>
-        )}
       </div>
     );
   }
