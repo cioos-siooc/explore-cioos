@@ -71,6 +71,7 @@ const clickUntil = async (page, at, expectation) => {
 };
 
 const chip = (page) => page.locator(".mapChip");
+const chipLines = (page) => page.locator(".mapChip .mapChipLine");
 
 const openCard = (page) => page.locator('[data-testid="feature-card"].open');
 
@@ -204,7 +205,12 @@ test.describe("pointing at markers and tracks", () => {
   test("hovering a marker names its days of data", async ({ page }) => {
     await openScene(page);
     await hoverUntil(page, LONE_MARKER.at, () =>
-      expect(chip(page)).toHaveText("12 days of data", { timeout: 1_000 }),
+      expect(chipLines(page)).toHaveText(
+        ["Surface vessel", "12 days of data"],
+        {
+          timeout: 1_000,
+        },
+      ),
     );
   });
 
@@ -269,7 +275,9 @@ test.describe("pointing at markers and tracks", () => {
   }) => {
     await openScene(page);
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toHaveText("5 days of data", { timeout: 1_000 }),
+      expect(chipLines(page)).toHaveText(["Surface vessel", "5 days of data"], {
+        timeout: 1_000,
+      }),
     );
   });
 
@@ -323,11 +331,14 @@ test.describe("pointing at gridded coverage", () => {
   test("a marker keeps the hover over a grid and names the grids", async ({
     page,
   }) => {
+    // Only grid B reaches CROSSED_MARKER.
     await openScene(page, "&griddap=true");
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toContainText("5 days of data", { timeout: 1_000 }),
+      expect(chipLines(page)).toHaveText(
+        ["Surface vessel", "5 days of data", "Grid: Synthetic grid B"],
+        { timeout: 1_000 },
+      ),
     );
-    await expect(chip(page)).toContainText("2 gridded datasets");
   });
 
   // The card lists what the datasets list does, and these grids are not in
@@ -428,6 +439,12 @@ test.describe("drawing a spatial filter", () => {
     // Only a shape the draw control holds has corners to drag: moving one
     // rewrites the bounds, and the rectangle mode drags its neighbours along
     // so it never turns into a free-form polygon.
+    // It rests as an outline: one click selects it, a second shows the corners.
+    const edge = await sceneAt(page, [-50, -60]);
+    for (let i = 0; i < 2; i += 1) {
+      await page.mouse.click(edge.x, edge.y);
+      await page.waitForTimeout(300);
+    }
     // One drag, not a retried one: the bounds land a debounce after mouseup,
     // and a second drag would start from where the corner used to be.
     const corner = await sceneAt(page, [100, -60]);
