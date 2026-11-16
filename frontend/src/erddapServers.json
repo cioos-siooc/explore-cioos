@@ -25,11 +25,6 @@
     "label_fr": "OGSL"
   },
   {
-    "url": "http://dap.onc.uvic.ca/erddap",
-    "label_en": "ONC",
-    "label_fr": "ONC"
-  },
-  {
     "url": "https://dap.oceannetworks.ca",
     "label_en": "ONC",
     "label_fr": "ONC"
