@@ -40,8 +40,7 @@ async function renderReady(url) {
   return result;
 }
 
-const toggle = () =>
-  screen.getByRole("button", { name: "Track date and window" });
+const toggle = () => screen.getByRole("button", { name: /^Arrows/ });
 
 async function renderOpened() {
   const result = await renderReady();
@@ -66,15 +65,28 @@ describe("TrajectoryDate", () => {
     expect(screen.queryByLabelText("Track window")).toBeNull();
   });
 
-  it("starts open on a date set by the link, so it is never hidden", async () => {
-    await renderReady("/?scrubTime=2020-06-01");
-    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+  it("tells the default story in its summary", async () => {
+    await renderReady();
+    expect(toggle()).toHaveAccessibleName(
+      "Arrows: platform positions today. Lines: tracks over the 90 days before",
+    );
+    expect(toggle()).toHaveTextContent("Today· 90 days prior");
+  });
+
+  it("states a linked date in the summary while staying folded", async () => {
+    const { user } = await renderReady("/?scrubTime=2020-06-01");
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(toggle()).toHaveAccessibleName(
+      /^Arrows: platform positions on Jun 1, 2020\./,
+    );
+    await user.click(toggle());
     expect(screen.getByDisplayValue("2020-06-01")).toBeInTheDocument();
   });
 
-  it("starts open on a track window set by the link", async () => {
+  it("states a linked track window in the summary while staying folded", async () => {
     await renderReady("/?trail=30");
-    expect(screen.getByLabelText("Track window")).toHaveValue("30");
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(toggle()).toHaveAccessibleName(/tracks over the 30 days before$/);
   });
 
   it("opens for the trajectory tip, which points at the date", async () => {
@@ -110,5 +122,6 @@ describe("TrajectoryDate", () => {
     const { user } = await renderOpened();
     await user.selectOptions(screen.getByLabelText("Track window"), "30");
     await waitFor(() => expect(latest.trailingDays).toBe(30));
+    expect(toggle()).toHaveAccessibleName(/tracks over the 30 days before$/);
   });
 });

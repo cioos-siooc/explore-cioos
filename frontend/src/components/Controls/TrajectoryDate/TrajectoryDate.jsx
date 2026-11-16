@@ -1,12 +1,8 @@
 import React, { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronLeft, ChevronRight } from "react-bootstrap-icons";
+import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 
-import {
-  defaultTrailingDays,
-  tracksMinDate,
-  trailingWindowOptions,
-} from "../../config.js";
+import { tracksMinDate, trailingWindowOptions } from "../../config.js";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
@@ -24,7 +20,7 @@ import "./styles.css";
 // The rail spans the tracks' own domain (tracksMinDate), not the catalogue's:
 // at 190px a century of empty axis would leave the Argo era a thumbnail.
 export default function TrajectoryDate() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { scrubTime, setScrubTime, trailingDays, setTrailingDays } =
     useMapState();
   const { activeTip, tipHighlight } = useTips();
@@ -34,18 +30,30 @@ export default function TrajectoryDate() {
   const axis = useMemo(() => createTimeAxis(tracksMinDate, maxIso), [maxIso]);
   const value = clampIso(scrubTime, tracksMinDate, maxIso);
 
-  // Folded at rest, but never over a date or window already set (say by a
-  // link), nor while the trajectory tip points at it.
-  const mustShow =
-    value !== maxIso ||
-    trailingDays !== defaultTrailingDays ||
-    activeTip === "trajectory";
-  const [open, setOpen] = useState(mustShow);
-  const [shownFor, setShownFor] = useState(mustShow);
-  if (mustShow !== shownFor) {
-    setShownFor(mustShow);
-    if (mustShow) setOpen(true);
+  // Folded at rest: the summary already states a linked date or window. Only
+  // the trajectory tip, which points at the date field, unfolds it.
+  const tipOpen = activeTip === "trajectory";
+  const [open, setOpen] = useState(tipOpen);
+  const [shownFor, setShownFor] = useState(tipOpen);
+  if (tipOpen !== shownFor) {
+    setShownFor(tipOpen);
+    if (tipOpen) setOpen(true);
   }
+
+  const trailLabel = (days) =>
+    days === 365
+      ? t("trajectoryTrailOneYear")
+      : `${days} ${t("trajectoryTrailDays")}`;
+  const dateLabel = new Date(isoToMs(value)).toLocaleDateString(i18n.language, {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  });
+  const story = [
+    value === maxIso
+      ? t("trajectoryPositionsToday")
+      : t("trajectoryPositionsOn", { date: dateLabel }),
+    t("trajectoryTrailBefore", { window: trailLabel(trailingDays) }),
+  ];
 
   function commit(iso) {
     setScrubTime(clampIso(iso, tracksMinDate, maxIso));
@@ -60,16 +68,19 @@ export default function TrajectoryDate() {
       <button
         type="button"
         className="trajectoryDateToggle"
+        title={(open ? story : [...story, t("trajectoryEdit")]).join("\n")}
+        aria-label={story.join(". ")}
         aria-expanded={open}
         aria-controls={controlsId}
         onClick={() => setOpen(!open)}
       >
-        <ChevronDown
-          className="trajectoryDateToggleIcon"
-          size={10}
-          aria-hidden="true"
-        />
-        {t("trajectoryControlsToggle")}
+        <TrackHeadIcon className="legendSwatch" />
+        <span aria-hidden="true">
+          {value === maxIso ? t("trajectoryToday") : dateLabel}
+        </span>
+        <span className="trajectorySummaryTrail" aria-hidden="true">
+          {t("trajectoryTrailPrior", { window: trailLabel(trailingDays) })}
+        </span>
       </button>
       {open && (
         <div id={controlsId}>
@@ -85,9 +96,7 @@ export default function TrajectoryDate() {
             >
               {trailingWindowOptions.map((days) => (
                 <option key={days} value={days}>
-                  {days === 365
-                    ? t("trajectoryTrailOneYear")
-                    : `${days} ${t("trajectoryTrailDays")}`}
+                  {trailLabel(days)}
                 </option>
               ))}
             </select>

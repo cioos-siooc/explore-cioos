@@ -64,7 +64,8 @@
 .trajectoryDateToggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  white-space: nowrap;
+  gap: 4px;
   width: 100%;
   min-height: var(--legend-row, 24px);
   padding: 0;
@@ -87,11 +88,9 @@
   box-shadow: var(--cioos-focus);
 }
 
-.trajectoryDateToggleIcon {
-  flex: none;
-  transform: rotate(-90deg);
-}
-
-.trajectoryDateToggle[aria-expanded="true"] .trajectoryDateToggleIcon {
-  transform: none;
+.trajectorySummaryTrail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--cioos-ink-80);
 }
