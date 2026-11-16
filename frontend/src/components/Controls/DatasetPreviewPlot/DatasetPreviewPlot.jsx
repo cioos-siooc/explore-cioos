@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowCounterclockwise,
-  ArrowDownUp,
   ChevronBarLeft,
   ChevronBarRight,
   ChevronDown,
@@ -461,20 +460,18 @@ export default function DatasetPreviewPlot() {
   // Several (one per panel) and each gets its own checkbox under Labels &
   // colours instead, where every panel already has a row.
   const singleYAxis = yAxisColumns.length === 1 ? yAxisColumns[0] : null;
-  const invertYButton = singleYAxis && (
-    <button
-      type="button"
-      className="controlAction"
-      aria-pressed={reversedYAxes.has(singleYAxis)}
-      aria-label={`${t("datasetPreviewPlotInvertYAxis")}: ${labelOf(singleYAxis)}`}
-      title={t("datasetPreviewPlotInvertYAxis")}
-      onClick={() =>
-        setYAxisReversed(singleYAxis, !reversedYAxes.has(singleYAxis))
-      }
-    >
-      <ArrowDownUp size={12} aria-hidden="true" />
-    </button>
+  const reverseCheckbox = (columnName) => (
+    <label className="paneCheckbox">
+      <input
+        type="checkbox"
+        checked={reversedYAxes.has(columnName)}
+        onChange={(event) => setYAxisReversed(columnName, event.target.checked)}
+        aria-label={`${t("datasetPreviewPlotReverseAxis")}: ${labelOf(columnName)}`}
+      />
+      {t("datasetPreviewPlotReverseAxis")}
+    </label>
   );
+  const reverseAxisCheckbox = singleYAxis && reverseCheckbox(singleYAxis);
 
   // The colour plot's axes: several make a grid. `excluded` keeps X and Y
   // apart.
@@ -580,19 +577,9 @@ export default function DatasetPreviewPlot() {
           }
         />
       </div>
-      {!singleYAxis && yAxisColumns.includes(columnName) && (
-        <label className="labelEditorCheckbox">
-          <input
-            type="checkbox"
-            checked={reversedYAxes.has(columnName)}
-            onChange={(event) =>
-              setYAxisReversed(columnName, event.target.checked)
-            }
-            aria-label={`${t("datasetPreviewPlotInvertYAxis")}: ${labelOf(columnName)}`}
-          />
-          {t("datasetPreviewPlotInvertYAxis")}
-        </label>
-      )}
+      {!singleYAxis &&
+        yAxisColumns.includes(columnName) &&
+        reverseCheckbox(columnName)}
     </div>
   );
 
@@ -602,7 +589,7 @@ export default function DatasetPreviewPlot() {
   const sharedAxisRow = (
     <ControlRow
       caption={axisCaptionFor(directions.x)}
-      action={!sharedIsX && invertYButton}
+      action={!sharedIsX && reverseAxisCheckbox}
     >
       <VariablePicker
         label={axisCaptionFor(directions.x)}
@@ -631,7 +618,7 @@ export default function DatasetPreviewPlot() {
   const panelsRow = (
     <ControlRow
       caption={axisCaptionFor(directions.y)}
-      action={sharedIsX && invertYButton}
+      action={sharedIsX && reverseAxisCheckbox}
     >
       <VariablePicker
         label={axisCaptionFor(directions.y)}
@@ -719,7 +706,7 @@ export default function DatasetPreviewPlot() {
           </ControlRow>
           <ControlRow
             caption={t("datasetPreviewPlotYAxis")}
-            action={invertYButton}
+            action={reverseAxisCheckbox}
           >
             {axisPicker(
               t("datasetPreviewPlotYAxis"),

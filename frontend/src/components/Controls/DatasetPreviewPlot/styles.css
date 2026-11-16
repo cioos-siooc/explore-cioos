@@ -307,40 +307,6 @@
   min-height: 22px;
 }
 
-/* A small icon button at the caption's end, e.g. inverting the axis it names. */
-.controlAction {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-white);
-  color: var(--cioos-primary-800);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease-out,
-    color 0.15s ease-out;
-}
-
-.controlAction:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.controlAction[aria-pressed="true"] {
-  border-color: var(--cioos-primary-800);
-  background-color: var(--cioos-primary);
-  color: var(--cioos-on-primary);
-}
-
-.controlAction:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
 /* The Layout and Style switches fill the pane, however many options. Columns
    sized to their labels, not equal shares, so "Markers + Line" gets the room
    the short "Line" does not need. */
@@ -615,7 +581,7 @@
   margin-top: 4px;
 }
 
-.labelEditorCheckbox {
+.paneCheckbox {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -623,6 +589,10 @@
   font-size: var(--cioos-font-size-2xs);
   color: var(--cioos-ink-80);
   cursor: pointer;
+}
+
+.paneCheckbox input {
+  accent-color: var(--cioos-primary);
 }
 
 .labelEditorRow {

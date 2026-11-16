@@ -250,22 +250,24 @@ describe("DatasetPreviewPlot", () => {
   it("inverts a lone Y axis from the row that picks it, pressed for a depth", async () => {
     const user = open();
     const plot = await plotted();
-    const invert = within(rowCaptioned("Y axis")).getByRole("button", {
-      name: "Invert Y axis: depth ( m )",
+    const invert = within(rowCaptioned("Y axis")).getByRole("checkbox", {
+      name: "Reverse axis direction: depth ( m )",
     });
-    expect(invert).toHaveAttribute("aria-pressed", "true");
+    expect(invert).toBeChecked();
     expect(plot).toHaveAttribute("data-y-autorange", "reversed");
 
     await user.click(invert);
 
-    expect(invert).toHaveAttribute("aria-pressed", "false");
+    expect(invert).not.toBeChecked();
     expect(screen.getByTestId("plotly")).not.toHaveAttribute(
       "data-y-autorange",
     );
     // One axis, one control: More options repeats no checkbox for it.
     await user.click(screen.getByRole("button", { name: "More options" }));
     expect(
-      screen.queryByRole("checkbox", { name: /Invert Y axis/ }),
+      within(document.querySelector(".labelEditor")).queryByRole("checkbox", {
+        name: /Reverse axis direction/,
+      }),
     ).not.toBeInTheDocument();
   });
 
@@ -276,13 +278,13 @@ describe("DatasetPreviewPlot", () => {
     });
     await plotted();
     expect(
-      within(rowCaptioned("Y axis")).queryByRole("button", {
-        name: /Invert Y axis/,
+      within(rowCaptioned("Y axis")).queryByRole("checkbox", {
+        name: /Reverse axis direction/,
       }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "More options" }));
     expect(
-      screen.getAllByRole("checkbox", { name: /Invert Y axis/ }),
+      screen.getAllByRole("checkbox", { name: /Reverse axis direction/ }),
     ).toHaveLength(2);
   });
 
