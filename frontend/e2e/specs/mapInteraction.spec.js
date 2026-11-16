@@ -320,11 +320,14 @@ test.describe("pointing at gridded coverage", () => {
     );
   });
 
-  test("a marker keeps the hover over a grid", async ({ page }) => {
+  test("a marker keeps the hover over a grid and names the grids", async ({
+    page,
+  }) => {
     await openScene(page, "&griddap=true");
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toHaveText("5 days of data", { timeout: 1_000 }),
+      expect(chip(page)).toContainText("5 days of data", { timeout: 1_000 }),
     );
+    await expect(chip(page)).toContainText("2 gridded datasets");
   });
 
   // The card lists what the datasets list does, and these grids are not in

@@ -86,9 +86,7 @@ import {
   gridsCovering,
   dedupeGriddapByPk,
   featureHasDataset,
-  griddapCoveredIn,
   griddapHitLayers,
-  griddapOutranksHexesIn,
   griddapTitle,
   idsOutsideDataset,
   isGriddapHit,
@@ -318,6 +316,9 @@ const DATA_STALE_OPACITY = 0.25;
 // direct_select fires draw.update on every drag tick, and setPolygon feeds
 // the /pointQuery fetch.
 const DRAW_UPDATE_DEBOUNCE_MS = 300;
+// Hit-testing and re-filtering the hover layers on every frame of a sweep
+// trailed the cursor; settle first.
+const HOVER_DEBOUNCE_MS = 50;
 // Zoomed in, one or two cells are often all there is; falling back to the
 // catalogue-wide domain painted them pale. generateColorStops gives a
 // one-value range a mid shade.
@@ -2486,22 +2487,14 @@ export default function CreateMap({
       type: "geojson",
       data: emptyFeatureCollection,
     });
-    // Fill kept transparent at rest (stacked rectangles composite into a
-    // slab) but still drawn, since hit-testing reads it.
+    // Fill kept transparent (stacked rectangles composite into a slab) but
+    // still drawn, since hit-testing reads it.
     map.current.addLayer(
       {
         id: "griddap-coverage-fill",
         type: "fill",
         source: "griddap-coverage",
-        paint: {
-          "fill-color": gridCoverageColor,
-          "fill-opacity": [
-            "case",
-            ["boolean", ["feature-state", "hovered"], false],
-            0.08,
-            0,
-          ],
-        },
+        paint: { "fill-color": gridCoverageColor, "fill-opacity": 0 },
       },
       "points-highlighted",
     );
@@ -3019,8 +3012,7 @@ export default function CreateMap({
         .addTo(map.current);
     };
 
-    // Debounced: rebuilding on every mousemove flickered.
-    const showGriddapTooltip = debounce((e, features) => {
+    const showGriddapTooltip = (e, features) => {
       const sameStack =
         features.length === hoveredGriddapIds.current.length &&
         features.every(
@@ -3036,46 +3028,37 @@ export default function CreateMap({
           ? t("mapChipGridStack", { n: features.length })
           : griddapTitle(features[0], i18n.language),
       );
-    }, 80);
+    };
 
-    // One handler, one hit-test, once per frame. MapLibre's per-layer listeners
+    // One handler, one hit-test, once the cursor settles. MapLibre's per-layer listeners
     // each run queryRenderedFeatures per raw mousemove (and 'mouseleave' adds
     // another), which over dense coastline was the most expensive thing the map
     // did. Precedence, highest first:
     //
-    //   1. griddap rectangles, unless an observation or a track is under the
-    //      cursor (griddapCoveredIn)
-    //   2. the selected platform's own fixes, deliberately unguarded
-    //   3. track lines, unless a point, a head or a selected fix is
-    //   4. track heads, unless a point is
-    //   5. points
-    //   6. coverage hexes, unless a point is — points draw over them
-    //   7. profile hexes, unless the rectangles outrank them at this zoom
+    //   1. the selected platform's own fixes, deliberately unguarded
+    //   2. track lines, unless a point, a head or a selected fix is
+    //   3. track heads, unless a point is
+    //   4. points
+    //   5. coverage hexes, unless a point is — points draw over them
+    //   6. profile hexes
+    //   7. griddap rectangles, which the others name in their own chip
     const hoverRules = [
-      {
-        id: "griddap",
-        layers: griddapHitLayers,
-        when: (hits) => !griddapCoveredIn(hits, map.current.getZoom()),
-        show: (e, features) =>
-          showGriddapTooltip(e, dedupeGriddapByPk(features)),
-      },
       {
         id: "selected-fixes",
         layers: ["selected-track-fixes", "selected-track-fixes-nocog"],
         // The record id is absent on a plain Trajectory dataset. Falls back to
         // the platform where a fix carries no time.
-        show: (e, features) => {
+        chip: (e, features) => {
           const {
             dataset_title: datasetTitle,
             profile_id: profileId,
             time,
             trajectory_id: trajectoryId,
           } = features[0].properties;
-          showChip(e.lngLat, [
-            datasetTitle,
-            profileId,
-            formatInstant(time) || trajectoryId,
-          ]);
+          return [
+            e.lngLat,
+            [datasetTitle, profileId, formatInstant(time) || trajectoryId],
+          ];
         },
       },
       {
@@ -3093,18 +3076,17 @@ export default function CreateMap({
         // No single instant or record id: an MVT line carries one set of
         // properties, so the segment's span is what it can say (lines CTE in
         // tiles.js).
-        show: (e, features) => {
+        chip: (e, features) => {
           const {
             dataset_title: datasetTitle,
             trajectory_id: trajectoryId,
             time_min: timeMin,
             time_max: timeMax,
           } = features[0].properties;
-          showChip(e.lngLat, [
-            datasetTitle,
-            trajectoryId,
-            formatInstantRange(timeMin, timeMax),
-          ]);
+          return [
+            e.lngLat,
+            [datasetTitle, trajectoryId, formatInstantRange(timeMin, timeMax)],
+          ];
         },
       },
       {
@@ -3112,28 +3094,26 @@ export default function CreateMap({
         layers: ["track-heads", "track-heads-fixed"],
         when: (hits, point) => !isOnAPointIn(hits, point, pointHitContext()),
         // A head is the platform's last fix in the scrubbed window.
-        show: (e, features) => {
+        chip: (e, features) => {
           const {
             dataset_title: datasetTitle,
             trajectory_id: trajectoryId,
             profile_id: profileId,
             head_time: headTime,
           } = features[0].properties;
-          showChip(e.lngLat, [
-            datasetTitle,
-            trajectoryId,
-            profileId,
-            formatInstant(headTime),
-          ]);
+          return [
+            e.lngLat,
+            [datasetTitle, trajectoryId, profileId, formatInstant(headTime)],
+          ];
         },
       },
       {
         id: "points",
         layers: ["points"],
         // Named as well as coloured: the hue alone is the platform otherwise.
-        show: (e, features) => {
+        chip: (e, features) => {
           const { platform, count } = features[0].properties;
-          showChip(
+          return [
             // the circle's centre, not the cursor
             features[0].geometry.coordinates.slice(),
             [
@@ -3142,22 +3122,31 @@ export default function CreateMap({
                 : platformLabel(platform, i18n.language),
               metricCountLabel(count),
             ],
-          );
+          ];
         },
       },
       {
         id: "coverage-hexes",
         layers: ["coverage-hexes"],
         when: (hits) => !hits.some((feature) => feature.layer.id === "points"),
-        show: (e, features) =>
-          showChip(e.lngLat, metricCountLabel(features[0].properties.count)),
+        chip: (e, features) => [
+          e.lngLat,
+          [metricCountLabel(features[0].properties.count)],
+        ],
       },
       {
         id: "hexes",
         layers: ["hexes"],
-        when: (hits) => !griddapOutranksHexesIn(hits, map.current.getZoom()),
+        chip: (e, features) => [
+          e.lngLat,
+          [metricCountLabel(features[0].properties.count)],
+        ],
+      },
+      {
+        id: "griddap",
+        layers: griddapHitLayers,
         show: (e, features) =>
-          showChip(e.lngLat, metricCountLabel(features[0].properties.count)),
+          showGriddapTooltip(e, dedupeGriddapByPk(features)),
       },
     ];
 
@@ -3174,7 +3163,6 @@ export default function CreateMap({
       // Drawing and the depth tool own the cursor; leave the popup as the last
       // hover left it.
       if (draw.getMode().includes("draw") || depthToolActiveRef.current) {
-        showGriddapTooltip.cancel();
         setGriddapHovered([]);
         return;
       }
@@ -3194,7 +3182,6 @@ export default function CreateMap({
       // The rectangles' hover outline is feature-state, so it must be
       // released whenever they aren't the winner.
       if (winner?.id !== "griddap") {
-        showGriddapTooltip.cancel();
         setGriddapHovered([]);
       }
 
@@ -3213,35 +3200,39 @@ export default function CreateMap({
       }
 
       map.current.getCanvas().style.cursor = "pointer";
-      winner.show(
-        e,
-        hits.filter((feature) => winner.layers.includes(feature.layer.id)),
+      const winnerHits = hits.filter((feature) =>
+        winner.layers.includes(feature.layer.id),
       );
+      if (winner.show) {
+        winner.show(e, winnerHits);
+        return;
+      }
+      // Whatever wins, the grids it sits inside are still named.
+      const grids = dedupeGriddapByPk(hits.filter(isGriddapHit));
+      const [at, lines] = winner.chip(e, winnerHits);
+      showChip(at, [
+        ...lines,
+        grids.length > 1
+          ? t("mapChipGridStack", { n: grids.length })
+          : grids.length === 1
+            ? t("mapChipInGrid", {
+                title: griddapTitle(grids[0], i18n.language),
+              })
+            : null,
+      ]);
     };
 
-    // Coalesced to one hit-test per frame, on the newest cursor position.
-    let pendingHover = null;
-    let hoverFrame = null;
+    const debouncedHover = debounce((e) => {
+      if (map.current) handleHover(e);
+    }, HOVER_DEBOUNCE_MS);
     map.current.on("mousemove", (e) => {
       setHoveredDataset();
-      pendingHover = e;
-      if (hoverFrame !== null) return;
-      hoverFrame = requestAnimationFrame(() => {
-        hoverFrame = null;
-        const event = pendingHover;
-        pendingHover = null;
-        if (event && map.current) handleHover(event);
-      });
+      debouncedHover(e);
     });
 
     // No mousemove fires once the cursor leaves the canvas.
     map.current.on("mouseout", () => {
-      if (hoverFrame !== null) {
-        cancelAnimationFrame(hoverFrame);
-        hoverFrame = null;
-      }
-      pendingHover = null;
-      showGriddapTooltip.cancel();
+      debouncedHover.cancel();
       setGriddapHovered([]);
       setHexHover(null);
       if (!draw.getMode().includes("draw") && !depthToolActiveRef.current) {

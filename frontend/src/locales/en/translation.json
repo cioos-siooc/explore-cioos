@@ -464,6 +464,7 @@
   "mapHexCountDays_one": "{{count, number}} day of data",
   "mapHexCountDays_other": "{{count, number}} days of data",
   "mapChipGridStack": "{{n}} gridded datasets",
+  "mapChipInGrid": "Grid: {{title}}",
   "mapChipPlatformUnknown": "Platform unknown",
   "mapCompassToolTitle": "Reset bearing to North",
   "currents": "Currents",

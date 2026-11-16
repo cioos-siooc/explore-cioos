@@ -1,20 +1,16 @@
 import { beforeAll, describe, it, expect, vi } from "vitest";
 
 import {
-  GRIDDAP_PRIORITY_ZOOM,
   POINT_HIT_GRACE_PX,
   buildFeatureQuery,
   gridsCovering,
   datasetPksOf,
   dedupeGriddapByPk,
   featureHasDataset,
-  griddapCoveredIn,
   idsOutsideDataset,
-  griddapOutranksHexesIn,
   griddapTitle,
   isOnAPointIn,
   loadTurfUnion,
-  trackFeatureIn,
   trackItemsIn,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
@@ -25,57 +21,6 @@ import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 const hits = (...layerIds) => layerIds.map((id) => ({ layer: { id } }));
 
 const GRID = "griddap-coverage-fill";
-
-describe("the grid outranks the hexes only once it is zoomed in", () => {
-  it("stands aside below the threshold", () => {
-    expect(
-      griddapOutranksHexesIn(hits(GRID), GRIDDAP_PRIORITY_ZOOM - 0.01),
-    ).toBe(false);
-  });
-
-  it("takes precedence at the threshold itself", () => {
-    // The boundary is inclusive: griddapCoveredIn in Map.jsx tests the same
-    // scalar with the same >=, and the two halves of the rule must agree on it.
-    expect(griddapOutranksHexesIn(hits(GRID), GRIDDAP_PRIORITY_ZOOM)).toBe(
-      true,
-    );
-  });
-
-  it("takes precedence above it", () => {
-    expect(griddapOutranksHexesIn(hits(GRID), 12)).toBe(true);
-  });
-});
-
-describe("only a coverage rectangle can outrank them", () => {
-  it("is false with nothing under the cursor", () => {
-    expect(griddapOutranksHexesIn([], 12)).toBe(false);
-  });
-
-  it("is false for hexes and points alone, however far in", () => {
-    expect(griddapOutranksHexesIn(hits("hexes", "points"), 12)).toBe(false);
-  });
-
-  it("finds the rectangle among other hits, in any order", () => {
-    expect(griddapOutranksHexesIn(hits("hexes", GRID, "points"), 12)).toBe(
-      true,
-    );
-  });
-
-  it("counts a single-point grid's dot like a rectangle", () => {
-    expect(griddapOutranksHexesIn(hits("griddap-coverage-point"), 12)).toBe(
-      true,
-    );
-  });
-
-  it("ignores the coverage outline, which is a different layer", () => {
-    // The rectangles are drawn as a fill plus griddap-coverage-line on top of
-    // it, and only the fill is hit-tested — matching the outline too would
-    // count every rectangle twice.
-    expect(griddapOutranksHexesIn(hits("griddap-coverage-line"), 12)).toBe(
-      false,
-    );
-  });
-});
 
 // Characterisation tests: a tidy-up that changes a ranking fails here first.
 
@@ -137,36 +82,6 @@ describe("isOnAPointIn", () => {
   it("only measures the points layer", () => {
     const halo = feature("points-halo", { count: 1 }, pointAt(0, 0));
     expect(isOnAPointIn([halo], { x: 0, y: 0 }, identity)).toBe(false);
-  });
-});
-
-describe("trackFeatureIn", () => {
-  it("ranks an arrowhead over a line, whatever the render order", () => {
-    const line = feature("track-lines");
-    const head = feature("track-heads");
-    expect(trackFeatureIn([line, head])).toBe(head);
-    expect(trackFeatureIn([head, line])).toBe(head);
-  });
-
-  it("is undefined with no track under the cursor", () => {
-    expect(trackFeatureIn(hits("hexes", "points"))).toBeUndefined();
-  });
-});
-
-describe("griddapCoveredIn", () => {
-  it("lets hexes cover a grid below the priority zoom", () => {
-    expect(griddapCoveredIn(hits("hexes"), GRIDDAP_PRIORITY_ZOOM - 1)).toBe(
-      true,
-    );
-  });
-
-  it("stops hexes covering it at the priority zoom", () => {
-    expect(griddapCoveredIn(hits("hexes"), GRIDDAP_PRIORITY_ZOOM)).toBe(false);
-  });
-
-  it("always lets points and tracks cover it", () => {
-    expect(griddapCoveredIn(hits("points"), 12)).toBe(true);
-    expect(griddapCoveredIn(hits("track-heads-fixed"), 12)).toBe(true);
   });
 });
 

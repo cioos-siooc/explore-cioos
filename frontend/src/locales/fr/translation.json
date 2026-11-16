@@ -465,6 +465,7 @@
   "mapHexCountDays_one": "{{count, number}} jour de données",
   "mapHexCountDays_other": "{{count, number}} jours de données",
   "mapChipGridStack": "{{n}} jeux maillés",
+  "mapChipInGrid": "Grille : {{title}}",
   "mapChipPlatformUnknown": "Plateforme inconnue",
   "mapCompassToolTitle": "Remettre l'orientation vers le nord",
   "currents": "Courants",

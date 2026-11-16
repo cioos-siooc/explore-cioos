@@ -17,10 +17,6 @@ export const loadTurfUnion = () =>
     })
     .catch(() => {});
 
-export const GRIDDAP_PRIORITY_ZOOM = 5;
-
-// Past this zoom someone is working with a specific grid; below it a
-// rectangle over a continent's worth of hexes cannot swallow their hover.
 // A single-point grid's coverage is a Point, drawn by its own circle layer.
 export const griddapHitLayers = [
   "griddap-coverage-fill",
@@ -28,9 +24,6 @@ export const griddapHitLayers = [
 ];
 export const isGriddapHit = (feature) =>
   griddapHitLayers.includes(feature.layer.id);
-
-export const griddapOutranksHexesIn = (hits, zoom) =>
-  zoom >= GRIDDAP_PRIORITY_ZOOM && hits.some(isGriddapHit);
 
 // Clickable track layers, most-deliberate target first: an arrowhead is
 // aimed at (it is what the head tooltip describes), the line is the fallback.
@@ -64,29 +57,6 @@ export const isOnAPointIn = (hits, point, { project, radiusRange }) =>
         (centre.x - point.x) ** 2 + (centre.y - point.y) ** 2 <= radius ** 2
       );
     });
-
-// Ranked by trackClickLayers rather than render order, so overlapping tracks
-// resolve the same way every time.
-export const trackFeatureIn = (hits) =>
-  hits
-    .filter((feature) => trackClickLayers.includes(feature.layer.id))
-    .sort(
-      (a, b) =>
-        trackClickLayers.indexOf(a.layer.id) -
-        trackClickLayers.indexOf(b.layer.id),
-    )[0];
-
-// Griddap rectangles defer to the point/hex layers below
-// GRIDDAP_PRIORITY_ZOOM; griddapOutranksHexesIn holds the other half of this
-// rule.
-export const griddapCoveredIn = (hits, zoom) => {
-  const covering =
-    zoom >= GRIDDAP_PRIORITY_ZOOM ? ["points"] : ["points", "hexes"];
-  return (
-    hits.some((feature) => covering.includes(feature.layer.id)) ||
-    Boolean(trackFeatureIn(hits))
-  );
-};
 
 export function dedupeGriddapByPk(features) {
   const byPk = new Map();
