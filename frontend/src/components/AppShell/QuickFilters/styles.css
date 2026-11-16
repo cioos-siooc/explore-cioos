@@ -7,8 +7,9 @@
   justify-content: center;
 
   /* Room for the captions under each button (20px), plus a gap before the
-     filter chips below. */
-  gap: 28px 36px;
+     filter chips below. The column gap fits the widest caption in either
+     language ("Tracer une zone"), so the row is the same in both. */
+  gap: 28px 56px;
   padding-bottom: 28px;
 }
 
