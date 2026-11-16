@@ -54,7 +54,6 @@ import {
   defaultMapBounds,
   dimmedFeatureColor,
   gridCoverageColor,
-  gridCoverageDeepColor,
   hexOutlineColor,
   mapInkColor,
   MARKER_MIN_ZOOM,
@@ -429,6 +428,7 @@ const trackLayerIds = [
 ];
 const griddapLayerIds = [
   "griddap-coverage-fill",
+  "griddap-coverage-casing",
   "griddap-coverage-line",
   "griddap-coverage-point",
 ];
@@ -2486,20 +2486,38 @@ export default function CreateMap({
       type: "geojson",
       data: emptyFeatureCollection,
     });
+    // Fill kept transparent at rest (stacked rectangles composite into a
+    // slab) but still drawn, since hit-testing reads it.
     map.current.addLayer(
       {
         id: "griddap-coverage-fill",
         type: "fill",
         source: "griddap-coverage",
-        // Kept low because stacked rectangles composite into a solid slab;
-        // the hover affordance leans on the outline.
         paint: {
           "fill-color": gridCoverageColor,
           "fill-opacity": [
             "case",
             ["boolean", ["feature-state", "hovered"], false],
-            0.12,
-            0.07,
+            0.08,
+            0,
+          ],
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-coverage-casing",
+        type: "line",
+        source: "griddap-coverage",
+        paint: {
+          "line-color": hexOutlineColor,
+          "line-opacity": 0.45,
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            4.5,
+            3.5,
           ],
         },
       },
@@ -2511,12 +2529,7 @@ export default function CreateMap({
         type: "line",
         source: "griddap-coverage",
         paint: {
-          "line-color": [
-            "case",
-            ["boolean", ["feature-state", "hovered"], false],
-            gridCoverageDeepColor,
-            gridCoverageColor,
-          ],
+          "line-color": gridCoverageColor,
           "line-width": [
             "case",
             ["boolean", ["feature-state", "hovered"], false],
@@ -2536,14 +2549,9 @@ export default function CreateMap({
         filter: ["==", ["geometry-type"], "Point"],
         paint: {
           "circle-radius": 5,
-          "circle-color": gridCoverageColor,
-          "circle-opacity": 0.35,
-          "circle-stroke-color": [
-            "case",
-            ["boolean", ["feature-state", "hovered"], false],
-            gridCoverageDeepColor,
-            gridCoverageColor,
-          ],
+          "circle-color": hexOutlineColor,
+          "circle-opacity": 0.8,
+          "circle-stroke-color": gridCoverageColor,
           "circle-stroke-width": [
             "case",
             ["boolean", ["feature-state", "hovered"], false],
@@ -2554,12 +2562,13 @@ export default function CreateMap({
       },
       "points-highlighted",
     );
+    // The focused grid answers in the click goldenrod, like every selection.
     map.current.addLayer(
       {
         id: "griddap-highlight-fill",
         type: "fill",
         source: "griddap-highlight",
-        paint: { "fill-color": gridCoverageColor, "fill-opacity": 0.1 },
+        paint: { "fill-color": clickHighlightColor, "fill-opacity": 0.1 },
       },
       "points-highlighted",
     );
@@ -2568,7 +2577,7 @@ export default function CreateMap({
         id: "griddap-highlight-line",
         type: "line",
         source: "griddap-highlight",
-        paint: { "line-color": gridCoverageDeepColor, "line-width": 2.5 },
+        paint: { "line-color": clickHighlightColor, "line-width": 2.5 },
       },
       "points-highlighted",
     );
@@ -2580,9 +2589,9 @@ export default function CreateMap({
         filter: ["==", ["geometry-type"], "Point"],
         paint: {
           "circle-radius": 7,
-          "circle-color": gridCoverageColor,
+          "circle-color": clickHighlightColor,
           "circle-opacity": 0.1,
-          "circle-stroke-color": gridCoverageDeepColor,
+          "circle-stroke-color": clickHighlightColor,
           "circle-stroke-width": 2.5,
         },
       },

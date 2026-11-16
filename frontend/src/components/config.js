@@ -62,10 +62,11 @@ export const hexOutlineColor = "#FFFFFF";
 // Must stay in step with --cioos-map-click in components/theme.css.
 export const clickHighlightColor = "#DAA520";
 
-// Griddap footprints at rest (base) and hovered (deep). Must stay in step with
-// --cioos-grid and --cioos-grid-700 in components/theme.css.
-export const gridCoverageColor = "#FBB03B";
-export const gridCoverageDeepColor = "#C77F14";
+// Griddap footprints: a navy dashed edge on a white casing, so the outline
+// holds over pale and dark cells alike. A neutral, not a hue: every warm hue
+// already means markers or the click answer, which a focused grid takes on.
+// Must stay in step with --cioos-grid-700 in components/theme.css.
+export const gridCoverageColor = "#152F37";
 
 // Features outside the focused dataset. Navy-tinted like every neutral, and
 // paler than the "unknown" platform's slate so a dimmed marker can't pass for

@@ -364,7 +364,7 @@ button.datasetCardTitle:focus-visible {
   transition: transform var(--cioos-transition-fast);
 }
 
-/* Grid amber, the glyph the gridded dataset cards and the map's coverage use. */
+/* Grid navy, the glyph the gridded dataset cards and the map's coverage use. */
 .datasetsCardGroupIcon {
   flex: 0 0 auto;
   color: var(--cioos-grid-700);

@@ -118,7 +118,7 @@ const TRACK_ICON = (
   </svg>
 );
 
-// The map's griddap footprint: a dashed outline over a faint fill.
+// The map's griddap footprint: a dashed navy edge on a white casing.
 const GRIDDAP_ICON = (
   <svg
     className="legendGroupIcon"
@@ -132,11 +132,7 @@ const GRIDDAP_ICON = (
       y="1.5"
       width="9"
       height="8"
-      style={{
-        fill: "var(--cioos-grid)",
-        fillOpacity: 0.15,
-        stroke: "var(--cioos-grid)",
-      }}
+      style={{ fill: "var(--cioos-white)", stroke: "var(--cioos-grid-700)" }}
       strokeWidth="1.5"
       strokeDasharray="2 1.5"
     />

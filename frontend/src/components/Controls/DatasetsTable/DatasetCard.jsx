@@ -307,7 +307,7 @@ export function DatasetPlatformIcon({
   decorative,
 }) {
   const { i18n } = useTranslation();
-  // Grid amber, the colour the map draws gridded coverage in.
+  // Grid navy, the colour of the map's gridded coverage edge.
   if (cdmDataType === "Grid") {
     return (
       <Grid3x3Gap
