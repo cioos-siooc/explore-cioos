@@ -140,7 +140,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* Room for the Live pill, which sits half above its card's top border. */
+  gap: 14px 8px;
   padding: 10px;
 }
 
@@ -621,8 +622,12 @@ button.datasetCardTitle:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* Straddles the card's top border, clear of the title and meta rows. */
 .datasetCardLive {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 12px;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
@@ -649,6 +654,13 @@ button.datasetCardTitle:focus-visible {
   align-items: center;
   gap: 4px;
   min-width: 0;
+}
+
+.datasetCardMetaType {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .datasetCardMetaItem svg {
@@ -867,7 +879,7 @@ button.datasetCardTitle:focus-visible {
 /* Compact rows (the toolbar's density toggle): a line each for the title and
    the meta. */
 .datasetsCardList.compact {
-  gap: 4px;
+  row-gap: 12px;
 }
 
 .datasetsCardList.compact .datasetCard {
@@ -885,11 +897,18 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetsCardList.compact .datasetCardMeta {
-  flex-wrap: nowrap;
-  overflow: hidden;
   font-size: var(--cioos-font-size-xs);
 }
 
+.sidebar .datasetsCardList .datasetCardMeta,
+.datasetsCardList.compact .datasetCardMeta {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  mask-image: linear-gradient(to left, transparent, #000 24px);
+}
+
+/* Shrinking a nowrap item would spill its text over the next item's icon. */
+.sidebar .datasetsCardList .datasetCardMetaItem,
 .datasetsCardList.compact .datasetCardMetaItem {
   white-space: nowrap;
 }
@@ -927,20 +946,11 @@ button.datasetCardTitle:focus-visible {
   }
 
   .sidebar .datasetsCardList:not(.compact) {
-    gap: 6px;
+    row-gap: 12px;
   }
 
   .sidebar .datasetsCardList:not(.compact) .datasetCard {
     padding: 8px 10px;
-  }
-
-  .sidebar .datasetCardMeta {
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-
-  .sidebar .datasetCardMetaItem {
-    white-space: nowrap;
   }
 }
 

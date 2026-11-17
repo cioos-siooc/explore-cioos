@@ -93,6 +93,14 @@ export default function DatasetCard({
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
     >
+      {row.is_realtime && (
+        <span
+          className="datasetCardLive"
+          title={t("datasetRealtimeBadgeTitle")}
+        >
+          {t("datasetRealtimeBadgeText")}
+        </span>
+      )}
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
           {/* A button with role=checkbox: it carries an icon a native input
@@ -354,7 +362,7 @@ function DatasetCardMeta({ row, t, i18n }) {
         title={t("datasetsTableHeaderTypeText")}
       >
         <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
-        {typeLabel}
+        <span className="datasetCardMetaType">{typeLabel}</span>
       </span>
       <span
         className="datasetCardMetaItem"
@@ -374,15 +382,6 @@ function DatasetCardMeta({ row, t, i18n }) {
         >
           <CalendarCheck size={13} aria-hidden="true" />
           {Number(row.days).toLocaleString(i18n.language)}
-        </span>
-      )}
-
-      {row.is_realtime && (
-        <span
-          className="datasetCardLive"
-          title={t("datasetRealtimeBadgeTitle")}
-        >
-          {t("datasetRealtimeBadgeText")}
         </span>
       )}
     </span>
