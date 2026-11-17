@@ -497,7 +497,15 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         os.makedirs(folder)
 
     # Unchanged datasets (erddap_verified) still need verified_at bumped.
-    if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
+    # A single source exposing only empty datasets is an upstream state (each
+    # dataset's attempt says why); its incremental load records the attempts
+    # and keeps what was loaded before.
+    nothing_harvested = (
+        erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty
+    )
+    if nothing_harvested and triggered_source:
+        logger.warning("No datasets harvested from %s", triggered_source)
+    elif nothing_harvested:
         logger.info("No datasets harvested from any source")
         _write_run_audit_csvs(
             folder=folder,
