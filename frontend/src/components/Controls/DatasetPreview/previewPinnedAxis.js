@@ -22,7 +22,14 @@ export const pinnedAxisKeyFor = (orientation) =>
 
 // What the strip draws of the axis: its label and its scale. The rest — spikes,
 // hover, domain, anchor — belongs to the panels it runs along.
-const DRAWN_KEYS = ["title", "tickmode", "tickvals", "ticktext"];
+const DRAWN_KEYS = [
+  "title",
+  "tickmode",
+  "tickvals",
+  "ticktext",
+  "nticks",
+  "tickangle",
+];
 
 // Plotly's smallest plot area with explicit margins (MIN_SPECIFIED_HEIGHT).
 const STRIP_PLOT_PX = 2;
@@ -41,7 +48,13 @@ export function splitPinnedAxis(figure, orientation) {
       ...figure,
       layout: {
         ...figure.layout,
-        [key]: { ...axis, showticklabels: false, title: { text: "" } },
+        // Unlabelled, it must not keep the margin its labels would have grown.
+        [key]: {
+          ...axis,
+          showticklabels: false,
+          title: { text: "" },
+          automargin: false,
+        },
       },
     },
     axis: pick(axis, DRAWN_KEYS),
@@ -70,8 +83,8 @@ export function pinnedViewFor(fullLayout, orientation) {
  * panels, and the axis drawn into the rest. Static — zooming is done on the
  * panels, and the strip follows.
  */
-export function pinnedAxisFigureFor(axis, view, orientation) {
-  const thickness = pinnedAxisSizeFor(orientation);
+export function pinnedAxisFigureFor(axis, view, orientation, labelFont) {
+  const thickness = pinnedAxisSizeFor(orientation, labelFont);
   const vertical = orientation === COLUMNS;
   const drawnAxis = {
     ...axis,

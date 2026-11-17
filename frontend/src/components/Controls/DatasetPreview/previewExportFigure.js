@@ -34,6 +34,7 @@ export function exportFigureFor({
   orientation,
   colorLegend,
   colorLegends = colorLegend ? [{ ...colorLegend, axis: "coloraxis" }] : [],
+  labelFont = LABEL_FONT_PX,
 }) {
   const exported = { data: cloneDeep(data), layout: cloneDeep(layout) };
   const margin = { ...exported.layout.margin };
@@ -47,7 +48,7 @@ export function exportFigureFor({
       showticklabels: true,
     };
     // Room the strip had on screen, so the panels keep their size.
-    const axisRoom = pinnedAxisSizeFor(orientation);
+    const axisRoom = pinnedAxisSizeFor(orientation, labelFont);
     if (orientation === COLUMNS) {
       margin.l += axisRoom;
       width += axisRoom;
@@ -89,10 +90,10 @@ export function exportFigureFor({
         title: {
           text: wrapLabel(
             colorLegend.label,
-            maxCharsFor(plottingHeight / drawn.length),
+            maxCharsFor(plottingHeight / drawn.length, labelFont),
           ),
           side: "right",
-          font: { size: LABEL_FONT_PX },
+          font: { size: labelFont },
         },
       },
     };

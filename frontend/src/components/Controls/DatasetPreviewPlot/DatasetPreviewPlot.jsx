@@ -16,6 +16,7 @@ import PaneDivider from "../../ui/PaneDivider.jsx";
 import SegmentedToggle from "../../ui/SegmentedToggle.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 import useMediaQuery, {
+  MOBILE_QUERY,
   PREVIEW_COMPACT_QUERY,
   REDUCED_MOTION_QUERY,
   TOUCH_QUERY,
@@ -33,6 +34,11 @@ import createPlotlyComponent from "react-plotly.js/factory";
 import isEqual from "lodash-es/isEqual";
 
 import { labelFor, shortLabelFor } from "../DatasetPreview/previewVariables.js";
+import {
+  LABEL_FONT_PX,
+  MOBILE_LABEL_FONT_PX,
+  MOBILE_LABEL_LINES,
+} from "../DatasetPreview/previewLabelText.js";
 import {
   axisDirectionsFor,
   panelCandidatesFor,
@@ -169,6 +175,11 @@ export default function DatasetPreviewPlot() {
   // A finger's drag pans the data, so the figure has to fit the screen: there
   // is no drag left over to scroll it with.
   const touch = useMediaQuery(TOUCH_QUERY);
+  // A phone spends its height on the data: smaller labels, panel titles held to
+  // two lines, and no header row of the plot's own.
+  const mobile = useMediaQuery(MOBILE_QUERY);
+  const labelFont = mobile ? MOBILE_LABEL_FONT_PX : LABEL_FONT_PX;
+  const labelLines = mobile ? MOBILE_LABEL_LINES : undefined;
 
   // The plot pane's own box. Its width is what the figure is drawn to; its
   // height enters only through plotBoxFor, which can lower the ceiling that
@@ -237,6 +248,7 @@ export default function DatasetPreviewPlot() {
       measured: plotAreaSize,
       withTitle: !titleInHeader,
       minPanel: touch ? 0 : undefined,
+      labelFont,
     };
     if (isGrid) {
       return gridBoxFor({
@@ -261,6 +273,7 @@ export default function DatasetPreviewPlot() {
     plotAreaSize,
     titleInHeader,
     touch,
+    labelFont,
     isColorLayout,
     isGrid,
     gridColumns,
@@ -304,6 +317,8 @@ export default function DatasetPreviewPlot() {
             sharedText: onPositionAxis ? trackIndex.labels : null,
             position,
             size: { width, height },
+            labelFont,
+            pinned: !touch,
             uirevision: revision,
             reversedYAxes,
           })
@@ -322,6 +337,7 @@ export default function DatasetPreviewPlot() {
         mode: plotType,
         sharedTicks: onPositionAxis ? trackIndex.ticks : null,
         size: { width, height },
+        labelFont,
         uirevision: revision,
         reversedYAxes,
       });
@@ -342,6 +358,7 @@ export default function DatasetPreviewPlot() {
             scales: scalesInUse,
             position,
             size: { width, height },
+            labelFont,
             uirevision: revision,
             reversedYAxes,
           })
@@ -362,11 +379,17 @@ export default function DatasetPreviewPlot() {
       sharedTicks: onPositionAxis ? trackIndex.ticks : null,
       sharedText: onPositionAxis ? trackIndex.labels : null,
       size: { width, height },
+      labelFont,
+      pinned: !touch,
+      labelLines,
       uirevision: revision,
       reversedYAxes,
     });
   }, [
     isColorLayout,
+    labelFont,
+    labelLines,
+    touch,
     stacked,
     isGrid,
     colorXs,
@@ -401,6 +424,8 @@ export default function DatasetPreviewPlot() {
   // title stay in view while the panels scroll — see previewPinnedAxis.js.
   const pinnedOrientation = isColorLayout ? ROWS : plan.orientation;
   // A grid has no one shared axis to pin: each column and row keeps its own.
+  // Nor does a touch screen's (`pinned` false): it fits its box and never
+  // scrolls, so it keeps its axis and Plotly's automargin sizes the edge to it.
   const split = useMemo(
     () =>
       figure &&
@@ -451,9 +476,14 @@ export default function DatasetPreviewPlot() {
   const pinnedFigure = useMemo(
     () =>
       split && split.axis && pinnedView
-        ? pinnedAxisFigureFor(split.axis, pinnedView, pinnedOrientation)
+        ? pinnedAxisFigureFor(
+            split.axis,
+            pinnedView,
+            pinnedOrientation,
+            labelFont,
+          )
         : null,
-    [split, pinnedView, pinnedOrientation],
+    [split, pinnedView, pinnedOrientation, labelFont],
   );
   const downloadPng = useCallback(
     (graphDiv) => {
@@ -464,13 +494,14 @@ export default function DatasetPreviewPlot() {
         orientation: pinnedOrientation,
         colorLegend: figure.colorLegend,
         colorLegends: figure.colorLegends,
+        labelFont,
       });
       Plotly.downloadImage(
         { data: exported.data, layout: exported.layout },
         { format: "png", width: exported.width, height: exported.height },
       );
     },
-    [split, figure, pinnedOrientation],
+    [split, figure, pinnedOrientation, labelFont],
   );
   // Memoised: react-plotly.js re-plots whenever `config` changes identity, which
   // an inline object did on every render of this component.
@@ -523,7 +554,7 @@ export default function DatasetPreviewPlot() {
     ),
     count: plotData?.length ?? 0,
   });
-  const pinnedThickness = pinnedAxisSizeFor(pinnedOrientation);
+  const pinnedThickness = pinnedAxisSizeFor(pinnedOrientation, labelFont);
   const pinnedLeft = pinnedOrientation === COLUMNS;
 
   const labelOf = (columnName) => labelFor(variablesByName.get(columnName));
@@ -716,21 +747,6 @@ export default function DatasetPreviewPlot() {
     ? "datasetPreviewPlotShowParams"
     : "datasetPreviewPlotHideParams";
 
-  // In the profile header when there is one, so it costs the plot no row.
-  const settingsButton = settingsInDialog && (
-    <button
-      type="button"
-      className="paneSettingsButton"
-      aria-haspopup="dialog"
-      aria-expanded={settingsOpen}
-      aria-label={t("datasetPreviewPlotSettings")}
-      title={t("datasetPreviewPlotSettings")}
-      onClick={() => setSettingsOpen(true)}
-    >
-      <Gear size={16} aria-hidden="true" />
-    </button>
-  );
-
   const paneControls = (
     <>
       {/* A filled colour plot has no plot type. */}
@@ -901,13 +917,26 @@ export default function DatasetPreviewPlot() {
         "datasetPreviewPlotPanes",
         resizing && "isResizing",
         slideFrom && "isSliding",
-        !settingsInDialog && paneCollapsed && "isPaneHidden",
+        // The settings in a dialog leave the corner to their gear, as a
+        // collapsed pane leaves it to its toggle.
+        (settingsInDialog || paneCollapsed) && "isPaneHidden",
       ]
         .filter(Boolean)
         .join(" ")}
     >
       {settingsInDialog ? (
         <>
+          <button
+            type="button"
+            className="paneCollapseToggle"
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            aria-label={t("datasetPreviewPlotSettings")}
+            title={t("datasetPreviewPlotSettings")}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Gear size={16} aria-hidden="true" />
+          </button>
           {/* Over the plot rather than beside or above it: there is not the
               width to share, nor the height to fold into. */}
           <Modal
@@ -989,7 +1018,7 @@ export default function DatasetPreviewPlot() {
         {/* Above the figure rather than in the parameters pane: this says WHICH
             rows are drawn where every control in the pane says how, and the
             pane is too narrow to read a cast's date in. */}
-        {titleInHeader && (
+        {(showSlice || (titleInHeader && headerTitle && !mobile)) && (
           <div
             className={
               showSlice
@@ -997,7 +1026,7 @@ export default function DatasetPreviewPlot() {
                 : "previewProfileHeader isSingleRow"
             }
           >
-            {headerTitle && (
+            {titleInHeader && headerTitle && !mobile && (
               <h5 className="previewProfileTitle" title={headerTitle}>
                 {headerTitle}
               </h5>
@@ -1005,7 +1034,6 @@ export default function DatasetPreviewPlot() {
             {showSlice && (
               <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
             )}
-            {settingsButton}
           </div>
         )}
 
@@ -1067,7 +1095,11 @@ export default function DatasetPreviewPlot() {
         {/* Below the scroller, not inside it: a profile wide enough to scroll
             is exactly the plot whose scale would otherwise be off-screen. */}
         {colorLegends.map((legend) => (
-          <ColorScaleLegend key={legend.label} legend={legend} />
+          <ColorScaleLegend
+            key={legend.label}
+            legend={legend}
+            labelFont={labelFont}
+          />
         ))}
       </div>
 

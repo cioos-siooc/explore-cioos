@@ -208,3 +208,11 @@ test("the height budget can only ever come down — no growth loop", () => {
   // case above).
   assert.ok(plotHeightFor(COLUMNS, 1, heightBudgetFor(0, 0)) > 0);
 });
+
+test("smaller labels shrink every margin they sit in", () => {
+  const small = 14;
+  assert.ok(pinnedAxisSizeFor(COLUMNS, small) < pinnedAxisSizeFor(COLUMNS));
+  assert.ok(pinnedAxisSizeFor(ROWS, small) < pinnedAxisSizeFor(ROWS));
+  assert.ok(marginFor(COLUMNS, 0, 3, small).t < marginFor(COLUMNS, 0, 3).t);
+  assert.ok(marginFor(ROWS, 0, 3, small).l < marginFor(ROWS, 0, 3).l);
+});

@@ -82,13 +82,6 @@ export default function DatasetPreview({
     [datasetPreview, rows, profiles, plotLayout, step],
   );
   const formatCount = (count) => count.toLocaleString(i18n.language);
-  // Said too when nothing was cut, so a complete record never reads as a sample.
-  const completeRowCount =
-    !sample &&
-    datasetPreview?.sample &&
-    datasetPreview.sample.rowCount >= datasetPreview.sample.totalRowCount
-      ? datasetPreview.sample.rowCount
-      : null;
 
   // Deliberately not in the URL: free text makes the query string unreadable,
   // and a rename is a private annotation rather than a view.
@@ -228,11 +221,6 @@ export default function DatasetPreview({
                       totalProfiles: formatCount(sample.totalProfileCount ?? 0),
                     },
                   )}
-                </span>
-              )}
-              {dataIsReady && completeRowCount !== null && (
-                <span className="datasetPreviewSample">
-                  {t("datasetPreviewAllRows", { count: completeRowCount })}
                 </span>
               )}
             </h2>

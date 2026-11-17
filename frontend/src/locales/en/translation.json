@@ -327,8 +327,6 @@
   "datasetPreviewSampleProfiles": "Sample: {{profiles}} of {{totalProfiles}} profiles · {{rows}} of {{totalRows}} rows",
   "datasetPreviewSampleAllProfiles": "Sample: every profile in the latest {{rows}} of {{totalRows}} rows ({{profiles}} of {{totalProfiles}} profiles)",
   "datasetPreviewSampleHelp": "A preview draws at most {{rows}} rows: the most recent ones, or the top of a single cast. Download the dataset to get every row.",
-  "datasetPreviewAllRows_one": "Complete record: {{count, number}} row",
-  "datasetPreviewAllRows_other": "Complete record: {{count, number}} rows",
   "datasetPreviewPlotSummary": "Plot of {{variables}} against {{axis}}, from {{count, number}} rows. The Table view lists the same values.",
   "datasetPreviewPlotEmptyGroup": "No data in this record",
   "datasetPreviewTableConstants": "Same on every row",

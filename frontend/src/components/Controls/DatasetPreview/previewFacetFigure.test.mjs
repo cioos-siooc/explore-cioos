@@ -11,6 +11,7 @@ import {
 import {
   buildColorFigure,
   buildFigure,
+  TICK_SPACING_PX,
   buildGridFigure,
   buildOverlayFigure,
   gridBoxFor,
@@ -1538,4 +1539,38 @@ test("a stacked profile runs every x axis across the top, stacking the extras up
 test("a single stacked variable keeps the full plot height", () => {
   const { layout } = overlayFrom("Profile", ["TE90_01"]);
   assert.deepEqual(layout.yaxis.domain, [0, 1]);
+});
+
+test("x tick labels stay level, thinned to the panel's width", () => {
+  const size = { width: 390, height: 600 };
+  const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"], {
+    size,
+  });
+  const xAxes = Object.keys(layout).filter((key) => /^xaxis\d*$/.test(key));
+  assert.ok(xAxes.length > 0);
+  xAxes.forEach((key) => {
+    const axis = layout[key];
+    assert.equal(axis.tickangle, 0, key);
+    const [start, end] = axis.domain ?? [0, 1];
+    assert.ok(
+      axis.nticks <=
+        Math.max(2, (size.width * (end - start)) / TICK_SPACING_PX),
+      `${key}: ${axis.nticks}`,
+    );
+  });
+});
+
+test("an unpinned figure keeps its shared axis, starting from a small margin", () => {
+  const size = { width: 390, height: 600 };
+  const pinned = figure("TimeSeriesProfile", ["TE90_01"], { size });
+  const kept = figure("TimeSeriesProfile", ["TE90_01"], {
+    size,
+    pinned: false,
+  });
+  assert.notEqual(pinned.pinnable, false);
+  assert.equal(kept.pinnable, false);
+  // Room for short ticks and the title; automargin grows it from there.
+  assert.ok(kept.layout.margin.l > pinned.layout.margin.l);
+  assert.ok(kept.layout.margin.l < marginFor(ROWS, 0).l);
+  assert.equal(kept.layout.yaxis.automargin, true);
 });

@@ -289,10 +289,10 @@ describe("DatasetPreview", () => {
       expect(screen.getByText("Sample: 2 of 26,131 rows")).toBeInTheDocument();
     });
 
-    it("says the record is complete when the rows are all of it", () => {
+    it("counts nothing when the rows are all of the record", () => {
       open({ sample: { rowCount: 2, totalRowCount: 2 } });
       expect(screen.queryByText(/^Sample:/)).not.toBeInTheDocument();
-      expect(screen.getByText("Complete record: 2 rows")).toBeInTheDocument();
+      expect(screen.queryByText(/rows$/)).not.toBeInTheDocument();
     });
 
     it("explains what a sample holds", () => {

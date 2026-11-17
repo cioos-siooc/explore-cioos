@@ -142,7 +142,7 @@ test.describe("the record preview on a phone", () => {
     },
   };
 
-  test("fills the screen and leads with the plot, settings folded above it", async ({
+  test("fills the screen and leads with the plot, settings behind the gear in its corner", async ({
     page,
   }) => {
     await page.route("**/preview?*", (route) =>

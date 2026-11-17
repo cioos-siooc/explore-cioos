@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import {
   MOBILE_WIDTH,
+  TABLET_WIDTH,
   setTouchScreen,
   setViewportWidth,
 } from "../../../test/viewport.js";
@@ -387,7 +388,7 @@ describe("DatasetPreviewPlot", () => {
     expect(screen.queryByText("Profile: record-1")).not.toBeInTheDocument();
   });
 
-  it("opens the settings from a gear on a phone, over the plot", async () => {
+  it("opens the settings from the corner's gear on a phone, over the plot", async () => {
     setViewportWidth(MOBILE_WIDTH);
     const user = open();
     await plotted();
@@ -439,7 +440,7 @@ describe("DatasetPreviewPlot", () => {
     expect(plot).toHaveAttribute("data-modebar", "true");
   });
 
-  it("names the record above the plot on a phone, not inside the figure", async () => {
+  it("names the record above the plot on a tablet, not inside the figure", async () => {
     const table = {
       ...TABLE,
       columnNames: [...TABLE.columnNames, "cast"],
@@ -454,12 +455,28 @@ describe("DatasetPreviewPlot", () => {
       ],
       rows: TABLE.rows.map((row) => [...row, "cast-7"]),
     };
-    setViewportWidth(MOBILE_WIDTH);
+    setViewportWidth(TABLET_WIDTH);
     open("/", DATASET, table);
     await plotted();
     expect(
       screen.getByRole("heading", { name: "Cast (profile_id): cast-7" }),
     ).toBeInTheDocument();
+  });
+
+  it("gives a phone's plot no header row, its gear in the corner", async () => {
+    setViewportWidth(MOBILE_WIDTH);
+    open();
+    const plot = await plotted();
+    const gear = screen.getByRole("button", { name: "Plot settings" });
+    expect(gear).toHaveClass("paneCollapseToggle");
+    expect(plot.contains(gear)).toBe(false);
+    expect(document.querySelector(".previewProfileHeader")).toBeNull();
+  });
+
+  it("has no gear beside the settings pane", async () => {
+    open();
+    await plotted();
+    expect(screen.queryByRole("button", { name: "Plot settings" })).toBeNull();
   });
 
   it("lets only one axis hold several variables", async () => {

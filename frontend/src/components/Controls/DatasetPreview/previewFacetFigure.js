@@ -32,6 +32,7 @@ import {
   wrapTitleFor,
   HOVER_FONT_PX,
   LABEL_FONT_PX,
+  MAX_LABEL_LINES,
   PLOT_FONT,
   TICK_FONT_PX,
   TITLE_FONT_PX,
@@ -52,7 +53,7 @@ import {
   MIN_PLOT_PX,
   PINNED_AXIS_LINES,
   ROW_GAP,
-  STACKED_AXIS_PX,
+  stackedAxisPxFor,
   TITLE_PAD_PX,
 } from "./previewFacetSizing.js";
 
@@ -82,9 +83,9 @@ const sharedAxisSpike = {
   spikecolor: SPIKE_COLOR,
 };
 
-const axisTitle = (text) => ({
+const axisTitle = (text, labelFont) => ({
   text,
-  font: { size: LABEL_FONT_PX },
+  font: { size: labelFont },
   standoff: 6,
 });
 
@@ -178,6 +179,7 @@ export function plotBoxFor({
   withTitle = true,
   orientation = plan.orientation, // the colour plot always stacks
   minPanel,
+  labelFont,
 }) {
   const title = withTitle
     ? recordTitleFor({ plan, variablesByName, data })
@@ -187,6 +189,7 @@ export function plotBoxFor({
     panelCount,
     boxBudgetFor(measured.width),
     minPanel,
+    labelFont,
   );
   const titleLines = titleLinesFor(title, width);
   const height = plotHeightFor(
@@ -195,6 +198,7 @@ export function plotBoxFor({
     heightBudgetFor(availableHeight, measured.height),
     titleLines,
     minPanel,
+    labelFont,
   );
   return { title, width, height, titleLines };
 }
@@ -215,6 +219,7 @@ export function gridBoxFor({
   header = false,
   colorbars = false,
   minPanel,
+  labelFont,
 }) {
   const title = withTitle
     ? recordTitleFor({ plan, variablesByName, data })
@@ -224,7 +229,7 @@ export function gridBoxFor({
     columns,
     rows,
     availableWidth,
-    margin: gridMarginFor(undefined, { header, colorbars }),
+    margin: gridMarginFor(undefined, { header, colorbars, labelFont }),
     minPanel,
   });
   const titleLines = titleLinesFor(title, width);
@@ -233,7 +238,7 @@ export function gridBoxFor({
     rows,
     availableWidth,
     availableHeight: heightBudgetFor(availableHeight, measured.height),
-    margin: gridMarginFor(titleLines, { header, colorbars }),
+    margin: gridMarginFor(titleLines, { header, colorbars, labelFont }),
     minPanel,
   });
   return { title, width, height, titleLines };
@@ -279,6 +284,26 @@ const AXIS_LINE = {
   linewidth: 1,
 };
 
+// Plotly tilts crowded x tick labels and never picks fewer than four ticks on
+// its own; a narrow panel reads better with fewer, level ones. Explicit ticks
+// (a track's ranks) are the caller's and stay as they are.
+export const TICK_SPACING_PX = 90;
+function levelXTicks(layout, plottingWidth) {
+  Object.keys(layout)
+    .filter((key) => /^xaxis\d*$/.test(key))
+    .forEach((key) => {
+      const axis = layout[key];
+      if (axis.tickmode === "array") return;
+      axis.tickangle = 0;
+      if (!plottingWidth) return;
+      const [start, end] = axis.domain ?? [0, 1];
+      axis.nticks = Math.max(
+        2,
+        Math.floor((plottingWidth * (end - start)) / TICK_SPACING_PX),
+      );
+    });
+}
+
 // Plotly draws the shared axis's line once, beside the panel it is anchored
 // to — a profile's first, a stack's last — and every other panel gets the same
 // edge as a shape.
@@ -320,7 +345,7 @@ function gridEdgesFor(columns, rows) {
 }
 
 // A column's caption above the grid: what its panels are coloured by.
-const columnHeaderFor = (text, domain) => ({
+const columnHeaderFor = (text, domain, labelFont) => ({
   text,
   xref: "paper",
   yref: "paper",
@@ -330,7 +355,7 @@ const columnHeaderFor = (text, domain) => ({
   yanchor: "bottom",
   yshift: 4,
   showarrow: false,
-  font: { size: LABEL_FONT_PX },
+  font: { size: labelFont },
 });
 
 // The rank axis of a track: ticks named by the caller, and the place each row
@@ -394,6 +419,10 @@ export function buildFigure({
   size = {},
   uirevision,
   reversedYAxes = new Set(plan.sharedReversed ? [sharedAxis] : []),
+  labelFont = LABEL_FONT_PX,
+  labelLines = MAX_LABEL_LINES,
+  // False when nothing scrolls: the figure keeps its shared axis.
+  pinned = true,
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
 
@@ -422,7 +451,13 @@ export function buildFigure({
   // 0 until the plot area has been measured, and maxCharsFor turns that into
   // "leave the label alone". The width needs only the side margins, so it is
   // known before the top margin is.
-  const sideMargin = marginFor(plan.orientation, titleLines);
+  const sideMargin = marginFor(
+    plan.orientation,
+    titleLines,
+    undefined,
+    labelFont,
+    pinned,
+  );
   const plottingWidth = size.width
     ? Math.max(size.width - sideMargin.l - sideMargin.r, 0)
     : 0;
@@ -432,7 +467,11 @@ export function buildFigure({
     panelLetter === "x"
       ? wrapLabel(
           titleFor(columnName),
-          maxCharsFor(plottingWidth * (domains[index][1] - domains[index][0])),
+          maxCharsFor(
+            plottingWidth * (domains[index][1] - domains[index][0]),
+            labelFont,
+          ),
+          labelLines,
         )
       : null,
   );
@@ -440,7 +479,13 @@ export function buildFigure({
     1,
     ...panelTitles.map((text) => (text ? text.split("<br>").length : 1)),
   );
-  const margin = marginFor(plan.orientation, titleLines, panelTitleLines);
+  const margin = marginFor(
+    plan.orientation,
+    titleLines,
+    panelTitleLines,
+    labelFont,
+    pinned,
+  );
   const plottingHeight = size.height
     ? Math.max(size.height - margin.t - margin.b, 0)
     : 0;
@@ -452,6 +497,7 @@ export function buildFigure({
       maxCharsFor(
         (letter === "y" ? plottingHeight : plottingWidth) *
           (domain[1] - domain[0]),
+        labelFont,
       ),
       maxLines,
     );
@@ -530,6 +576,7 @@ export function buildFigure({
       : {}),
     title: axisTitle(
       wrapAlong(sharedTitle, sharedLetter, [0, 1], PINNED_AXIS_LINES), // the pinned strip's fixed room
+      labelFont,
     ),
   };
 
@@ -549,6 +596,7 @@ export function buildFigure({
       // Wrapped to its own panel's width, not the plot's.
       title: axisTitle(
         panelTitles[index] ?? wrapAlong(panelTitle, panelLetter, domain),
+        labelFont,
       ),
       zeroline: false,
       ...(panelLetter === "y" && reversedYAxes.has(columnName)
@@ -653,7 +701,13 @@ export function buildFigure({
     : null;
   layout.shapes = sharedAxisEdgesFor(panelLetter, panels.length);
   // First, so every panel's markers draw over its line.
-  return { data: [...lineTraces, ...traces], layout, colorLegend };
+  levelXTicks(layout, plottingWidth);
+  return {
+    data: [...lineTraces, ...traces],
+    layout,
+    colorLegend,
+    pinnable: pinned,
+  };
 }
 
 // A stack's value axes all sit left of the plot, a profile's all above it.
@@ -683,6 +737,7 @@ export function buildOverlayFigure({
   size = {},
   uirevision,
   reversedYAxes = new Set(plan.sharedReversed ? [sharedAxis] : []),
+  labelFont = LABEL_FONT_PX,
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
   const arrangement = ARRANGEMENTS[plan.orientation] || ROWS_LAYOUT;
@@ -691,7 +746,7 @@ export function buildOverlayFigure({
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
-  const margin = overlayMarginFor(plan.orientation, titleLines);
+  const margin = overlayMarginFor(plan.orientation, titleLines, labelFont);
   const plottingWidth = size.width
     ? Math.max(size.width - margin.l - margin.r, 0)
     : 0;
@@ -702,7 +757,7 @@ export function buildOverlayFigure({
 
   // A profile's value axes past the first are stacked upward, which only fits
   // inside the paper if the plot shrinks to make room.
-  const step = STACKED_AXIS_PX / plottingHeight;
+  const step = stackedAxisPxFor(labelFont) / plottingHeight;
   const plotDomain =
     valueLetter === "x"
       ? [0, round6(1 - Math.max(panels.length - 1, 0) * step)]
@@ -749,9 +804,11 @@ export function buildOverlayFigure({
           sharedLetter === "y"
             ? plottingHeight * (plotDomain[1] - plotDomain[0])
             : plottingWidth,
+          labelFont,
         ),
         PINNED_AXIS_LINES,
       ),
+      labelFont,
     ),
   };
 
@@ -785,9 +842,13 @@ export function buildOverlayFigure({
         axisLabelFor(
           valueLetter,
           titleFor(columnName),
-          maxCharsFor(valueLetter === "y" ? plottingHeight : plottingWidth),
+          maxCharsFor(
+            valueLetter === "y" ? plottingHeight : plottingWidth,
+            labelFont,
+          ),
           PINNED_AXIS_LINES,
         ),
+        labelFont,
       ),
     };
     return {
@@ -804,6 +865,7 @@ export function buildOverlayFigure({
     };
   });
 
+  levelXTicks(layout, plottingWidth);
   return { data: traces, layout, colorLegend: null, pinnable: false };
 }
 
@@ -838,6 +900,7 @@ export function buildGridFigure({
   size = {},
   uirevision,
   reversedYAxes = new Set(),
+  labelFont = LABEL_FONT_PX,
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
 
@@ -861,7 +924,7 @@ export function buildGridFigure({
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
-  const margin = gridMarginFor(titleLines, { header });
+  const margin = gridMarginFor(titleLines, { header, labelFont });
   const plottingWidth = size.width
     ? Math.max(size.width - margin.l - margin.r, 0)
     : 0;
@@ -871,7 +934,7 @@ export function buildGridFigure({
   const columnDomains = domainsFor(columnCount, COLUMN_GAP);
   const rowDomains = rowDomainsFor(rowCount);
   const wrapAlong = (text, pixels, maxLines) =>
-    wrapLabel(text, maxCharsFor(pixels), maxLines);
+    wrapLabel(text, maxCharsFor(pixels, labelFont), maxLines);
   const coloredLine = mode.includes("lines");
   const binLimit = lineBinLimitFor({
     panelCount: columnCount * rowCount,
@@ -931,6 +994,7 @@ export function buildGridFigure({
           plottingWidth * (domain[1] - domain[0]),
           PINNED_AXIS_LINES,
         ),
+        labelFont,
       ),
     };
   });
@@ -947,8 +1011,9 @@ export function buildGridFigure({
       title: axisTitle(
         inlineLabel(
           titleFor(yAxis),
-          maxCharsFor(plottingHeight * (domain[1] - domain[0])),
+          maxCharsFor(plottingHeight * (domain[1] - domain[0]), labelFont),
         ),
+        labelFont,
       ),
     };
   });
@@ -1044,6 +1109,7 @@ export function buildGridFigure({
             )
           : "",
         columnDomains[column],
+        labelFont,
       ),
     );
   }
@@ -1059,6 +1125,7 @@ export function buildGridFigure({
         },
     )
     .filter(Boolean);
+  levelXTicks(layout, plottingWidth);
   return {
     data: [...lineTraces, ...traces],
     layout,
@@ -1108,6 +1175,8 @@ export function buildColorFigure({
   uirevision,
   yReversed = isDownwardVertical(variablesByName.get(yAxes[0])),
   reversedYAxes = null,
+  labelFont = LABEL_FONT_PX,
+  pinned = true,
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
   const isReversed = (columnName, index) => {
@@ -1123,9 +1192,9 @@ export function buildColorFigure({
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
-  const baseMargin = marginFor(ROWS, titleLines);
+  const baseMargin = marginFor(ROWS, titleLines, undefined, labelFont, pinned);
   const margin = gridded
-    ? gridMarginFor(titleLines, { colorbars: true })
+    ? gridMarginFor(titleLines, { colorbars: true, labelFont })
     : { ...baseMargin, r: baseMargin.r + COLORBAR_ROOM_PX };
   const plottingWidth = size.width
     ? Math.max(size.width - margin.l - margin.r, 0)
@@ -1134,7 +1203,7 @@ export function buildColorFigure({
     ? Math.max(size.height - margin.t - margin.b, 0)
     : 0;
   const wrapAlong = (text, pixels, maxLines) =>
-    wrapLabel(text, maxCharsFor(pixels), maxLines);
+    wrapLabel(text, maxCharsFor(pixels, labelFont), maxLines);
   const spanOf = (domain) => domain[1] - domain[0];
 
   const layout = {
@@ -1182,6 +1251,7 @@ export function buildColorFigure({
           plottingWidth * spanOf(domain),
           PINNED_AXIS_LINES, // the pinned strip's fixed room
         ),
+        labelFont,
       ),
     };
   });
@@ -1224,7 +1294,7 @@ export function buildColorFigure({
               plottingHeight * spanOf(barDomain),
             ),
             side: "right",
-            font: { size: LABEL_FONT_PX },
+            font: { size: labelFont },
           },
         },
       };
@@ -1245,8 +1315,9 @@ export function buildColorFigure({
         title: axisTitle(
           inlineLabel(
             titleFor(yColumn),
-            maxCharsFor(plottingHeight * spanOf(domain)),
+            maxCharsFor(plottingHeight * spanOf(domain), labelFont),
           ),
+          labelFont,
         ),
       };
       const yValues = (data || []).map((entry) => entry[yColumn]);
@@ -1330,5 +1401,11 @@ export function buildColorFigure({
   });
 
   layout.shapes = gridEdgesFor(xAxes.length, rowCount);
-  return { data: traces, layout, colorLegend: null, pinnable: !gridded };
+  levelXTicks(layout, plottingWidth);
+  return {
+    data: traces,
+    layout,
+    colorLegend: null,
+    pinnable: pinned && !gridded,
+  };
 }

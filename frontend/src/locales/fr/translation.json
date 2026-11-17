@@ -328,8 +328,6 @@
   "datasetPreviewSampleProfiles": "Échantillon : {{profiles}} profils sur {{totalProfiles}} · {{rows}} lignes sur {{totalRows}}",
   "datasetPreviewSampleAllProfiles": "Échantillon : tous les profils des {{rows}} dernières lignes sur {{totalRows}} ({{profiles}} profils sur {{totalProfiles}})",
   "datasetPreviewSampleHelp": "Un aperçu trace au plus {{rows}} lignes : les plus récentes, ou le haut d’un profil unique. Téléchargez le jeu de données pour obtenir toutes les lignes.",
-  "datasetPreviewAllRows_one": "Enregistrement complet : {{count, number}} ligne",
-  "datasetPreviewAllRows_other": "Enregistrement complet : {{count, number}} lignes",
   "datasetPreviewPlotSummary": "Graphique de {{variables}} en fonction de {{axis}}, à partir de {{count, number}} lignes. La vue Tableau présente les mêmes valeurs.",
   "datasetPreviewPlotEmptyGroup": "Aucune donnée dans cet enregistrement",
   "datasetPreviewTableConstants": "Identique sur chaque ligne",

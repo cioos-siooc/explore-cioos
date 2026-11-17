@@ -779,7 +779,7 @@
   padding: 0 0 2px;
 }
 
-/* Nothing to drop under the title: the gear stays beside it. */
+/* Nothing to drop under the title: it keeps the row to itself. */
 .previewProfileHeader.isSingleRow {
   flex-wrap: nowrap;
 }
@@ -877,7 +877,7 @@
 }
 
 /* Up to tablets (PREVIEW_COMPACT_QUERY): the plot keeps the whole width, and
-   the settings open in a dialog over it from a gear. */
+   the settings open in a dialog over it from a gear in its corner. */
 @media (max-width: 1100px) {
   .datasetPreviewPlotPanes {
     flex-direction: column;
@@ -890,40 +890,9 @@
     overflow: visible;
   }
 
-  .paneSettingsButton {
-    display: flex;
-    flex: 0 0 auto;
-    align-self: flex-end;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: 1px solid var(--cioos-hairline);
-    border-radius: var(--cioos-radius-sm);
-    background-color: var(--cioos-white);
-    color: var(--cioos-ink);
-    cursor: pointer;
-  }
-
-  .previewProfileHeader .paneSettingsButton {
-    align-self: center;
-    margin-left: auto; /* right-aligned even with no title beside it */
-  }
-
   /* Centred with a gutter, rather than edge to edge on a phone. */
   .previewSettingsModal .modal-dialog {
     width: calc(100% - 2 * var(--cioos-space-lg));
-  }
-
-  .paneSettingsButton:hover {
-    background-color: var(--cioos-surface-2);
-    color: var(--cioos-primary-800);
-  }
-
-  .paneSettingsButton:focus-visible {
-    outline: none;
-    box-shadow: var(--cioos-focus);
   }
 
   .datasetPreviewPlotColumn {

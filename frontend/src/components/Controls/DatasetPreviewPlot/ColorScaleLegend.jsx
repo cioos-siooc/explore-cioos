@@ -27,7 +27,10 @@ const alignmentAt = (index, count) => {
   return index === count - 1 ? "end" : "mid";
 };
 
-export default function ColorScaleLegend({ legend }) {
+export default function ColorScaleLegend({
+  legend,
+  labelFont = LABEL_FONT_PX,
+}) {
   if (!legend || !legend.stops.length) return null;
 
   return (
@@ -35,7 +38,7 @@ export default function ColorScaleLegend({ legend }) {
       className="colorScaleLegend"
       // The plot's own axis sizes, so this reads as one more axis of it.
       style={{
-        "--legend-label-font": `${LABEL_FONT_PX}px`,
+        "--legend-label-font": `${labelFont}px`,
         "--legend-tick-font": `${TICK_FONT_PX}px`,
       }}
     >
