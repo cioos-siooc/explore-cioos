@@ -3,7 +3,20 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import DatasetCard from "./DatasetCard.jsx";
+import { createInstance } from "i18next";
+
+import { resources } from "../../../locales/resources.js";
+import DatasetCard, { DatasetPlatformIcon } from "./DatasetCard.jsx";
+
+function realI18n(lng = "en") {
+  const instance = createInstance();
+  instance.init({
+    lng,
+    resources,
+    interpolation: { escapeValue: false },
+  });
+  return { t: instance.t, i18n: instance };
+}
 
 // DatasetCard takes t/i18n as props, so a stub translator needs no providers.
 const t = (key) => key;
@@ -23,7 +36,7 @@ describe("DatasetCard", () => {
   it("renders the title and type", () => {
     render(<DatasetCard row={ROW} t={t} i18n={i18n} />);
     expect(screen.getByText("Green Bay LoRaWAN Buoy 4")).toBeInTheDocument();
-    expect(screen.getByText("layerTimeseries")).toBeInTheDocument();
+    expect(screen.getByText(/· layerTimeseries$/)).toBeInTheDocument();
   });
 
   it("names an OBIS occurrence dataset by its Point geometry", () => {
@@ -34,9 +47,10 @@ describe("DatasetCard", () => {
         i18n={i18n}
       />,
     );
-    expect(screen.getByTitle("datasetsTableHeaderTypeText").textContent).toBe(
-      "layerPoint",
-    );
+    const item = screen
+      .getByText(/· layerPoint$/)
+      .closest(".datasetCardMetaItem");
+    expect(item.querySelector("svg")).toBeInTheDocument();
   });
 
   it("opens on a click anywhere, and from the keyboard through its title button", async () => {
@@ -103,16 +117,31 @@ describe("DatasetCard", () => {
       ],
     };
     render(<DatasetCard row={grid} t={t} i18n={i18n} />);
-    // "griddapTypeLabel" appears twice: the platform icon's SVG <title> and
-    // the meta row's own text — assert there are two, not one specific node.
-    expect(screen.getAllByText("griddapTypeLabel")).toHaveLength(2);
+    expect(screen.getByText(/· griddapTypeLabel$/)).toBeInTheDocument();
     expect(screen.getByText("184×80")).toBeInTheDocument();
   });
 
-  it("shows profiles_count / n_profiles when they differ", () => {
+  it("shows bare figures and names them in the tooltip, in either language", async () => {
+    const user = userEvent.setup();
+    const row = { ...ROW, profiles_count: 1234, n_profiles: 1234 };
+    const { rerender } = render(<DatasetCard row={row} {...realI18n()} />);
+    const locations = screen.getByText("Locations: 1,234");
+    expect(locations).toHaveClass("sr-only");
+    expect(locations.previousSibling).toHaveTextContent(/^1,234$/);
+
+    await user.hover(locations.parentElement);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Locations: 1,234");
+    await user.unhover(locations.parentElement);
+
+    rerender(<DatasetCard row={row} {...realI18n("fr")} />);
+    expect(screen.getByText(/^Emplacements: 1\s234$/)).toHaveClass("sr-only");
+  });
+
+  it("shows how many of the dataset's locations the selection holds when that is fewer", () => {
     const partial = { ...ROW, profiles_count: 3, n_profiles: 10 };
-    render(<DatasetCard row={partial} t={t} i18n={i18n} />);
-    expect(screen.getByText("3 / 10")).toBeInTheDocument();
+    render(<DatasetCard row={partial} {...realI18n()} />);
+    const label = screen.getByText("Locations: 3/10");
+    expect(label.previousSibling).toHaveTextContent(/^3\/10$/);
   });
 
   it("shows the dataset's days of data when the query carries them", () => {
@@ -129,19 +158,42 @@ describe("DatasetCard", () => {
   });
 
   it("draws trajectories and OBIS as hexagons, like the map's cells", () => {
-    const glyph = (row) => {
+    const glyph = (props) => {
       const { container, unmount } = render(
-        <DatasetCard row={{ ...ROW, ...row }} t={t} i18n={i18n} />,
+        <DatasetPlatformIcon platform="mooring" t={t} {...props} />,
       );
-      const cls = container.querySelector(".datasetCardPlatform svg").classList;
+      const cls = container.querySelector("svg").classList;
       unmount();
       return cls;
     };
-    expect(glyph({ cdm_data_type: "Trajectory" })).toContain("bi-hexagon-fill");
-    expect(
-      glyph({ cdm_data_type: "Occurrence", source_type: "obis" }),
-    ).toContain("bi-hexagon-fill");
+    expect(glyph({ cdmDataType: "Trajectory" })).toContain("bi-hexagon-fill");
+    expect(glyph({ cdmDataType: "Occurrence", sourceType: "obis" })).toContain(
+      "bi-hexagon-fill",
+    );
     expect(glyph({})).toContain("bi-circle-fill");
+  });
+
+  it("puts the geometry glyph on the platform's colour, named in its tooltip", () => {
+    const { rerender } = render(
+      <DatasetCard
+        row={{ ...ROW, platform: "mooring", cdm_data_type: "TimeSeries" }}
+        {...realI18n()}
+      />,
+    );
+    const label = screen.getByText(/· Time series$/);
+    const chip = label.parentElement.querySelector(".datasetCardTypeChip");
+    expect(chip).toHaveStyle({ backgroundColor: "#ff8a17" });
+    expect(chip.querySelector("svg")).toBeInTheDocument();
+
+    rerender(
+      <DatasetCard
+        row={{ ...ROW, platform: "unknown", cdm_data_type: "TimeSeries" }}
+        {...realI18n()}
+      />,
+    );
+    expect(
+      screen.getByText("Time series", { selector: ".sr-only" }),
+    ).toBeInTheDocument();
   });
 
   it("calls onHover/onHoverEnd on mouse enter/leave", async () => {

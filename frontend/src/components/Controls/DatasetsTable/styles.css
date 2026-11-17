@@ -140,7 +140,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* Room for the Live pill, which sits half above its card's top border. */
+  gap: 14px 8px;
   padding: 10px;
 }
 
@@ -602,13 +603,6 @@ button.datasetCardTitle:focus-visible {
   gap: 7px;
 }
 
-.datasetCardPlatform {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
-}
-
 .datasetCardTitle {
   /* Without min-width a long unbroken title pushes the slot off the card. */
   flex: 1 1 auto;
@@ -621,8 +615,12 @@ button.datasetCardTitle:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* Straddles the card's top border, clear of the title and meta rows. */
 .datasetCardLive {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 12px;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
@@ -654,6 +652,23 @@ button.datasetCardTitle:focus-visible {
 .datasetCardMetaItem svg {
   flex: 0 0 auto;
   color: var(--cioos-ink-40);
+}
+
+/* The platform colour behind the geometry glyph: the map's marker colour, on a
+   chip because a 1.5px line in float yellow vanishes on white. */
+.datasetCardTypeChip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(21 47 55 / 15%);
+}
+
+.datasetCardMetaItem .datasetCardTypeChip svg {
+  color: inherit;
 }
 
 .datasetCardDownloadInfo {
@@ -867,7 +882,7 @@ button.datasetCardTitle:focus-visible {
 /* Compact rows (the toolbar's density toggle): a line each for the title and
    the meta. */
 .datasetsCardList.compact {
-  gap: 4px;
+  row-gap: 12px;
 }
 
 .datasetsCardList.compact .datasetCard {
@@ -885,11 +900,18 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetsCardList.compact .datasetCardMeta {
-  flex-wrap: nowrap;
-  overflow: hidden;
   font-size: var(--cioos-font-size-xs);
 }
 
+.sidebar .datasetsCardList .datasetCardMeta,
+.datasetsCardList.compact .datasetCardMeta {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  mask-image: linear-gradient(to left, transparent, #000 24px);
+}
+
+/* Shrinking a nowrap item would spill its text over the next item's icon. */
+.sidebar .datasetsCardList .datasetCardMetaItem,
 .datasetsCardList.compact .datasetCardMetaItem {
   white-space: nowrap;
 }
@@ -927,20 +949,11 @@ button.datasetCardTitle:focus-visible {
   }
 
   .sidebar .datasetsCardList:not(.compact) {
-    gap: 6px;
+    row-gap: 12px;
   }
 
   .sidebar .datasetsCardList:not(.compact) .datasetCard {
     padding: 8px 10px;
-  }
-
-  .sidebar .datasetCardMeta {
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-
-  .sidebar .datasetCardMetaItem {
-    white-space: nowrap;
   }
 }
 
