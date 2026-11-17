@@ -315,6 +315,26 @@ describe("DatasetPreviewPlot", () => {
     ).toBeInTheDocument();
   });
 
+  it("names the header's record by the cf_role of the column holding it", async () => {
+    open(
+      "/",
+      { ...STATION, timeseries_id_variable: "station" },
+      {
+        ...TABLE,
+        columnNames: [...TABLE.columnNames, "station"],
+        columnTypes: [...TABLE.columnTypes, "String"],
+        columnUnits: [...TABLE.columnUnits, null],
+        rows: TABLE.rows.map((row) => [...row, "record-1"]),
+      },
+    );
+    await plotted();
+    expect(
+      screen.getByRole("heading", {
+        name: "station (timeseries_id): record-1",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("offers no layout for a record of one profile, its link's included", async () => {
     open("/?playout=color");
     const plot = await plotted();
@@ -427,7 +447,7 @@ describe("DatasetPreviewPlot", () => {
     open("/", DATASET, table);
     await plotted();
     expect(
-      screen.getByRole("heading", { name: "Cast: cast-7" }),
+      screen.getByRole("heading", { name: "Cast (profile_id): cast-7" }),
     ).toBeInTheDocument();
   });
 

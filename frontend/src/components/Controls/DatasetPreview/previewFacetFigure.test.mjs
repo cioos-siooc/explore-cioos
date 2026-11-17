@@ -69,7 +69,8 @@ const DATA = Array.from({ length: 20 }, (_, i) => {
   return row;
 });
 
-const TITLE = "Station Id: PMZA-RIKI — Profile: PMZA-RIKI-25/09/16-17:35:26";
+const TITLE =
+  "Station Id (timeseries_id): PMZA-RIKI — Profile (profile_id): PMZA-RIKI-25/09/16-17:35:26";
 
 // Publisher palettes on two measurements, to exercise the ERDDAP colour default.
 const VIKING_PALETTES = {
@@ -568,7 +569,7 @@ test("a catalogue with no columnMeta still names the record", () => {
       variablesByName: byColumnName(variables),
       data: DATA,
     }),
-    "station_id: PMZA-RIKI — profile: PMZA-RIKI-25/09/16-17:35:26",
+    "station_id (timeseries_id): PMZA-RIKI — profile (profile_id): PMZA-RIKI-25/09/16-17:35:26",
   );
 });
 

@@ -132,6 +132,13 @@ function distinctValues(data, columnName) {
   return seen;
 }
 
+// An id column's name with the cf_role it carries, "Station Id (timeseries_id)",
+// since a long_name alone does not say which level of the record it names.
+export function idLabelFor(variable, columnName) {
+  const label = shortLabelFor(variable) || columnName;
+  return variable && variable.cfRole ? `${label} (${variable.cfRole})` : label;
+}
+
 // One "<label>: <value>" per cf_role column, in ERDDAP's order. For a
 // TimeSeriesProfile the record id is the station while what is drawn is one
 // profile, which nothing else on screen names.
@@ -144,8 +151,7 @@ export function recordTitleFor({ plan, variablesByName, data }) {
       const shown = values.slice(0, MAX_TITLE_VALUES).join(VALUE_JOIN);
       const rest = values.length - MAX_TITLE_VALUES;
       const variable = variablesByName && variablesByName.get(columnName);
-      const label = shortLabelFor(variable) || columnName;
-      return `${label}: ${shown}${rest > 0 ? ` +${rest}` : ""}`;
+      return `${idLabelFor(variable, columnName)}: ${shown}${rest > 0 ? ` +${rest}` : ""}`;
     })
     .filter(Boolean)
     .join(TITLE_JOIN);

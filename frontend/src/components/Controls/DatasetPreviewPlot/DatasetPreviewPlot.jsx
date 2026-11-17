@@ -47,6 +47,7 @@ import {
   buildOverlayFigure,
   gridBoxFor,
   plotBoxFor,
+  idLabelFor,
   recordTitleFor,
 } from "../DatasetPreview/previewFacetFigure.js";
 import {
@@ -415,7 +416,21 @@ export default function DatasetPreviewPlot() {
   );
   let headerTitle = "";
   if (hasProfileHeader) {
-    headerTitle = t("previewProfileTitle", { record: inspectRecordID });
+    // The record may be the station or the cast, so its role comes from the
+    // id column that holds it.
+    const recordIdVariable = plan.titleColumns
+      .map((columnName) => variablesByName.get(columnName))
+      .find(
+        (variable) =>
+          variable &&
+          plotData?.some(
+            (row) =>
+              String(row[variable.columnName]) === String(inspectRecordID),
+          ),
+      );
+    headerTitle = recordIdVariable
+      ? `${idLabelFor(recordIdVariable)}: ${inspectRecordID}`
+      : t("previewProfileTitle", { record: inspectRecordID });
   } else if (titleInHeader) {
     headerTitle = recordTitleFor({ plan, variablesByName, data: plotData });
   }
