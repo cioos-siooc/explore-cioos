@@ -30,8 +30,8 @@ def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
     # harvest() reloads the list via get_all_datasets(), so stub the call too.
     mock_erddap.get_all_datasets.return_value = df
     mock_erddap.get_logger.return_value = __import__("logging").getLogger("test")
-    # get_croissant_fingerprint() is unpacked into (content_hash, has_files,
-    # reason); has_files=False means skip_unchanged never triggers.
+    # get_croissant_fingerprint() is unpacked into (content_hash, reliable,
+    # reason); reliable=False means skip_unchanged never triggers.
     mock_erddap.get_croissant_fingerprint.return_value = (None, False, None)
     return mock_erddap
 

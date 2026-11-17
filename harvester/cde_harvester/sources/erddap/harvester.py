@@ -385,12 +385,12 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     dataset = None
     progress = f" {idx}/{total}" if idx and total else ""
     try:
-        new_hash, has_files, hash_reason = erddap.get_croissant_fingerprint(
+        new_hash, reliable, hash_reason = erddap.get_croissant_fingerprint(
             erddap_url, dataset_id,
             dap="griddap" if data_structure == "grid" else "tabledap",
         )
         prev_hash = (previous_hashes or {}).get(dataset_id)
-        if skip_unchanged and has_files and new_hash and prev_hash == new_hash:
+        if skip_unchanged and reliable and new_hash and prev_hash == new_hash:
             duration_ms = int((time.monotonic() - t0) * 1000)
             log.info(
                 f"Dataset not updated since last harvest, skipping: "

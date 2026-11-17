@@ -107,12 +107,18 @@ function createCache({ redis: redisModule = redis } = {}) {
     // (with the response in hand), and per-route `statusCodes` is ignored, so
     // the toggle is the only way to keep errors out of the cache. On the serve
     // path res.statusCode is still the default 200.
-    route:
-      (duration = "5 minutes", toggle) =>
-      async (req, res, next) => {
-        const mw = await ensureReady();
-        return mw(duration, toggle)(req, res, next);
-      },
+    //
+    // Built once per route: every apicache.middleware() call joins a list
+    // apicache never prunes and re-syncs on each call, so building it per
+    // request made every hit slower than the last until a restart. Its
+    // redisClient is synced in when ensureReady installs the adapter.
+    route: (duration = "5 minutes", toggle) => {
+      const middleware = apicache.middleware(duration, toggle);
+      return async (req, res, next) => {
+        await ensureReady();
+        return middleware(req, res, next);
+      };
+    },
   };
 }
 

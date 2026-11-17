@@ -60,7 +60,9 @@ services:
     shm_size: 1gb
     # log_lock_waits: near-zero cost, and makes db-loader vs web-api lock
     # contention diagnosable straight from `docker logs`.
-    command: ["postgres", "-c", "log_lock_waits=on"]
+    # jit=off: compiling took 0.3-1.5 s per tile/legend/histogram query, often
+    # longer than the query itself ran.
+    command: ["postgres", "-c", "log_lock_waits=on", "-c", "jit=off"]
     environment:
       # Postgres' own variable names, so this service cannot use *db-env; the
       # values behind them are the same, defaults included.

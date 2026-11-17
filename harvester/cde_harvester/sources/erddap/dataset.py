@@ -219,6 +219,28 @@ class Dataset:
             )
             return []
 
+        if profile_variables.get("timeseries_id") == "time":
+            # distinct() of it lists every timestamp; on salishsea's 1-minute
+            # ubcONCTWDP1mV18-01 that ran 24 min, then ERDDAP kept computing it
+            # and 408'd every later request for 1.7 h.
+            self.no_features_reason = (
+                "cf_role=timeseries_id is on time, which makes every record its "
+                "own station; set it on a station id variable"
+            )
+            return pd.DataFrame()
+
+        if (
+            len(profile_variable_list) == 1
+            and df_variables.loc[profile_variable_list[0], "type"] == "byte"
+        ):
+            # The IOOS/NCEI templates' scalar `platform` container: it holds no
+            # data, the dataset IS that one platform. Its distinct() and the
+            # orderByMinMax fallback below each scan the whole dataset to learn
+            # nothing (seagull-erddap: ~80s apiece); tabledap_features takes the
+            # single feature's time and lat/lon ranges from metadata instead.
+            self.profile_ids = pd.DataFrame({profile_variable_list[0]: [float("nan")]})
+            return self.profile_ids
+
         # distinct() of the ids alone measured ~0.2s on every ONC and
         # cioospacific dataset tried; an orderByMinMax over time scans every
         # record and 504s on dap.oceannetworks.ca's long sensor streams.

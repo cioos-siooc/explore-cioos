@@ -226,6 +226,51 @@ class TestCroissantVersionGate:
         assert before != after
 
 
+class TestDatabaseBackedFingerprint:
+    """No file list: only a finished deployment's Croissant is trusted."""
+
+    def _fingerprint(self, croissant):
+        erddap = _make_erddap()
+        erddap.session.get.side_effect = lambda url, **kw: MockResponse(
+            text="ERDDAP_version=2.31\n" if url.endswith("/version") else croissant
+        )
+        return erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+
+    def test_closed_temporal_coverage_is_reliable(self):
+        digest, reliable, reason = self._fingerprint(
+            '{"temporalCoverage": "2021-05-28T21:45:00Z/2022-11-25T19:45:00Z"}'
+        )
+        assert digest and reliable and reason is None
+
+    def _on_day(self, monkeypatch, day):
+        monkeypatch.setattr(client.time, "time", lambda: day * 86400)
+
+    def test_hash_rolls_over_once_per_refresh_period(self, monkeypatch):
+        croissant = '{"temporalCoverage": "2021-05-28T21:45:00Z/2022-11-25T19:45:00Z"}'
+        hashes = set()
+        for day in range(1_000, 1_000 + client.DB_REFRESH_DAYS):
+            self._on_day(monkeypatch, day)
+            hashes.add(self._fingerprint(croissant)[0])
+        assert len(hashes) == 2
+
+    def test_a_day_refreshes_only_some_datasets(self, monkeypatch):
+        ids = [f"profile_{i}" for i in range(300)]
+        self._on_day(monkeypatch, 1_000)
+        before = [client._refresh_period(i) for i in ids]
+        self._on_day(monkeypatch, 1_001)
+        rolled = sum(a != client._refresh_period(i) for a, i in zip(before, ids, strict=True))
+        assert 0 < rolled < len(ids) / 5
+
+    @pytest.mark.parametrize("croissant", [
+        "{}",
+        '{"temporalCoverage": "2021-05-28T21:45:00Z/.."}',
+        '{"temporalCoverage": "2021-05-28T21:45:00Z"}',
+    ])
+    def test_ongoing_or_unknown_coverage_is_not_hashed(self, croissant):
+        from cde_harvester.core.errors import HASH_NO_FILE_LIST
+        assert self._fingerprint(croissant) == (None, False, HASH_NO_FILE_LIST)
+
+
 class TestRequestCache:
     @pytest.fixture
     def erddap(self, tmp_path, monkeypatch):
