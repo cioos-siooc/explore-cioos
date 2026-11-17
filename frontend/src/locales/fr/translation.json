@@ -599,6 +599,7 @@
   "previewStepRecord": "Récupération de l’enregistrement auprès de son serveur de données…",
   "previewStepProfiles": "Liste des profils de cet enregistrement…",
   "previewErddapQueryLabel": "Requête ERDDAP",
+  "previewErddapQueryActiveLabel": "Requête ERDDAP en cours",
   "previewStepPlotly": "Chargement de la bibliothèque graphique…",
   "datasetPreviewErrorPlot": "La figure n’a pas pu être tracée. Le tableau peut tout de même afficher cet enregistrement.",
   "datasetPreviewErrorDetail": "Erreur : {{code}}",

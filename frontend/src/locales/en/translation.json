@@ -598,6 +598,7 @@
   "previewStepRecord": "Fetching the record from its data server…",
   "previewStepProfiles": "Listing the profiles in this record…",
   "previewErddapQueryLabel": "ERDDAP request",
+  "previewErddapQueryActiveLabel": "Querying ERDDAP",
   "previewStepPlotly": "Loading the plotting library…",
   "datasetPreviewErrorPlot": "The figure could not be drawn. The table may still show this record.",
   "datasetPreviewErrorDetail": "Error: {{code}}",

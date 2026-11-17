@@ -130,6 +130,9 @@ describe("DatasetPreview", () => {
       global.fetch = vi.fn(() => new Promise(() => {}));
       const url = "https://erddap.example.com/erddap/tabledap/d1.json?&id=1";
       open({ recordLoading: true, previewQuery: url });
+      expect(screen.getByTestId("preview-loading")).toHaveTextContent(
+        /querying erddap/i,
+      );
       const link = screen.getByRole("link", { name: url });
       expect(link).toHaveAttribute("href", url);
       expect(link).toHaveAttribute("target", "_blank");

@@ -8,12 +8,12 @@ import reportError from "../../../state/reportError.js";
 
 // The exact request, opened in a new tab so the reader can see what ERDDAP
 // says for themselves.
-function ErddapQuery({ url }) {
+function ErddapQuery({ url, labelKey = "previewErddapQueryLabel" }) {
   const { t } = useTranslation();
   if (!url) return null;
   return (
     <p className="previewStatusQuery">
-      <span>{t("previewErddapQueryLabel")}</span>
+      <span>{t(labelKey)}</span>
       <a href={url} target="_blank" rel="noopener noreferrer">
         {url}
       </a>
@@ -28,7 +28,7 @@ export function PreviewLoading({ labelKeys, query }) {
     <div className="previewStatus" role="status" data-testid="preview-loading">
       <Spinner size="lg" role="presentation" />
       <ActivityList labelKeys={labelKeys} className="previewStatusSteps" />
-      <ErddapQuery url={query} />
+      <ErddapQuery url={query} labelKey="previewErddapQueryActiveLabel" />
     </div>
   );
 }
