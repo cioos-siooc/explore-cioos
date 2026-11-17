@@ -2,8 +2,7 @@
 // Publishers spell the same license a dozen ways — a creativecommons.org URL,
 // "Creative Commons Attribution 4.0 International", "CC-BY 4.0", a sentence
 // that mentions it — so the label is recognised, not copied. Unrecognised
-// text is used only when it is short enough for a chip; a pasted disclaimer
-// gets no label (undefined) and the caller names it generically.
+// licenses show the source's own wording (or URL) as is.
 const CC_URL =
   /creativecommons\.org\/(?:licenses\/([a-z-]+)|publicdomain\/zero)\/?(\d\.\d)?/i;
 const CC_CODE = /\bCC[\s-]?(BY(?:[\s-](?:NC|SA|ND))*|0)\b[\s-]*(\d\.\d)?/i;
@@ -11,7 +10,6 @@ const CC_WORDS =
   /creative commons\s+(attribution|zero)((?:[\s-]+(?:non[\s-]?commercial|share[\s-]?alike|no[\s-]?deriv\w*))*)[^\d]{0,30}(\d\.\d)?/i;
 const OGL_CANADA =
   /open[\s-]government[\s-]licen[cs]e[\s-–]*canada|government-open-license-canada/i;
-const MAX_LABEL_LENGTH = 32;
 
 // Harvested text can carry HTML entities from a double-escaped source.
 export function licenseText(text) {
@@ -62,7 +60,5 @@ export function licenseLabel(license) {
     return cc(["BY", ...extras].join("-"), fromWords[3]);
   }
   if (OGL_CANADA.test(title) || OGL_CANADA.test(url)) return "OGL Canada";
-  return title.length <= MAX_LABEL_LENGTH && !/\s{2}|\n/.test(title)
-    ? title || undefined
-    : undefined;
+  return title || url || undefined;
 }
