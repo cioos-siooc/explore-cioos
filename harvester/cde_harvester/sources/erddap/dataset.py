@@ -186,6 +186,10 @@ class Dataset:
 
         return df_min_max
 
+    def has_values(self, variable):
+        url = variable + requests.utils.quote(f'&orderByMinMax("{variable}")')
+        return not self.dataset_tabledap_query(url).empty
+
     def get_profile_ids(self, collapse_time_profile_ids=False):
         df_variables = self.df_variables
 
