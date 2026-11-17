@@ -369,7 +369,7 @@ def _raw_nccf(path):
     ).to_netcdf(path)
 
 
-def _raw_obis(path):
+def _raw_obis(path, dropped=(None, False), absence=(False, None)):
     lats, lons = zip(*_POINTS, strict=True)
     interpreted = pa.StructArray.from_arrays(
         [
@@ -384,7 +384,10 @@ def _raw_obis(path):
         names=["scientificName", "decimalLatitude", "decimalLongitude", "date_start", "date_end",
                "minimumDepthInMeters", "maximumDepthInMeters"],
     )
-    pq.write_table(pa.table({"_id": ["a", "b"], "interpreted": interpreted}), path)
+    pq.write_table(
+        pa.table({"_id": ["a", "b"], "dropped": list(dropped), "absence": list(absence), "interpreted": interpreted}),
+        path,
+    )
 
 
 def _reproduce(tmp_path, archive, edit=None):
@@ -544,6 +547,16 @@ def test_obis_occurrences_are_filtered_by_depth_and_time(tmp_path, query, n_rows
     written = formats.write_obis("csv", str(export), query, [], tmp_path / "out")
 
     assert sum(f["n_rows"] for f in written) == n_rows
+
+
+@pytest.mark.parametrize("flags", [{"dropped": (True, False)}, {"absence": (False, True)}])
+def test_obis_absences_and_dropped_records_are_left_out(tmp_path, flags):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export, **flags)
+
+    [written] = formats.write_obis("csv", str(export), {}, [], tmp_path / "out")
+
+    assert written["n_rows"] == 1
 
 
 def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):
