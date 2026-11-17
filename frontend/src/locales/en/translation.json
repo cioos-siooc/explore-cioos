@@ -332,7 +332,7 @@
   "previewWindowStartOfRecord": "These rows reach the start of the record",
   "previewWindowLatest": "Latest",
   "previewWindowLatestHelp": "Back to the record's most recent rows",
-  "previewWindowRows": "Rows",
+  "previewWindowRows": "Max rows loaded",
   "datasetPreviewPlotSummary": "Plot of {{variables}} against {{axis}}, from {{count, number}} rows. The Table view lists the same values.",
   "datasetPreviewPlotEmptyGroup": "No data in this record",
   "datasetPreviewTableConstants": "Same on every row",
