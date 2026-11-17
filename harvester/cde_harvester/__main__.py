@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
-from sentry_sdk.crons import monitor
 
 from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.core.day_sets import ranges_to_csv_cell
@@ -356,7 +355,6 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     return written_files
 
 
-@monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
          obis_discovery=None, source=None, triggered_by=None, skip_unchanged=False):
