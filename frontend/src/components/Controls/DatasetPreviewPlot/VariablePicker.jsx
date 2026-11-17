@@ -4,6 +4,7 @@ import Select, { components } from "react-select";
 import {
   CaretDownFill,
   GripVertical,
+  PlusLg,
   SlashCircle,
 } from "react-bootstrap-icons";
 import {
@@ -145,11 +146,16 @@ function Option(props) {
 }
 
 // The small filled caret the pane's other dropdowns and SelectPill draw, in
-// place of react-select's 20px chevron and its separator rule.
+// place of react-select's 20px chevron and its separator rule; a multi pick
+// shows a plus instead, since opening it adds another variable.
 function DropdownIndicator(props) {
   return (
     <components.DropdownIndicator {...props}>
-      <CaretDownFill size={9} aria-hidden="true" />
+      {props.isMulti ? (
+        <PlusLg size={11} aria-hidden="true" />
+      ) : (
+        <CaretDownFill size={9} aria-hidden="true" />
+      )}
     </components.DropdownIndicator>
   );
 }
