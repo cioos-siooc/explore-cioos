@@ -603,13 +603,6 @@ button.datasetCardTitle:focus-visible {
   gap: 7px;
 }
 
-.datasetCardPlatform {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
-}
-
 .datasetCardTitle {
   /* Without min-width a long unbroken title pushes the slot off the card. */
   flex: 1 1 auto;
@@ -656,16 +649,26 @@ button.datasetCardTitle:focus-visible {
   min-width: 0;
 }
 
-.datasetCardMetaType {
-  max-width: 14ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .datasetCardMetaItem svg {
   flex: 0 0 auto;
   color: var(--cioos-ink-40);
+}
+
+/* The platform colour behind the geometry glyph: the map's marker colour, on a
+   chip because a 1.5px line in float yellow vanishes on white. */
+.datasetCardTypeChip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(21 47 55 / 15%);
+}
+
+.datasetCardMetaItem .datasetCardTypeChip svg {
+  color: inherit;
 }
 
 .datasetCardDownloadInfo {

@@ -1,4 +1,5 @@
 import platformColors from "./components/platformColors.js";
+import { contrastOnWhite } from "./components/Controls/DatasetPreview/erddapPalettes.js";
 import platforms from "./platforms.json";
 import { capitalizeFirstLetter } from "./utilities.jsx";
 
@@ -31,4 +32,12 @@ export function platformColor(platform) {
     platformColors.find((pc) => pc.platform === category) ??
     platformColors.find((pc) => pc.platform === "unknown")
   ).color;
+}
+
+// A glyph drawn on the platform colour: white wherever it keeps WCAG's 3:1 for
+// graphics, the theme's ink on the pale ones (float yellow, spacecraft lilac).
+export function platformInk(platform) {
+  return contrastOnWhite(platformColor(platform)) >= 3
+    ? "var(--cioos-white)"
+    : "var(--cioos-ink)";
 }

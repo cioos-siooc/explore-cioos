@@ -124,11 +124,18 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       i18n.addResourceBundle("fr", "translation", resources.fr.translation);
       await i18n.changeLanguage("fr");
     });
-    expect(screen.getAllByTitle("Type").map((el) => el.textContent)).toEqual([
-      "Profil",
-      "Série temporelle",
-      "Profil de trajectoire",
-    ]);
+    // The type is the meta row's first icon; its screen-reader text ends with
+    // the type's name, after the platform's.
+    expect(
+      screen
+        .getAllByTestId("dataset-card")
+        .map((c) =>
+          c
+            .querySelector(".datasetCardMeta .sr-only")
+            .textContent.split(" · ")
+            .at(-1),
+        ),
+    ).toEqual(["Profil", "Série temporelle", "Profil de trajectoire"]);
 
     await user.selectOptions(await screen.findByLabelText("Tri"), "Type");
     expect(

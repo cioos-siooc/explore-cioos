@@ -20,7 +20,11 @@ import classNames from "classnames";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
-import { platformColor, platformLabel } from "../../../platformVocab.js";
+import {
+  platformColor,
+  platformInk,
+  platformLabel,
+} from "../../../platformVocab.js";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import {
@@ -28,7 +32,11 @@ import {
   localizedErddapUrl,
 } from "../../../downloadLinks.js";
 import erddapServersJSONfile from "../../../erddapServers.json";
-import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
+import {
+  cdmDataTypeLabel,
+  dataLayerKeyForDataset,
+} from "../../../state/dataLayers.js";
+import DataTypeIcon from "../../ui/DataTypeIcon.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 
@@ -103,6 +111,22 @@ export default function DatasetCard({
       )}
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
+          {/* The whole card can't be a button because it holds the checkbox
+              and links. Its click bubbles to the card's own handler. */}
+          {clickable ? (
+            <button
+              type="button"
+              className="datasetCardTitle"
+              title={row.title}
+            >
+              {row.title}
+            </button>
+          ) : (
+            <span className="datasetCardTitle" title={row.title}>
+              {row.title}
+            </span>
+          )}
+
           {/* A button with role=checkbox: it carries an icon a native input
               cannot. */}
           <button
@@ -122,32 +146,6 @@ export default function DatasetCard({
               <PlusCircle size={16} aria-hidden="true" />
             )}
           </button>
-
-          {/* The wrapper is the height of the title's first line, so the dot
-              stays centered on that line however the title wraps. */}
-          <span className="datasetCardPlatform">
-            <DatasetPlatformIcon
-              platform={row.platform}
-              cdmDataType={row.cdm_data_type}
-              sourceType={row.source_type}
-              t={t}
-            />
-          </span>
-          {/* The whole card can't be a button because it holds the checkbox
-              and links. Its click bubbles to the card's own handler. */}
-          {clickable ? (
-            <button
-              type="button"
-              className="datasetCardTitle"
-              title={row.title}
-            >
-              {row.title}
-            </button>
-          ) : (
-            <span className="datasetCardTitle" title={row.title}>
-              {row.title}
-            </span>
-          )}
 
           {isDownloadModal && (
             <span className="datasetCardDownloadInfo">
@@ -335,6 +333,29 @@ export function DatasetPlatformIcon({
   );
 }
 
+// The figure alone on the card; the full wording is the tooltip and, for
+// screen readers, the item's text.
+function MetaIconItem({ icon, label, children }) {
+  return (
+    <Tooltip placement="top" content={label}>
+      <span className="datasetCardMetaItem">
+        {icon}
+        {children && <span aria-hidden="true">{children}</span>}
+        <span className="sr-only">{label}</span>
+      </span>
+    </Tooltip>
+  );
+}
+
+function locationsCount(row, language) {
+  const format = (n) => new Intl.NumberFormat(language).format(n);
+  const count = Number(row.profiles_count);
+  const total = row.n_profiles == null ? undefined : Number(row.n_profiles);
+  return total !== undefined && count < total
+    ? `${format(count)}/${format(total)}`
+    : format(count);
+}
+
 function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
@@ -345,36 +366,53 @@ function DatasetCardMeta({ row, t, i18n }) {
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
     : cdmDataTypeLabel(row.cdm_data_type, t) || "";
-  const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || "—"
-    : row.profiles_count !== row.n_profiles
-      ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count;
+  const gridSize = isGrid && (formatGridSize(row.grid_dimensions) || "—");
+  const layerKey = dataLayerKeyForDataset(row);
 
   return (
     <span className="datasetCardMeta">
+      <MetaIconItem
+        icon={
+          <span
+            className="datasetCardTypeChip"
+            style={{
+              backgroundColor: platformColor(row.platform),
+              color: platformInk(row.platform),
+            }}
+          >
+            {layerKey ? (
+              <DataTypeIcon layerKey={layerKey} size={14} />
+            ) : (
+              <FileEarmarkSpreadsheet size={12} aria-hidden="true" />
+            )}
+          </span>
+        }
+        label={
+          row.platform && row.platform !== "unknown"
+            ? `${platformLabel(row.platform, i18n.language)} · ${typeLabel}`
+            : typeLabel
+        }
+      />
       <span className="datasetCardMetaItem" title={t("coverageGroup_source")}>
         <Server size={13} aria-hidden="true" />
         {serverName}
       </span>
-      <span
-        className="datasetCardMetaItem"
-        title={t("datasetsTableHeaderTypeText")}
-      >
-        <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
-        <span className="datasetCardMetaType">{typeLabel}</span>
-      </span>
-      <span
-        className="datasetCardMetaItem"
-        title={
-          isGrid
-            ? t("griddapGridSizeTooltip")
-            : t("datasetsTableHeaderLocationsText")
-        }
-      >
-        <PinMapFill size={13} aria-hidden="true" />
-        {locationsLabel}
-      </span>
+      {isGrid ? (
+        <span
+          className="datasetCardMetaItem"
+          title={t("griddapGridSizeTooltip")}
+        >
+          <PinMapFill size={13} aria-hidden="true" />
+          {gridSize}
+        </span>
+      ) : (
+        <MetaIconItem
+          icon={<PinMapFill size={13} aria-hidden="true" />}
+          label={`${t("datasetsTableHeaderLocationsText")}: ${locationsCount(row, i18n.language)}`}
+        >
+          {locationsCount(row, i18n.language)}
+        </MetaIconItem>
+      )}
       {row.days != null && (
         <span
           className="datasetCardMetaItem"
