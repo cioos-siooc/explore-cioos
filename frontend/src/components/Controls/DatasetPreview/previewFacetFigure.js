@@ -23,7 +23,9 @@ import {
 } from "./previewColoredLine.js";
 import { colorGridFor } from "./previewColorGrid.js";
 import {
+  axisLabelFor,
   ellipsize,
+  inlineLabel,
   maxCharsFor,
   titleLinesFor,
   wrapLabel,
@@ -175,6 +177,7 @@ export function plotBoxFor({
   measured = {},
   withTitle = true,
   orientation = plan.orientation, // the colour plot always stacks
+  minPanel,
 }) {
   const title = withTitle
     ? recordTitleFor({ plan, variablesByName, data })
@@ -183,6 +186,7 @@ export function plotBoxFor({
     orientation,
     panelCount,
     boxBudgetFor(measured.width),
+    minPanel,
   );
   const titleLines = titleLinesFor(title, width);
   const height = plotHeightFor(
@@ -190,6 +194,7 @@ export function plotBoxFor({
     panelCount,
     heightBudgetFor(availableHeight, measured.height),
     titleLines,
+    minPanel,
   );
   return { title, width, height, titleLines };
 }
@@ -209,6 +214,7 @@ export function gridBoxFor({
   withTitle = true,
   header = false,
   colorbars = false,
+  minPanel,
 }) {
   const title = withTitle
     ? recordTitleFor({ plan, variablesByName, data })
@@ -219,6 +225,7 @@ export function gridBoxFor({
     rows,
     availableWidth,
     margin: gridMarginFor(undefined, { header, colorbars }),
+    minPanel,
   });
   const titleLines = titleLinesFor(title, width);
   const { height } = gridSizeFor({
@@ -227,6 +234,7 @@ export function gridBoxFor({
     availableWidth,
     availableHeight: heightBudgetFor(availableHeight, measured.height),
     margin: gridMarginFor(titleLines, { header, colorbars }),
+    minPanel,
   });
   return { title, width, height, titleLines };
 }
@@ -438,7 +446,8 @@ export function buildFigure({
     : 0;
   // A title wraps against the length of its own axis: across for x, along for y.
   const wrapAlong = (text, letter, domain, maxLines) =>
-    wrapLabel(
+    axisLabelFor(
+      letter,
       text,
       maxCharsFor(
         (letter === "y" ? plottingHeight : plottingWidth) *
@@ -733,7 +742,8 @@ export function buildOverlayFigure({
       ? { autorange: "reversed" }
       : {}),
     title: axisTitle(
-      wrapLabel(
+      axisLabelFor(
+        sharedLetter,
         titleFor(sharedAxis),
         maxCharsFor(
           sharedLetter === "y"
@@ -772,7 +782,8 @@ export function buildOverlayFigure({
         ? { autorange: "reversed" }
         : {}),
       title: axisTitle(
-        wrapLabel(
+        axisLabelFor(
+          valueLetter,
           titleFor(columnName),
           maxCharsFor(valueLetter === "y" ? plottingHeight : plottingWidth),
           PINNED_AXIS_LINES,
@@ -934,7 +945,10 @@ export function buildGridFigure({
       ...positionTicksFor(position, yAxis),
       ...(reversedYAxes.has(yAxis) ? { autorange: "reversed" } : {}),
       title: axisTitle(
-        wrapAlong(titleFor(yAxis), plottingHeight * (domain[1] - domain[0])),
+        inlineLabel(
+          titleFor(yAxis),
+          maxCharsFor(plottingHeight * (domain[1] - domain[0])),
+        ),
       ),
     };
   });
@@ -1229,7 +1243,10 @@ export function buildColorFigure({
         ...(row >= yAxes.length ? { matches: axisRef("y", yIndex) } : {}),
         ...(isReversed(yColumn, yIndex) ? { autorange: "reversed" } : {}),
         title: axisTitle(
-          wrapAlong(titleFor(yColumn), plottingHeight * spanOf(domain)),
+          inlineLabel(
+            titleFor(yColumn),
+            maxCharsFor(plottingHeight * spanOf(domain)),
+          ),
         ),
       };
       const yValues = (data || []).map((entry) => entry[yColumn]);

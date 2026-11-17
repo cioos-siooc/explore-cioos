@@ -8,31 +8,37 @@
 import { COLUMNS } from "./previewFacetPlan.js";
 import { MAX_LABEL_LINES, MAX_TITLE_LINES } from "./previewLabelText.js";
 
-// Left of every vertical axis: room for its tick labels, then room for the
-// axis's own label, which runs along the axis and so needs only its line
-// height — two 18px lines here, automargin covers a third. Reserved by a
-// stack's margin and by a profile's pinned strip, both left of a vertical axis.
-export const TICK_ROOM_PX = 48;
-export const LABEL_GUTTER_PX = 48;
-
 // Above a profile's panels: their tick labels and the title standoff. The panel
 // titles' own lines are added per line, so they never reach the figure title.
 export const TOP_TICK_ROOM_PX = 32;
 // 18px at Plotly's LINE_SPACING of 1.3 is 23.4.
 export const LABEL_LINE_PX = 24;
 
+// Left of every vertical axis: room for its tick labels, then one line for the
+// axis's own label, which runs along the axis with its unit inline (axisLabelFor).
+// Reserved by a stack's margin and by a profile's pinned strip.
+export const TICK_ROOM_PX = 48;
+export const LABEL_GUTTER_PX = LABEL_LINE_PX;
+
+// Right of every figure: Plotly's toolbar runs down that edge, its buttons 40px
+// wide on a touch screen (DatasetPreviewPlot/styles.css), and would sit on the
+// last panel without it.
+export const TOOLBAR_ROOM_PX = 40;
+
 // The shared axis is drawn in a strip of its own outside the scroller (see
 // previewPinnedAxis.js), so it stays in view however far the panels scroll: a
 // profile's on the left, a stack's at the bottom. The figure keeps only enough
-// of that edge not to clip the axis line. The title is capped at two lines,
-// because a strip sized from its title would feed back into the figure's size.
+// of that edge not to clip the axis line. A bottom strip's title is capped at
+// two lines, a left one's at one, because a strip sized from its title would
+// feed back into the figure's size.
 export const PINNED_AXIS_LINES = 2;
 const BOTTOM_TICK_ROOM_PX = 28;
 export const PINNED_EDGE_PX = 4;
 
 export function pinnedAxisSizeFor(orientation) {
-  const tickRoom = orientation === COLUMNS ? TICK_ROOM_PX : BOTTOM_TICK_ROOM_PX;
-  return tickRoom + PINNED_AXIS_LINES * LABEL_LINE_PX;
+  return orientation === COLUMNS
+    ? TICK_ROOM_PX + LABEL_GUTTER_PX
+    : BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX;
 }
 
 // Orientation-dependent because the two layouts spend their other edges
@@ -42,14 +48,13 @@ export function pinnedAxisSizeFor(orientation) {
 // panel, and nothing below a profile, whose ticks and titles are all on top.
 const COLUMNS_MARGIN = {
   l: PINNED_EDGE_PX,
-  r: 14,
+  r: TOOLBAR_ROOM_PX,
   t: TOP_TICK_ROOM_PX,
   b: PINNED_EDGE_PX,
 };
-// r stays wider than a profile's: a date tick is half a "May 25" past the end.
 const ROWS_MARGIN = {
   l: TICK_ROOM_PX + LABEL_GUTTER_PX,
-  r: 26,
+  r: TOOLBAR_ROOM_PX,
   t: 12,
   b: PINNED_EDGE_PX,
 };
@@ -103,7 +108,9 @@ export function marginFor(
 export const COLUMN_GAP = 0.15;
 export const ROW_GAP = 0.08;
 
-// Below this a panel is not worth drawing; the container scrolls instead.
+// Below this a panel is not worth drawing; the container scrolls instead. Each
+// sizing function takes it as `minPanel`, which 0 turns into "fit the box": on
+// a touch screen a drag pans the data, so there is no scroll to fall back on.
 export const MIN_PANEL_PX = 150;
 export const MIN_PLOT_PX = 320;
 
@@ -173,12 +180,13 @@ export function plotHeightFor(
   panelCount,
   availableHeight,
   titleLines = MAX_TITLE_LINES,
+  minPanel = MIN_PANEL_PX,
 ) {
   const available = Math.max(availableHeight || 0, MIN_PLOT_PX);
   if (orientation === COLUMNS) return available;
   const margin = marginFor(orientation, titleLines);
   const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b;
+    minPanel * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b;
   // Whole pixels: a fractional height is a fractional scroll position.
   return Math.ceil(Math.max(available, needed));
 }
@@ -192,12 +200,17 @@ const widthBudgetFor = (availableWidth) =>
 // Profiles get narrow fast: six panels in a 1140px modal is ~170px each, which
 // still reads. The floor keeps a 14-column selection legible at the cost of a
 // horizontal scroll.
-export function plotWidthFor(orientation, panelCount, availableWidth) {
+export function plotWidthFor(
+  orientation,
+  panelCount,
+  availableWidth,
+  minPanel = MIN_PANEL_PX,
+) {
   const available = widthBudgetFor(availableWidth);
   if (orientation !== COLUMNS) return available;
   const margin = marginFor(orientation, MAX_TITLE_LINES);
   const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
+    minPanel * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
   return Math.ceil(Math.max(available, needed));
 }
 
@@ -207,7 +220,7 @@ export function plotWidthFor(orientation, panelCount, availableWidth) {
 // columns naming what each one is coloured by, as many lines as an X title.
 const GRID_MARGIN = {
   l: TICK_ROOM_PX + LABEL_GUTTER_PX,
-  r: 26,
+  r: TOOLBAR_ROOM_PX,
   t: 12,
   b: BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
 };
@@ -226,15 +239,16 @@ export function gridMarginFor(
   };
 }
 
-// Every panel at least MIN_PANEL_PX square; the scroller takes the rest.
+// Every panel at least minPanel square; the scroller takes the rest.
 export function gridSizeFor({
   columns,
   rows,
   availableWidth,
   availableHeight,
   margin,
+  minPanel = MIN_PANEL_PX,
 }) {
-  const needed = (count, gap) => MIN_PANEL_PX * panelPitch(count, gap);
+  const needed = (count, gap) => minPanel * panelPitch(count, gap);
   return {
     width: Math.ceil(
       Math.max(
@@ -266,14 +280,14 @@ export function overlayMarginFor(orientation, titleLines = MAX_TITLE_LINES) {
   if (orientation === COLUMNS) {
     return {
       l: SIDE_AXIS_ROOM_PX,
-      r: 26,
+      r: TOOLBAR_ROOM_PX,
       t: 10 + STACKED_AXIS_PX + titleRoom,
       b: PINNED_EDGE_PX,
     };
   }
   return {
     l: SIDE_AXIS_ROOM_PX,
-    r: 26,
+    r: TOOLBAR_ROOM_PX,
     t: 12 + titleRoom,
     b: BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
   };

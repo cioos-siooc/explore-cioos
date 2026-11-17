@@ -166,7 +166,8 @@ export default function DatasetPreviewPlot() {
   const [resizing, setResizing] = useState(false);
   // Too narrow for two panes side by side: the settings fold above the plot.
   const settingsInDialog = useMediaQuery(PREVIEW_COMPACT_QUERY);
-  // A finger's drag has to scroll the panels, not zoom them.
+  // A finger's drag pans the data, so the figure has to fit the screen: there
+  // is no drag left over to scroll it with.
   const touch = useMediaQuery(TOUCH_QUERY);
 
   // The plot pane's own box. Its width is what the figure is drawn to; its
@@ -235,6 +236,7 @@ export default function DatasetPreviewPlot() {
       availableHeight,
       measured: plotAreaSize,
       withTitle: !titleInHeader,
+      minPanel: touch ? 0 : undefined,
     };
     if (isGrid) {
       return gridBoxFor({
@@ -258,6 +260,7 @@ export default function DatasetPreviewPlot() {
     availableHeight,
     plotAreaSize,
     titleInHeader,
+    touch,
     isColorLayout,
     isGrid,
     gridColumns,
@@ -406,11 +409,11 @@ export default function DatasetPreviewPlot() {
         : splitPinnedAxis(figure, pinnedOrientation)),
     [figure, pinnedOrientation],
   );
-  // Toolbar zoom stays available, and picking the zoom tool brings drag back.
+  // Zooming is the toolbar's; picking its zoom tool turns the drag into a box.
   const mainLayout = useMemo(
     () =>
       split && touch
-        ? { ...split.figure.layout, dragmode: false }
+        ? { ...split.figure.layout, dragmode: "pan" }
         : split?.figure.layout,
     [split, touch],
   );
@@ -484,7 +487,8 @@ export default function DatasetPreviewPlot() {
         "select2d",
         "lasso2d",
         "resetScale2d",
-        "pan2d",
+        // The way back from the zoom tool to a finger's pan.
+        ...(touch ? [] : ["pan2d"]),
         "toImage", // replaced below: it would miss the pinned axis and the colour legend
       ],
       modeBarButtonsToAdd: [
@@ -507,7 +511,7 @@ export default function DatasetPreviewPlot() {
       scrollZoom: true,
       locale: language === "fr" ? "fr" : "en",
     }),
-    [t, language, downloadPng, setShowInteractionHelp],
+    [t, language, downloadPng, setShowInteractionHelp, touch],
   );
   // What a screen reader hears in place of the figure, and where the values are.
   const plotSummary = t("datasetPreviewPlotSummary", {

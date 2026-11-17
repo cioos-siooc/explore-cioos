@@ -36,6 +36,7 @@ import {
   COLORBAR_ROOM_PX,
   COLUMN_GAP,
   MIN_PANEL_PX,
+  TOOLBAR_ROOM_PX,
 } from "./previewFacetSizing.js";
 import { colorScaleFor } from "./previewColorScales.js";
 import { defaultColorFor } from "./previewColors.js";
@@ -277,7 +278,7 @@ test("every stacked panel is titled on its own y axis", () => {
   }
 });
 
-test("a vertical axis title wraps to its own panel's height once it is known", () => {
+test("a vertical axis title fits its own panel's height on one line once it is known", () => {
   const size = { width: 900, height: 1300 };
   const { layout } = figure("TimeSeries", ALL_SIX, { size });
   const margin = marginFor(ROWS, 1);
@@ -288,17 +289,16 @@ test("a vertical axis title wraps to its own panel's height once it is known", (
       layout[index === 0 ? "yaxis" : `yaxis${index + 1}`].title.text,
   );
   titles.forEach((text) => {
-    text.split("<br>").forEach((line) => {
-      assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
-    });
+    assert.ok(!text.includes("<br>"), text);
+    assert.ok(text.length <= fits, `"${text}" (${text.length} > ${fits})`);
   });
   assert.ok(
-    titles.some((text) => text.includes("<br>")),
+    titles.some((text) => text.includes("…")),
     titles.join(" | "),
   );
-  // Unmeasured, nothing wraps.
+  // Unmeasured, nothing is cut.
   const unsized = figure("TimeSeries", ALL_SIX);
-  assert.ok(!unsized.layout.yaxis2.title.text.includes("<br>"));
+  assert.ok(!unsized.layout.yaxis2.title.text.includes("…"));
 });
 
 test("a stack keeps its shared axis title", () => {
@@ -1273,13 +1273,13 @@ const LONG_NAME =
   "a renamed axis whose label keeps going well past any line it could fit on";
 const lineCount = (text) => text.split("<br>").length;
 
-test("a profile's shared title fits its pinned strip: two lines, unit kept", () => {
+test("a profile's shared title fits its pinned strip: one line, unit kept", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
     labels: { depth: LONG_NAME },
     size: { width: 600, height: 400 },
   });
-  assert.equal(lineCount(layout.yaxis.title.text), 2);
-  assert.ok(layout.yaxis.title.text.endsWith("<br>(m)"));
+  assert.equal(lineCount(layout.yaxis.title.text), 1);
+  assert.match(layout.yaxis.title.text, /… \(m\)$/);
 });
 
 test("a colour plot's X title fits its pinned strip: two lines, unit kept", () => {
@@ -1488,7 +1488,7 @@ test("a stacked timeseries overlays every y axis on the left, shifting the extra
     assert.equal(axis.autoshift, true);
     assert.equal(axis.overlaying, "y");
   });
-  assert.equal(layout.margin.r, 26);
+  assert.equal(layout.margin.r, TOOLBAR_ROOM_PX);
   assert.equal(layout.hovermode, "x unified");
 });
 

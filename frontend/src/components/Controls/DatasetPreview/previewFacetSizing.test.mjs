@@ -86,6 +86,11 @@ test("profile width grows past the container once panels hit their floor", () =>
   assert.equal(plotWidthFor(ROWS, 14, 1000), 1000);
 });
 
+test("a zero panel floor fits any panel count to the box", () => {
+  assert.equal(plotWidthFor(COLUMNS, 14, 300, 0), 300);
+  assert.equal(plotHeightFor(ROWS, 14, 600, undefined, 0), 600);
+});
+
 test("each orientation reserves the edge its labels actually use", () => {
   // Without the title, which sits at the top of both.
   const columns = marginFor(COLUMNS, 0);
@@ -103,14 +108,12 @@ test("each orientation reserves the edge its labels actually use", () => {
 });
 
 test("the pinned strip reserves the room the figure gave up", () => {
-  // Its tick labels, then a two-line title running along the axis.
+  // Its tick labels, then the title: one line along a left axis, two under a
+  // bottom one.
   assert.equal(PINNED_AXIS_LINES, 2);
-  assert.equal(
-    pinnedAxisSizeFor(COLUMNS),
-    TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
-  );
-  assert.equal(pinnedAxisSizeFor(COLUMNS), 88);
-  assert.equal(pinnedAxisSizeFor(ROWS), 72);
+  assert.equal(pinnedAxisSizeFor(COLUMNS), TICK_ROOM_PX + LABEL_LINE_PX);
+  assert.equal(pinnedAxisSizeFor(COLUMNS), 72);
+  assert.equal(pinnedAxisSizeFor(ROWS), 76);
 });
 
 test("a profile's top margin pays for every line of its panel titles", () => {

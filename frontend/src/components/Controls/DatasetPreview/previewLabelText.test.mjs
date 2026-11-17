@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  inlineLabel,
   maxCharsFor,
   titleLinesFor,
   wrapLabel,
@@ -86,4 +87,16 @@ test("the title wraps at the line cap rather than overflowing the figure", () =>
   assert.ok(lines[lines.length - 1].endsWith("…"));
   // Wrapped at the FIGURE's width, not a panel's: it is centred on the figure.
   assert.ok(titleLinesFor(TITLE, 1140) < titleLinesFor(TITLE, 400));
+});
+
+test("inlineLabel keeps one line and the whole unit, cutting the name", () => {
+  assert.equal(inlineLabel("Depth (m)", 20), "Depth (m)");
+  const cut = inlineLabel("Sea Water Practical Salinity (PSS-78)", 20);
+  assert.equal(cut, "Sea Water… (PSS-78)");
+  assert.ok(cut.length <= 20);
+  assert.equal(inlineLabel("Sea Water Practical Salinity", 12), "Sea Water P…");
+  assert.equal(
+    inlineLabel("Sea Water Practical Salinity (PSS-78)", 0),
+    "Sea Water Practical Salinity (PSS-78)",
+  );
 });

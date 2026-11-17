@@ -93,6 +93,27 @@ export function wrapLabel(text, maxChars, maxLines = MAX_LABEL_LINES) {
   return [...lines, ...(unit ? [unit] : [])].join("<br>");
 }
 
+/**
+ * One line, for a title running along a vertical axis: there the margin pays
+ * for every extra line, while length along the axis is cheap. The name is cut
+ * short so the unit always fits — the same reason wrapLabel keeps it.
+ */
+export function inlineLabel(text, maxChars) {
+  const label = (text || "").trim();
+  if (!maxChars || label.length <= maxChars) return label;
+  const match = label.match(UNIT_SUFFIX);
+  if (!match) return ellipsize(label, maxChars);
+  const unit = match[0].trim();
+  const name = label.slice(0, match.index).trim();
+  return `${ellipsize(name, Math.max(1, maxChars - unit.length - 1))} ${unit}`;
+}
+
+export function axisLabelFor(letter, text, maxChars, maxLines) {
+  return letter === "y"
+    ? inlineLabel(text, maxChars)
+    : wrapLabel(text, maxChars, maxLines);
+}
+
 // The title wraps against the whole figure width, not a panel: it is centred on
 // the figure, not on anything inside it.
 export function wrapTitleFor(title, widthPx) {

@@ -296,7 +296,7 @@ describe("DatasetPreviewPlot", () => {
       document.querySelector(".datasetPreviewPlotArea").contains(strip),
     ).toBe(false);
     expect(strip.parentElement).toHaveClass("isPinnedLeft");
-    expect(strip).toHaveStyle({ width: "96px" });
+    expect(strip).toHaveStyle({ width: "72px" });
   });
 
   it("pins a stack's shared axis below the scroller", async () => {
@@ -412,11 +412,12 @@ describe("DatasetPreviewPlot", () => {
     expect(gear).toHaveFocus();
   });
 
-  it("lets a finger scroll the plot rather than zoom it", async () => {
+  it("lets a finger pan the plot, with the pan tool kept to return to", async () => {
     setTouchScreen(true);
     open();
     const plot = await plotted();
-    expect(plot).toHaveAttribute("data-dragmode", "false");
+    expect(plot).toHaveAttribute("data-dragmode", "pan");
+    expect(plot.dataset.removedButtons.split(" ")).not.toContain("pan2d");
     // No hover to reveal the toolbar, which is where zooming went.
     expect(plot).toHaveAttribute("data-modebar", "true");
   });
@@ -433,6 +434,7 @@ describe("DatasetPreviewPlot", () => {
     open();
     const plot = await plotted();
     expect(plot).toHaveAttribute("data-dragmode", "zoom");
+    expect(plot.dataset.removedButtons.split(" ")).toContain("pan2d");
     // Export and the help live in it: a hover-only toolbar hid both.
     expect(plot).toHaveAttribute("data-modebar", "true");
   });
