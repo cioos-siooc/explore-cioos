@@ -11,7 +11,7 @@ import pick from "lodash-es/pick.js";
 
 import { COLUMNS } from "./previewFacetPlan.js";
 import { pinnedAxisSizeFor } from "./previewFacetSizing.js";
-import { TICK_FONT_PX } from "./previewLabelText.js";
+import { PLOT_FONT, TICK_FONT_PX } from "./previewLabelText.js";
 
 // A profile shares its vertical axis, a stack (and the colour plot) its
 // horizontal one.
@@ -116,7 +116,7 @@ export function pinnedAxisFigureFor(axis, view, orientation) {
             xaxis: drawnAxis,
             yaxis: hiddenAxis,
           }),
-      font: { size: TICK_FONT_PX },
+      font: { ...PLOT_FONT, size: TICK_FONT_PX },
       showlegend: false,
       paper_bgcolor: TRANSPARENT,
       plot_bgcolor: TRANSPARENT,

@@ -169,6 +169,11 @@ export default function SelectionProvider({ children }) {
   const [previewError, setPreviewError] = useState();
   // The ERDDAP request /preview is waiting on, so the modal can show it running.
   const [previewQuery, setPreviewQuery] = useState();
+  const [previewAttempt, setPreviewAttempt] = useState(0);
+  const retryPreview = useCallback(
+    () => setPreviewAttempt((attempt) => attempt + 1),
+    [],
+  );
   const [combinedQueries, setCombinedQueries] = useState([]);
   const [onlyInView, setOnlyInView] = useState(
     () => initialParams.get("onlyInView") === "true",
@@ -759,6 +764,7 @@ export default function SelectionProvider({ children }) {
     inspectRecordStep,
     inspectAllProfiles,
     inspectRecordPeriod,
+    previewAttempt,
   ]);
 
   const value = {
@@ -798,6 +804,7 @@ export default function SelectionProvider({ children }) {
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
     previewError,
     previewQuery,
+    retryPreview,
     recordLoading,
     setRecordLoading,
     datasetPreview,

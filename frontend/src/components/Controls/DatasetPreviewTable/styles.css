@@ -1,9 +1,190 @@
-.datasetPreviewTable {
-  max-width: 50%;
-  min-width: 50%;
+/* The grid with what every row shares beside it, the way the plot view sits
+   beside its settings. Fills the view so each side scrolls on its own. */
+.previewTableLayout {
+  display: flex;
+  gap: var(--cioos-space-sm);
+  height: 100%;
+  min-height: 0;
+}
+
+.previewTableMain {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The plot's settings pane width (PANE_DEFAULT_PX). */
+.previewTableAside {
+  flex: 0 0 240px;
+  min-height: 0;
+  overflow: hidden auto;
+  padding-right: var(--cioos-space-sm);
+  border-right: 1px solid var(--cioos-hairline);
+}
+
+.previewTableAsideTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  margin: 6px 0 var(--cioos-space-sm);
+  font-family: var(--cioos-font-body);
+  font-size: inherit;
+}
+
+/* Too narrow for two columns: each value sits under its name. */
+.previewTableAside .previewTableConstantsList tbody {
+  display: block;
+}
+
+.previewTableAside .previewTableConstantsList tr {
+  display: block;
+  padding: 4px var(--cioos-space-sm);
+  border-radius: var(--cioos-radius-sm);
+}
+
+.previewTableAside .previewTableConstantsList th,
+.previewTableAside .previewTableConstantsList td {
+  display: block;
+  width: auto;
+  padding: 0;
+}
+
+.previewTableAside .previewTableConstantsList th {
+  font-size: var(--cioos-font-size-xs);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .datasetPreviewFilter {
   display: flex;
   margin: 6px 0;
+}
+
+/* What every row shares, said once above the grid instead of down ten
+   identical columns — folded until asked for. */
+.previewTableConstants {
+  margin: 0 0 var(--cioos-space-sm);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+.previewTableConstants > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  padding: 6px var(--cioos-space-md);
+  border-radius: var(--cioos-radius);
+  list-style: none;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.previewTableConstants > summary::-webkit-details-marker {
+  display: none;
+}
+
+.previewTableConstants > summary:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.previewTableConstants > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.previewTableConstantsChevron {
+  flex: 0 0 auto;
+  color: var(--cioos-primary-800);
+  transition: transform var(--cioos-transition-fast);
+}
+
+.previewTableConstants[open] .previewTableConstantsChevron {
+  transform: rotate(90deg);
+}
+
+.previewTableConstantsLabel {
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+}
+
+.previewTableConstantsCount {
+  min-width: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  text-align: center;
+  color: var(--cioos-ink-80);
+}
+
+.previewTableConstantsList {
+  display: block;
+  border-collapse: collapse;
+  font-size: var(--cioos-font-size-sm);
+}
+
+/* Folded above the grid: name beside value, capped so a long list scrolls in
+   place rather than pushing the grid out of the modal. */
+.previewTableConstants .previewTableConstantsList {
+  max-height: 40vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.previewTableConstantsList tr:nth-child(even) {
+  background-color: var(--cioos-surface-2);
+}
+
+.previewTableConstantsList th,
+.previewTableConstantsList td {
+  padding: 4px var(--cioos-space-md);
+  vertical-align: baseline;
+  text-align: left;
+}
+
+.previewTableConstantsList th {
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--cioos-ink);
+}
+
+.previewTableConstantsList td {
+  width: 100%;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink-80);
+}
+
+.previewTableConstantsList td.isEmpty {
+  color: var(--cioos-ink-60);
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .previewTableConstantsChevron {
+    transition: none;
+  }
+}
+
+/* Name over unit: a header breaks between the two, never inside a word. */
+.previewTableHead {
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+}
+
+.previewTableUnit {
+  font-weight: 400;
+  color: var(--cioos-ink-60);
+}
+
+.previewTableCell {
+  white-space: nowrap;
 }

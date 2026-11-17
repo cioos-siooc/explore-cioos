@@ -828,3 +828,24 @@ test("a trajectory still opens on a single panel", () => {
     1,
   );
 });
+
+test("without an EOV, weather columns give way to the ocean ones", () => {
+  const dataset = {
+    ...VIKING_DATASET,
+    cdm_data_type: "TimeSeriesProfile",
+    first_eov_column: null,
+  };
+  const table = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta && meta.name === "TE90_01"
+        ? { ...meta, standard_name: "wind_speed", long_name: "Wind Spd Avg" }
+        : meta,
+    ),
+  };
+  const [first] = facetPlanFor(
+    dataset,
+    variablesFrom(table, dataset),
+  ).panelDefaults;
+  assert.notEqual(first, "TE90_01");
+});

@@ -22,6 +22,7 @@ import { COLOR_LAYOUT } from "../../../state/selection/previewParams.js";
 import "./styles.css";
 
 const NO_CUSTOM_LABELS = {};
+const TITLE_ID = "datasetPreviewTitle";
 // Never equal to a linkKey (which is a query string, and may be ""), so the
 // button starts un-copied and returns there the moment the URL moves on.
 const NO_LINK_COPIED = Symbol("no link copied");
@@ -30,6 +31,7 @@ export default function DatasetPreview({
   datasetPreview,
   previewError,
   previewQuery,
+  retryPreview,
   inspectDataset,
   inspectRecordID,
   // {start, end} UTC days when one period of the record is shown (a
@@ -46,10 +48,7 @@ export default function DatasetPreview({
     const columnNames = datasetPreview?.table?.columnNames || [];
     const table = datasetPreview?.table?.rows || [];
     return table.map((row) =>
-      columnNames.reduce(
-        (merged, key, index) => ({ ...merged, [key]: row[index] }),
-        {},
-      ),
+      Object.fromEntries(columnNames.map((key, index) => [key, row[index]])),
     );
   }, [datasetPreview]);
 
@@ -83,6 +82,13 @@ export default function DatasetPreview({
     [datasetPreview, rows, profiles, plotLayout, step],
   );
   const formatCount = (count) => count.toLocaleString(i18n.language);
+  // Said too when nothing was cut, so a complete record never reads as a sample.
+  const completeRowCount =
+    !sample &&
+    datasetPreview?.sample &&
+    datasetPreview.sample.rowCount >= datasetPreview.sample.totalRowCount
+      ? datasetPreview.sample.rowCount
+      : null;
 
   // Deliberately not in the URL: free text makes the query string unreadable,
   // and a rename is a private annotation rather than a view.
@@ -117,21 +123,36 @@ export default function DatasetPreview({
     setCustomLabels(NO_CUSTOM_LABELS);
   }
 
-  const plotValue = {
-    ...plotParams,
-    inspectDataset,
-    inspectRecordID,
-    profiles,
-    customLabels,
-    setCustomLabels,
-    paneWidth,
-    setPaneWidth,
-    paneCollapsed,
-    setPaneCollapsed,
-    settingsOpen,
-    setSettingsOpen,
-    availableHeight: scrollSize.height,
-  };
+  // Memoised: a fresh value would re-render every consumer, the plot included,
+  // on each render of this modal.
+  const plotValue = useMemo(
+    () => ({
+      ...plotParams,
+      inspectDataset,
+      inspectRecordID,
+      profiles,
+      customLabels,
+      setCustomLabels,
+      paneWidth,
+      setPaneWidth,
+      paneCollapsed,
+      setPaneCollapsed,
+      settingsOpen,
+      setSettingsOpen,
+      availableHeight: scrollSize.height,
+    }),
+    [
+      plotParams,
+      inspectDataset,
+      inspectRecordID,
+      profiles,
+      customLabels,
+      paneWidth,
+      paneCollapsed,
+      settingsOpen,
+      scrollSize.height,
+    ],
+  );
 
   const onModalClose = () => {
     // One call clears ?preview= and every plot param: react-router drops one of
@@ -149,6 +170,7 @@ export default function DatasetPreview({
       size="xl"
       onHide={onModalClose}
       centered
+      aria-labelledby={TITLE_ID}
     >
       {inspectDataset && inspectRecordID && (
         <PreviewPlotProvider value={plotValue}>
@@ -173,7 +195,7 @@ export default function DatasetPreview({
               />
             )}
 
-            <h4 className="datasetTitle">
+            <h2 className="datasetTitle" id={TITLE_ID}>
               <span
                 className="datasetPreviewDatasetTitle"
                 title={inspectDataset.title}
@@ -187,7 +209,12 @@ export default function DatasetPreview({
                 </span>
               )}
               {dataIsReady && sample && (
-                <span className="datasetPreviewSample">
+                <span
+                  className="datasetPreviewSample"
+                  title={t("datasetPreviewSampleHelp", {
+                    rows: formatCount(sample.rowCount),
+                  })}
+                >
                   {t(
                     sample.profileCount === null
                       ? "datasetPreviewSampleRows"
@@ -203,7 +230,12 @@ export default function DatasetPreview({
                   )}
                 </span>
               )}
-            </h4>
+              {dataIsReady && completeRowCount !== null && (
+                <span className="datasetPreviewSample">
+                  {t("datasetPreviewAllRows", { count: completeRowCount })}
+                </span>
+              )}
+            </h2>
 
             {dataIsReady && (
               // The URL mirrors the whole app state, so it is the share link.
@@ -233,6 +265,7 @@ export default function DatasetPreview({
                 rows={rows}
                 previewError={previewError}
                 previewQuery={previewQuery}
+                retryPreview={retryPreview}
               />
             </div>
           </Modal.Body>

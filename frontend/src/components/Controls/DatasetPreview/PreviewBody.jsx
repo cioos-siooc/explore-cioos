@@ -32,8 +32,12 @@ const WANTED_LABELS = {
   track: "datasetPreviewPlotWantedTrack",
   measurement: "datasetPreviewPlotWantedMeasurement",
 };
-// Only the outage suggests trying again — the other three do not get better by
-// waiting.
+// Only the outage and a lost connection suggest trying again, so only they get
+// a Retry — the others do not get better by waiting.
+const RETRYABLE = new Set([
+  PREVIEW_ERROR.ERDDAP_UNAVAILABLE,
+  PREVIEW_ERROR.NETWORK,
+]);
 const PREVIEW_ERROR_MESSAGES = {
   [PREVIEW_ERROR.NO_DATA]: "datasetPreviewErrorNoData",
   [PREVIEW_ERROR.ERDDAP_UNAVAILABLE]: "datasetPreviewErrorUnavailable",
@@ -78,6 +82,7 @@ export default function PreviewBody({
   rows,
   previewError,
   previewQuery,
+  retryPreview,
 }) {
   const { t } = useTranslation();
   const {
@@ -88,6 +93,7 @@ export default function PreviewBody({
     variables,
     plotData,
     profiles,
+    availableHeight,
   } = usePreviewPlot();
 
   // Two records of the same cdm_data_type genuinely differ here — one publisher
@@ -113,6 +119,11 @@ export default function PreviewBody({
     return (
       <PreviewFailure
         query={previewError?.erddapQuery}
+        onRetry={
+          previewError && RETRYABLE.has(previewError.code)
+            ? retryPreview
+            : undefined
+        }
         message={t(
           (previewError && PREVIEW_ERROR_MESSAGES[previewError.code]) ||
             "datasetPreviewNoData",
@@ -134,7 +145,14 @@ export default function PreviewBody({
   }
 
   if (selectedVis === "table") {
-    return <DatasetPreviewTable datasetPreview={datasetPreview} data={rows} />;
+    return (
+      <DatasetPreviewTable
+        datasetPreview={datasetPreview}
+        data={rows}
+        variables={variables}
+        availableHeight={availableHeight}
+      />
+    );
   }
 
   if (!plan) return plotBlocker ? <PlotBlocked blocker={plotBlocker} /> : null;

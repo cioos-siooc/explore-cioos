@@ -251,7 +251,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     const plot = await plotted();
     const invert = within(rowCaptioned("Y axis")).getByRole("checkbox", {
-      name: "Reverse axis direction: depth ( m )",
+      name: "Reverse axis direction: depth (m)",
     });
     expect(invert).toBeChecked();
     expect(plot).toHaveAttribute("data-y-autorange", "reversed");
@@ -421,11 +421,20 @@ describe("DatasetPreviewPlot", () => {
     expect(plot).toHaveAttribute("data-modebar", "true");
   });
 
-  it("keeps drag-to-zoom and a hover toolbar for a mouse", async () => {
+  it("describes the figure to a screen reader and points to the table", async () => {
+    open();
+    await plotted();
+    expect(
+      screen.getByRole("figure", { name: /^Plot of .+ against .+Table view/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps drag-to-zoom for a mouse, with the toolbar always shown", async () => {
     open();
     const plot = await plotted();
     expect(plot).toHaveAttribute("data-dragmode", "zoom");
-    expect(plot).toHaveAttribute("data-modebar", "hover");
+    // Export and the help live in it: a hover-only toolbar hid both.
+    expect(plot).toHaveAttribute("data-modebar", "true");
   });
 
   it("names the record above the plot on a phone, not inside the figure", async () => {
@@ -475,7 +484,7 @@ describe("DatasetPreviewPlot", () => {
       [...document.querySelectorAll(".colorScaleLegendLabel")].map(
         (label) => label.textContent,
       ),
-    ).toEqual(["salinity ( PSU )", "time ( UTC )"]);
+    ).toEqual(["salinity (PSU)", "time (UTC)"]);
   });
 
   it("captions the colour scales once, with one picker each until shared", async () => {
@@ -637,7 +646,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open("/?pz=salinity&pmode=lines");
     await plotted();
     await user.click(screen.getByRole("button", { name: "More options" }));
-    await user.type(screen.getByLabelText("temperature ( degree_C )"), "Temp");
+    await user.type(screen.getByLabelText("temperature (degree_C)"), "Temp");
 
     await user.click(screen.getByRole("button", { name: "Reset plot" }));
 
@@ -647,7 +656,7 @@ describe("DatasetPreviewPlot", () => {
     expect(
       screen.getByRole("button", { name: "Markers + Line" }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByLabelText("temperature ( degree_C )")).toHaveValue("");
+    expect(screen.getByLabelText("temperature (degree_C)")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Reset plot" })).toBeDisabled();
   });
 
@@ -698,7 +707,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     await plotted();
     await user.click(screen.getByRole("button", { name: "More options" }));
-    await user.type(screen.getByLabelText("temperature ( degree_C )"), "Temp");
+    await user.type(screen.getByLabelText("temperature (degree_C)"), "Temp");
 
     await user.click(screen.getByRole("button", { name: "Table" }));
     await user.click(screen.getByRole("button", { name: "Plot" }));
@@ -706,9 +715,7 @@ describe("DatasetPreviewPlot", () => {
     await user.click(screen.getByRole("button", { name: "More options" }));
 
     // Held by the provider, which outlives the component that was unmounted.
-    expect(screen.getByLabelText("temperature ( degree_C )")).toHaveValue(
-      "Temp",
-    );
+    expect(screen.getByLabelText("temperature (degree_C)")).toHaveValue("Temp");
   });
 
   it("collapses the settings pane and expands it again", async () => {

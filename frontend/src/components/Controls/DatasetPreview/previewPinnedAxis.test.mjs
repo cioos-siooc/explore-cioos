@@ -16,7 +16,7 @@ const SHARED_X = {
   tickmode: "array",
   tickvals: [0, 1],
   ticktext: ["start", "end"],
-  title: { text: "Time ( UTC )", font: { size: 18 } },
+  title: { text: "Time (UTC)", font: { size: 18 } },
 };
 const PANEL_Y = { domain: [0, 1], title: { text: "Temperature" } };
 const STACK = {
@@ -44,7 +44,7 @@ test("the figure keeps its shared axis, unlabelled, and nothing else changes", (
   assert.equal(figure.layout.xaxis.showspikes, true);
   assert.equal(figure.layout.xaxis.anchor, "y");
   assert.equal(figure.layout.yaxis, PANEL_Y);
-  assert.equal(STACK.layout.xaxis.title.text, "Time ( UTC )"); // not mutated
+  assert.equal(STACK.layout.xaxis.title.text, "Time (UTC)"); // not mutated
 });
 
 test("the strip takes the axis's label and scale, not the panels' wiring", () => {
@@ -60,12 +60,12 @@ test("the strip takes the axis's label and scale, not the panels' wiring", () =>
 test("a profile pins its vertical axis", () => {
   const profile = {
     data: [],
-    layout: { yaxis: { title: { text: "depth ( m )" } }, xaxis: PANEL_Y },
+    layout: { yaxis: { title: { text: "depth (m)" } }, xaxis: PANEL_Y },
   };
   const { figure, axis } = splitPinnedAxis(profile, COLUMNS);
   assert.equal(figure.layout.yaxis.showticklabels, false);
   assert.equal(figure.layout.xaxis, PANEL_Y);
-  assert.equal(axis.title.text, "depth ( m )");
+  assert.equal(axis.title.text, "depth (m)");
 });
 
 test("the view is what Plotly resolved: the range it drew and the margins it grew", () => {
@@ -97,14 +97,14 @@ test("a stack's strip runs under the panels, across their exact width", () => {
   assert.equal(layout.xaxis.autorange, false);
   assert.equal(layout.xaxis.type, "linear");
   assert.deepEqual(layout.xaxis.ticktext, ["start", "end"]);
-  assert.equal(layout.xaxis.title.text, "Time ( UTC )");
+  assert.equal(layout.xaxis.title.text, "Time (UTC)");
   assert.equal(layout.xaxis.fixedrange, true);
   assert.equal(layout.yaxis.visible, false);
 });
 
 test("a profile's strip runs beside the panels, down their exact height", () => {
   const { layout } = pinnedAxisFigureFor(
-    { title: { text: "depth ( m )" } },
+    { title: { text: "depth (m)" } },
     VIEW,
     COLUMNS,
   );

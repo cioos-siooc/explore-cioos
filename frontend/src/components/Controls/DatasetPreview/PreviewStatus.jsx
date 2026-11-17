@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { ExclamationTriangle } from "react-bootstrap-icons";
+import { ArrowClockwise, ExclamationTriangle } from "react-bootstrap-icons";
 
 import ActivityList from "../../ui/ActivityList.jsx";
 import Spinner from "../../ui/Spinner.jsx";
@@ -33,7 +33,8 @@ export function PreviewLoading({ labelKeys, query }) {
   );
 }
 
-export function PreviewFailure({ message, detail, query }) {
+export function PreviewFailure({ message, detail, query, onRetry }) {
+  const { t } = useTranslation();
   return (
     <div
       className="previewStatus previewStatus-error"
@@ -43,6 +44,12 @@ export function PreviewFailure({ message, detail, query }) {
       <ExclamationTriangle size={40} aria-hidden="true" />
       <p className="previewStatusMessage">{message}</p>
       {detail && <p className="previewStatusDetail">{detail}</p>}
+      {onRetry && (
+        <button type="button" className="previewStatusRetry" onClick={onRetry}>
+          <ArrowClockwise size={14} aria-hidden="true" />
+          {t("apiErrorRetryButton")}
+        </button>
+      )}
       <ErddapQuery url={query} />
     </div>
   );

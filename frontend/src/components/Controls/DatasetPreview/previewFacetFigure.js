@@ -30,6 +30,7 @@ import {
   wrapTitleFor,
   HOVER_FONT_PX,
   LABEL_FONT_PX,
+  PLOT_FONT,
   TICK_FONT_PX,
   TITLE_FONT_PX,
 } from "./previewLabelText.js";
@@ -66,10 +67,10 @@ const axisRef = (letter, index) =>
 // noise. `across` is what makes it span every panel: Plotly draws it between the
 // lowest and highest domain of that axis's counter axes.
 //
-// A fixed grey because the default is the hovered POINT's colour, and with a
+// A fixed ink because the default is the hovered POINT's colour, and with a
 // colour dimension set that tints the line by the ramp value it is pointing at —
 // the line is a guide, not data.
-const SPIKE_COLOR = "#6c757d";
+const SPIKE_COLOR = "rgba(21,47,55,0.62)"; // --cioos-ink-60
 const sharedAxisSpike = {
   showspikes: true,
   spikemode: "across",
@@ -237,9 +238,7 @@ function labellerFor(variablesByName, labels) {
     const custom = labels[columnName] && labels[columnName].trim();
     const variable = variablesByName.get(columnName);
     if (!custom) return labelFor(variable);
-    return variable && variable.unit
-      ? `${custom} ( ${variable.unit} )`
-      : custom;
+    return variable && variable.unit ? `${custom} (${variable.unit})` : custom;
   };
 
   // What the hover calls a column: the user's rename, else its long_name. Capped
@@ -458,7 +457,7 @@ export function buildFigure({
     uirevision,
     margin,
     // Ticks; every label states its own LABEL_FONT_PX.
-    font: { size: TICK_FONT_PX },
+    font: { ...PLOT_FONT, size: TICK_FONT_PX },
     hoverlabel: { font: { size: HOVER_FONT_PX } },
     showlegend: false, // each panel is titled; a legend would repeat it
     // One hover for every panel at once, along the axis they share.
@@ -650,7 +649,9 @@ export function buildFigure({
 
 // A stack's value axes all sit left of the plot, a profile's all above it.
 const OVERLAY_SIDE = { y: "left", x: "top" };
-const OVERLAY_GRID_COLOR = "#eee"; // Plotly's own, which `color` would tint
+// Set, not left to Plotly: its default derives from the axis `color`, which a
+// stack tints per curve.
+const OVERLAY_GRID_COLOR = "#dce8e5"; // --cioos-hairline
 const round6 = (value) => Number(Math.min(Math.max(value, 0), 1).toFixed(6));
 
 /**
@@ -701,7 +702,7 @@ export function buildOverlayFigure({
   const layout = {
     uirevision,
     margin,
-    font: { size: TICK_FONT_PX },
+    font: { ...PLOT_FONT, size: TICK_FONT_PX },
     hoverlabel: { font: { size: HOVER_FONT_PX } },
     showlegend: false, // each curve's axis is titled in its colour
     hovermode: `${sharedLetter} unified`,
@@ -869,7 +870,7 @@ export function buildGridFigure({
   const layout = {
     uirevision,
     margin,
-    font: { size: TICK_FONT_PX },
+    font: { ...PLOT_FONT, size: TICK_FONT_PX },
     hoverlabel: { font: { size: HOVER_FONT_PX } },
     showlegend: false,
     // No axis is shared by every panel, so no unified box: the point under
@@ -1125,7 +1126,7 @@ export function buildColorFigure({
   const layout = {
     uirevision,
     margin,
-    font: { size: TICK_FONT_PX },
+    font: { ...PLOT_FONT, size: TICK_FONT_PX },
     hoverlabel: { font: { size: HOVER_FONT_PX } },
     showlegend: false,
     // Panels share X and Y but not their rows' colours: the point under the

@@ -61,6 +61,7 @@ function open({
   previewQuery,
   recordLoading = false,
   setInspectRecordID = vi.fn(),
+  retryPreview = vi.fn(),
   url = "/",
   sample,
 } = {}) {
@@ -70,6 +71,7 @@ function open({
       datasetPreview={table ? { table, sample } : null}
       previewError={previewError}
       previewQuery={previewQuery}
+      retryPreview={retryPreview}
       inspectDataset={dataset}
       inspectRecordID="record-1"
       setInspectRecordID={setInspectRecordID}
@@ -176,6 +178,24 @@ describe("DatasetPreview", () => {
       expect(screen.getByRole("button", { name: "Table" })).toBeInTheDocument();
     });
 
+    it("offers a retry when the data server did not answer", async () => {
+      const retryPreview = vi.fn();
+      const { user } = open({
+        table: null,
+        previewError: { code: PREVIEW_ERROR.ERDDAP_UNAVAILABLE },
+        retryPreview,
+      });
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(retryPreview).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers no retry for a record that has no data to give", () => {
+      open({ table: null, previewError: { code: PREVIEW_ERROR.NO_DATA } });
+      expect(
+        screen.queryByRole("button", { name: "Retry" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("falls back to the generic sentence for a failure it has no words for", () => {
       open({ table: null, previewError: { code: PREVIEW_ERROR.UNKNOWN } });
       expect(screen.getByText(/can not be previewed/i)).toBeInTheDocument();
@@ -228,6 +248,13 @@ describe("DatasetPreview", () => {
       expect(screen.getByText("Test dataset:")).toBeInTheDocument();
       expect(screen.getByText("record-1")).toBeInTheDocument();
     });
+
+    it("is named by that title for a screen reader", () => {
+      open();
+      expect(
+        screen.getByRole("dialog", { name: /Test dataset: record-1/ }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe("saying when the rows are only part of the record", () => {
@@ -262,9 +289,18 @@ describe("DatasetPreview", () => {
       expect(screen.getByText("Sample: 2 of 26,131 rows")).toBeInTheDocument();
     });
 
-    it("says nothing when the rows are the whole record", () => {
+    it("says the record is complete when the rows are all of it", () => {
       open({ sample: { rowCount: 2, totalRowCount: 2 } });
       expect(screen.queryByText(/^Sample:/)).not.toBeInTheDocument();
+      expect(screen.getByText("Complete record: 2 rows")).toBeInTheDocument();
+    });
+
+    it("explains what a sample holds", () => {
+      open({ sample: { rowCount: 2, totalRowCount: 26131 } });
+      expect(screen.getByText("Sample: 2 of 26,131 rows")).toHaveAttribute(
+        "title",
+        expect.stringMatching(/most recent/),
+      );
     });
 
     it("counts the profiles too when the window holds several", async () => {

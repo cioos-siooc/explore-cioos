@@ -116,7 +116,7 @@ test("a profile gets one shared y axis and one x axis per panel", () => {
 test("the shared depth axis is reversed, and titled along itself", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
   assert.equal(layout.yaxis.autorange, "reversed");
-  assert.equal(layout.yaxis.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis.title.text, "depth of observation (m)");
   assert.equal(layout.yaxis.automargin, true);
   assert.equal(layout.annotations, undefined);
 });
@@ -140,12 +140,9 @@ test("a stack reverses only the panels it is asked to", () => {
 test("profile panel titles sit on top, one per variable", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
   assert.equal(layout.xaxis.side, "top");
-  assert.equal(
-    layout.xaxis.title.text,
-    "Temperature (1990 scale) ( degree_C )",
-  );
+  assert.equal(layout.xaxis.title.text, "Temperature (1990 scale) (degree_C)");
   assert.equal(layout.xaxis2.side, "top");
-  assert.equal(layout.xaxis2.title.text, "Practical Salinity ( PSU )");
+  assert.equal(layout.xaxis2.title.text, "Practical Salinity (PSU)");
 });
 
 test("every profile trace shares y and takes its own x", () => {
@@ -198,10 +195,7 @@ test("the first selected variable is drawn at the top", () => {
   const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01", "DOXY_01"]);
   assert.ok(layout.yaxis.domain[0] > layout.yaxis3.domain[0]);
   assert.equal(layout.xaxis.anchor, "y3");
-  assert.equal(
-    layout.yaxis.title.text,
-    "Temperature (1990 scale) ( degree_C )",
-  );
+  assert.equal(layout.yaxis.title.text, "Temperature (1990 scale) (degree_C)");
 });
 
 test("a timeseries puts time across and the variable up", () => {
@@ -250,7 +244,7 @@ test("a custom label replaces the name but keeps the unit", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
     labels: { TE90_01: "Temp" },
   });
-  assert.equal(layout.xaxis.title.text, "Temp ( degree_C )");
+  assert.equal(layout.xaxis.title.text, "Temp (degree_C)");
 });
 
 test("no rows yet still produces the full axis skeleton", () => {
@@ -267,7 +261,7 @@ test("no rows yet still produces the full axis skeleton", () => {
   });
   assert.equal(data.length, 2);
   assert.deepEqual(data[0].x, []);
-  assert.equal(layout.xaxis2.title.text, "Practical Salinity ( PSU )");
+  assert.equal(layout.xaxis2.title.text, "Practical Salinity (PSU)");
 });
 
 // --- every label runs along its own axis -----------------------------------
@@ -309,7 +303,7 @@ test("a vertical axis title wraps to its own panel's height once it is known", (
 
 test("a stack keeps its shared axis title", () => {
   const { layout } = figure("TimeSeries", ["TE90_01"]);
-  assert.equal(layout.xaxis.title.text, "Time ( UTC )");
+  assert.equal(layout.xaxis.title.text, "Time (UTC)");
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
 });
 
@@ -351,7 +345,7 @@ test("panel titles wrap to their own panel once the width is known", () => {
   titles.forEach((text) => {
     text
       .split("<br>")
-      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut, so it alone may run over
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut, so it alone may run over
       .forEach((line) => {
         assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
       });
@@ -833,11 +827,15 @@ test("the legend carries the label, the stops and the ticks", () => {
   assert.equal(colorLegend.label, labelFor(depth));
   // The same stops the markers were given, not a second likeness of them.
   assert.deepEqual(colorLegend.stops, layout.coloraxis.colorscale);
-  assert.equal(colorLegend.ticks.length, 4);
+  // The ends are the record's extent; the ticks between them are round.
+  const last = colorLegend.ticks.at(-1);
   assert.equal(colorLegend.ticks[0].position, 0);
-  assert.equal(colorLegend.ticks[3].position, 1);
+  assert.equal(last.position, 1);
   assert.equal(colorLegend.ticks[0].text, "1");
-  assert.equal(colorLegend.ticks[3].text, String(DATA.length));
+  assert.equal(last.text, String(DATA.length));
+  colorLegend.ticks
+    .slice(1, -1)
+    .forEach(({ text }) => assert.match(text, /^-?\d+(\.\d)?$/));
 });
 
 test("no colour column, no legend", () => {
@@ -1148,8 +1146,8 @@ test("every colour panel titles its Y, reverses depth and zooms with the first",
   const { layout } = colorFigure(["TE90_01", "PSAL_01"]);
   assert.equal(layout.yaxis.autorange, "reversed");
   assert.equal(layout.yaxis2.autorange, "reversed");
-  assert.equal(layout.yaxis.title.text, "depth of observation ( m )");
-  assert.equal(layout.yaxis2.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis.title.text, "depth of observation (m)");
+  assert.equal(layout.yaxis2.title.text, "depth of observation (m)");
   assert.equal(layout.yaxis.matches, undefined);
   assert.equal(layout.yaxis2.matches, "y");
 });
@@ -1163,8 +1161,8 @@ test("the user can draw a colour plot's depth upwards", () => {
 test("each panel's colourbar spans exactly its panel and names its variable", () => {
   const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
   [
-    ["coloraxis", layout.yaxis, "Temperature (1990 scale) ( degree_C )"],
-    ["coloraxis2", layout.yaxis2, "Practical Salinity ( PSU )"],
+    ["coloraxis", layout.yaxis, "Temperature (1990 scale) (degree_C)"],
+    ["coloraxis2", layout.yaxis2, "Practical Salinity (PSU)"],
   ].forEach(([name, axis, label], index) => {
     const { colorbar } = layout[name];
     const [start, end] = axis.domain;
@@ -1189,7 +1187,7 @@ test("each colourbar title wraps to its own panel's height", () => {
     const lines = layout[name].colorbar.title.text.split("<br>");
     assert.ok(lines.length > 1, name);
     lines
-      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
       .forEach((line) => assert.ok(line.length <= fits, `${name}: "${line}"`));
   });
 });
@@ -1281,7 +1279,7 @@ test("a profile's shared title fits its pinned strip: two lines, unit kept", () 
     size: { width: 600, height: 400 },
   });
   assert.equal(lineCount(layout.yaxis.title.text), 2);
-  assert.ok(layout.yaxis.title.text.endsWith("<br>( m )"));
+  assert.ok(layout.yaxis.title.text.endsWith("<br>(m)"));
 });
 
 test("a colour plot's X title fits its pinned strip: two lines, unit kept", () => {
@@ -1290,7 +1288,7 @@ test("a colour plot's X title fits its pinned strip: two lines, unit kept", () =
     size: { width: 400, height: 400 },
   });
   assert.equal(lineCount(layout.xaxis.title.text), 2);
-  assert.ok(layout.xaxis.title.text.endsWith("<br>( UTC )"));
+  assert.ok(layout.xaxis.title.text.endsWith("<br>(UTC)"));
 });
 
 // --- grids -------------------------------------------------------------------
@@ -1384,7 +1382,7 @@ test("a grid's colour headers wrap within their own column", () => {
     const lines = text.split("<br>");
     assert.ok(lines.length > 1);
     lines
-      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
       .forEach((line) => assert.ok(line.length <= fits, `"${line}"`));
   });
 });

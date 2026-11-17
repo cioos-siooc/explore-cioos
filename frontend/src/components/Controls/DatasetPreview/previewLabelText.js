@@ -14,16 +14,22 @@ export const HOVER_FONT_PX = 12; // the hover box is read, not scanned: not tick
 export const TITLE_FONT_PX = 14;
 export const MAX_TITLE_LINES = 2;
 
-// Average advance per character for Plotly's default stack ("Open Sans,
-// verdana, arial, sans-serif"), as a fraction of the font size. Deliberately
-// generous: overestimating wraps a label one word early, underestimating puts
-// two panel titles on top of each other.
-const CHAR_PX_PER_FONT_PX = 0.58;
+// The app's body face and ink (--cioos-font-body, --cioos-ink-80) rather than
+// Plotly's Open Sans in grey. Every font in a figure inherits from this one.
+export const PLOT_FONT = {
+  family: "Montserrat, system-ui, -apple-system, sans-serif",
+  color: "rgba(21,47,55,0.82)",
+};
+
+// Average advance per character for PLOT_FONT, as a fraction of the font size.
+// Deliberately generous: overestimating wraps a label one word early,
+// underestimating puts two panel titles on top of each other.
+const CHAR_PX_PER_FONT_PX = 0.62;
 export const MAX_LABEL_LINES = 3;
 
-// labelFor writes "long_name ( unit )", and the unit group is both the tail of
+// labelFor writes "long_name (unit)", and the unit group is both the tail of
 // every label and the part that collides first, so it gets its own line.
-const UNIT_SUFFIX = /\s\(\s[^()]*\s\)$/;
+const UNIT_SUFFIX = /\s\([^()]*\)$/;
 
 // 0 means "unknown" — buildFigure is called before the plot area has been
 // measured, and every caller treats 0 as "do not wrap" rather than wrapping

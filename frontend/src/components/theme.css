@@ -430,7 +430,9 @@ h6 {
   .sidebarFooterHintMore,
   .railStep,
   .sortSelectDirection,
-  .quickFilterButton
+  .quickFilterButton,
+  .variableSelectDragHandle,
+  .copyLinkButton
 ) {
   position: relative;
 }
@@ -449,6 +451,8 @@ h6 {
   .railStep,
   .sortSelectDirection,
   .quickFilterButton,
+  .variableSelectDragHandle,
+  .copyLinkButton,
   .railHandle
 )::before,
 .form-switch .form-check-input::after {

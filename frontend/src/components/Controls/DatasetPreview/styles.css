@@ -9,13 +9,13 @@
   /* A definite height, not max-height: the plot sizes from this container, so a
    * content-sized modal would grow in visible steps (plot -> modal -> budget).
    * Definite all the way down, so the plot's pane row can use it as a % basis. */
-  height: min(1100px, calc(100vh - 2 * var(--cioos-space-lg, 16px)));
+  height: min(1100px, calc(100vh - 2 * var(--cioos-space-lg)));
 }
 
 /* Wider than the shared .modal-xl (1140px): the plot shares its row with the
    parameters pane. */
 .dataPreviewModal .modal-dialog {
-  max-width: min(1600px, calc(100vw - 2 * var(--cioos-space-lg, 16px)));
+  max-width: min(1600px, calc(100vw - 2 * var(--cioos-space-lg)));
 }
 
 .dataPreviewModal .modal-body {
@@ -38,25 +38,6 @@
    of rounding; its panes scroll for themselves. */
 .tableAndPlotGridItem.tableAndPlot:has(> .datasetPreviewPlotPanes) {
   overflow: hidden;
-}
-
-.backButton {
-  text-align: center;
-  border: 2px solid var(--cioos-hairline);
-  border-radius: 10px;
-  justify-content: space-between;
-  padding: 5px;
-  margin-right: 10px;
-  min-width: fit-content;
-}
-
-.backButton:hover {
-  background-color: var(--cioos-teal-light);
-  cursor: pointer;
-}
-
-.backButton svg {
-  margin-right: 5px;
 }
 
 .tableAndPlotGridContainer {
@@ -111,10 +92,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--cioos-space-md, 12px);
+  gap: var(--cioos-space-md);
   height: 100%;
   min-height: 320px;
-  padding: var(--cioos-space-lg, 16px);
+  padding: var(--cioos-space-lg);
   text-align: center;
   color: var(--cioos-primary);
 }
@@ -145,6 +126,29 @@
   overflow-wrap: anywhere;
 }
 
+.previewStatusRetry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.previewStatusRetry:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.previewStatusRetry:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 /* A URL runs to hundreds of characters; it wraps anywhere and stays a small
    footnote under the steps rather than the headline. */
 .previewStatusQuery {
@@ -169,8 +173,8 @@
 }
 
 .datasetPreviewPlotBlockedColumns {
-  color: var(--cioos-text-muted, #666);
-  font-size: 0.9em;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
   overflow-wrap: anywhere;
 }
 
@@ -178,7 +182,8 @@
 .dataPreviewModal .datasetPreviewSample {
   display: block;
   margin-top: 4px;
-  font-size: 0.8em;
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
   font-weight: normal;
   color: var(--cioos-ink-80);
 }
@@ -225,6 +230,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Two lines for the dataset's name: siblings in a catalogue often differ
+     only at the end ("… 0706a", "… 0706b"), which one line cuts off. */
+  .dataPreviewModal .datasetTitle > .datasetPreviewDatasetTitle {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
   }
 
   .dataPreviewModal .datasetPreviewPeriod,

@@ -72,4 +72,10 @@
   .activityStatus .activityList {
     gap: 2px;
   }
+
+  /* A modal is full-screen here: the map's work is out of sight, and a dialog
+     that loads something says so itself. */
+  .cioos-modal-open .activityIndicator {
+    display: none;
+  }
 }

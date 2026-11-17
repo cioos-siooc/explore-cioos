@@ -64,6 +64,14 @@ const COORDINATE_CATEGORIES = new Set(["Time"]);
 const trimmed = (value) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+// Some servers publish long_name with its accents still escaped
+// ("Temp\\u00e9rature"), which would print as written.
+const unescaped = (value) =>
+  value &&
+  value.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
+
 const numberOr = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -152,7 +160,7 @@ export function variablesFrom(table, dataset) {
         trimmed(columnUnits[index]) || (meta && trimmed(meta.units)) || null,
       type,
       isNumeric: NUMERIC_TYPES.has(String(type)),
-      longName: meta && trimmed(meta.long_name),
+      longName: meta && unescaped(trimmed(meta.long_name)),
       standardName: meta && trimmed(meta.standard_name),
       // columnMeta is what ERDDAP publishes; the dataset id fields are inferred.
       cfRole:
@@ -187,7 +195,7 @@ export function variablesFrom(table, dataset) {
 export function labelFor(variable) {
   if (!variable) return "";
   const name = shortLabelFor(variable);
-  return variable.unit ? `${name} ( ${variable.unit} )` : name;
+  return variable.unit ? `${name} (${variable.unit})` : name;
 }
 
 export function shortLabelFor(variable) {

@@ -33,16 +33,16 @@ import {
 
 const columnNameOf = (variable) => variable.columnName;
 
-// The columns the preview leaves empty sink below a rule, as an unlabelled
-// second group, so the drawable ones are what the list leads with.
-function withDataFirst(choices) {
+// The columns the preview leaves empty sink below a rule, as a second group
+// headed by why, so the drawable ones are what the list leads with.
+function withDataFirst(choices, emptyLabel) {
   const withData = choices.filter(hasData);
   const empty = choices.filter((variable) => !hasData(variable));
   return {
     ordered: [...withData, ...empty],
     options:
       withData.length && empty.length
-        ? [{ options: withData }, { options: empty }]
+        ? [{ options: withData }, { label: emptyLabel, options: empty }]
         : choices,
   };
 }
@@ -228,7 +228,10 @@ export default function VariablePicker({
 }) {
   const { t } = useTranslation();
   const menuOpen = React.useRef(false);
-  const { ordered, options: grouped } = withDataFirst(choices);
+  const { ordered, options: grouped } = withDataFirst(
+    choices,
+    t("datasetPreviewPlotEmptyGroup"),
+  );
   const selectable = Math.min(choices.length, maxSelected);
   const atCap = isMulti && selected.length >= maxSelected;
   const allSelected = selected.length === selectable;

@@ -323,8 +323,18 @@ function isLinearIn(data, variable, shared) {
   return Math.abs(cov) / Math.sqrt(varX * varY) > LINEAR_R;
 }
 
+// Weather a buoy logs beside the ocean: never mapped to an EOV, so without this a
+// station whose columns start with wind opened on wind, not on the water.
+const ATMOSPHERIC =
+  /^(wind|eastward_wind|northward_wind|air_|surface_air|dew_point|relative_humidity|precipitation|rainfall|visibility)/;
+const isAtmospheric = (variable) =>
+  ATMOSPHERIC.test(variable.standardName || "") ||
+  /\b(wind|air temp|humidity|barometric)/i.test(
+    `${variable.columnName} ${variable.longName || ""}`.replace(/_/g, " "),
+  );
+
 // An EOV first: the dataset's first_eov_column when plottable, else any column
-// mapped to an EOV, else the first candidate. Up to `count` of them when the
+// mapped to an EOV, else the first candidate that is not weather. Up to `count` of them when the
 // rows show which vary — leaving out depth, pressure, straight lines and a
 // second column of an already-picked standard_name (a backup sensor, a second
 // calibration); otherwise, or when none is left, the single first pick.
@@ -342,10 +352,12 @@ function defaultPanelsFor(dataset, variables, data, shared, count) {
         (variable) => variable.columnName === dataset.first_eov_column,
       )) ||
     candidates.find(isEov) ||
+    candidates.find((variable) => !isAtmospheric(variable)) ||
     candidates[0];
   const ordered = uniqueColumns([
     preferred,
     ...candidates.filter(isEov),
+    ...candidates.filter((variable) => !isAtmospheric(variable)),
     ...candidates,
   ]);
   const varying = [];

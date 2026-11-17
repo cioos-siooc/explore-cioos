@@ -436,8 +436,8 @@ export default function DatasetPreviewPlot() {
   }
   const [pinnedView, setPinnedView] = useState(null);
   const [showInteractionHelp, setShowInteractionHelp] = useState(false);
-  // Fired after every draw and every zoom; the main Plot redraws on each render
-  // (its config is a fresh object), so an unchanged view must not re-render.
+  // Fired after every draw and every zoom, so an unchanged view must not
+  // re-render.
   const readPinnedView = useCallback(
     (_figure, graphDiv) => {
       const next = pinnedViewFor(graphDiv._fullLayout, pinnedOrientation);
@@ -452,20 +452,73 @@ export default function DatasetPreviewPlot() {
         : null,
     [split, pinnedView, pinnedOrientation],
   );
-  const downloadPng = (graphDiv) => {
-    const exported = exportFigureFor({
-      data: graphDiv.data,
-      layout: graphDiv.layout,
-      pinnedAxis: split.axis,
-      orientation: pinnedOrientation,
-      colorLegend: figure.colorLegend,
-      colorLegends: figure.colorLegends,
-    });
-    Plotly.downloadImage(
-      { data: exported.data, layout: exported.layout },
-      { format: "png", width: exported.width, height: exported.height },
-    );
-  };
+  const downloadPng = useCallback(
+    (graphDiv) => {
+      const exported = exportFigureFor({
+        data: graphDiv.data,
+        layout: graphDiv.layout,
+        pinnedAxis: split.axis,
+        orientation: pinnedOrientation,
+        colorLegend: figure.colorLegend,
+        colorLegends: figure.colorLegends,
+      });
+      Plotly.downloadImage(
+        { data: exported.data, layout: exported.layout },
+        { format: "png", width: exported.width, height: exported.height },
+      );
+    },
+    [split, figure, pinnedOrientation],
+  );
+  // Memoised: react-plotly.js re-plots whenever `config` changes identity, which
+  // an inline object did on every render of this component.
+  const { language } = i18n;
+  const plotConfig = useMemo(
+    () => ({
+      displaylogo: false,
+      // Always shown: export and the interaction help live in it, and a toolbar
+      // that appears only on hover hides both from anyone who has not found it.
+      displayModeBar: true,
+      // Plotly 4 defaults this on; it posts the chart to cloud.plotly.com.
+      showSendToCloud: false,
+      modeBarButtonsToRemove: [
+        "select2d",
+        "lasso2d",
+        "resetScale2d",
+        "pan2d",
+        "toImage", // replaced below: it would miss the pinned axis and the colour legend
+      ],
+      modeBarButtonsToAdd: [
+        {
+          name: "downloadPlotPng",
+          title: t("datasetPreviewPlotDownloadPng"),
+          icon: Plotly.Icons.camera,
+          click: downloadPng,
+        },
+        {
+          name: "plotInteractionHelp",
+          title: t("datasetPreviewPlotInteractionHelpTitle"),
+          icon: Plotly.Icons.question,
+          click: () => setShowInteractionHelp(true),
+        },
+      ],
+      // Off: `responsive` would fight the sizes set on the Plot; useElementSize
+      // drives resizing instead.
+      responsive: false,
+      scrollZoom: true,
+      locale: language === "fr" ? "fr" : "en",
+    }),
+    [t, language, downloadPng, setShowInteractionHelp],
+  );
+  // What a screen reader hears in place of the figure, and where the values are.
+  const plotSummary = t("datasetPreviewPlotSummary", {
+    variables: panels
+      .map((columnName) => shortLabelFor(variablesByName.get(columnName)))
+      .join(", "),
+    axis: shortLabelFor(
+      variablesByName.get(isColorLayout ? colorXs[0] : sharedAxis),
+    ),
+    count: plotData?.length ?? 0,
+  });
   const pinnedThickness = pinnedAxisSizeFor(pinnedOrientation);
   const pinnedLeft = pinnedOrientation === COLUMNS;
 
@@ -958,6 +1011,8 @@ export default function DatasetPreviewPlot() {
           <div
             className="datasetPreviewPlotArea"
             ref={plotAreaRef}
+            role={split ? "figure" : undefined}
+            aria-label={split ? plotSummary : undefined}
             // Plotly already answers the tap itself; the browser's emulated
             // mouse events after it would count as a second tap (a double tap
             // resets the zoom) and their mouseout would unhover the values.
@@ -973,39 +1028,7 @@ export default function DatasetPreviewPlot() {
                 // reads 0px on first mount and falls back to 450px.
                 style={{ width: `${width}px`, height: `${height}px` }}
                 useResizeHandler={false}
-                config={{
-                  displaylogo: false,
-                  // No hover to reveal it on a touch screen.
-                  displayModeBar: touch || "hover",
-                  // Plotly 4 defaults this on; it posts the chart to cloud.plotly.com.
-                  showSendToCloud: false,
-                  modeBarButtonsToRemove: [
-                    "select2d",
-                    "lasso2d",
-                    "resetScale2d",
-                    "pan2d",
-                    "toImage", // replaced below: it would miss the pinned axis and the colour legend
-                  ],
-                  modeBarButtonsToAdd: [
-                    {
-                      name: "downloadPlotPng",
-                      title: t("datasetPreviewPlotDownloadPng"),
-                      icon: Plotly.Icons.camera,
-                      click: downloadPng,
-                    },
-                    {
-                      name: "plotInteractionHelp",
-                      title: t("datasetPreviewPlotInteractionHelpTitle"),
-                      icon: Plotly.Icons.question,
-                      click: () => setShowInteractionHelp(true),
-                    },
-                  ],
-                  // Off: `responsive` would fight the sizes above;
-                  // useElementSize drives resizing instead.
-                  responsive: false,
-                  scrollZoom: true,
-                  locale: i18n.language === "fr" ? "fr" : "en",
-                }}
+                config={plotConfig}
               />
             ) : (
               <p className="datasetPreviewPlotEmpty">

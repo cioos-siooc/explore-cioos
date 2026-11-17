@@ -52,7 +52,7 @@ describe("ColorScaleLegend", () => {
     const legend = legendFrom("salinity");
     renderWithProviders(<ColorScaleLegend legend={legend} />);
 
-    expect(screen.getByText("salinity ( PSU )")).toBeInTheDocument();
+    expect(screen.getByText("salinity (PSU)")).toBeInTheDocument();
     // The ends of the ramp are the record's own extent, not the catalogue's.
     expect(screen.getByText("30")).toBeInTheDocument();
     expect(screen.getByText("34")).toBeInTheDocument();

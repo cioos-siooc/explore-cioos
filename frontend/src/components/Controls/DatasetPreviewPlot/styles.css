@@ -184,8 +184,9 @@
 }
 
 .variableSelectDragHandle:focus-visible {
-  outline: 2px solid var(--cioos-focus);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: var(--cioos-focus);
+  color: var(--cioos-ink);
 }
 
 .variableSelect .variableSelect__multi-value__label {
@@ -278,6 +279,15 @@
 
 .variableSelect__menu-portal .variableSelect__group {
   padding: 0;
+}
+
+.variableSelect__menu-portal .variableSelect__group-heading {
+  margin: 0;
+  padding: var(--cioos-space-sm) var(--cioos-space-md) var(--cioos-space-xs);
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .variableSelect__menu-portal .variableSelect__group-heading:empty {
@@ -392,8 +402,9 @@
   flex: 0 0 auto;
   padding: 6px 0 0;
 
-  /* Plotly's default, which every axis of the figure is drawn in. */
-  font-family: "Open Sans", verdana, arial, sans-serif;
+  /* The face the figure's axes are drawn in (PLOT_FONT). */
+  font-family: var(--cioos-font-body);
+  color: var(--cioos-ink-80);
 }
 
 .colorScaleLegendLabel {
@@ -405,7 +416,7 @@
 
 .colorScaleLegendBar {
   height: 10px;
-  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border: 1px solid var(--cioos-hairline);
   border-radius: 3px;
 }
 
@@ -611,7 +622,7 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-size: var(--cioos-font-size-2xs);
+  font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-80);
   cursor: pointer;
 }
@@ -627,7 +638,7 @@
 }
 
 .labelEditorRow label {
-  font-size: var(--cioos-font-size-2xs);
+  font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-80);
 }
 
@@ -655,7 +666,7 @@
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border: 1px solid var(--cioos-hairline);
   border-radius: 3px;
 }
 
@@ -703,7 +714,7 @@
   width: 32px;
   height: 22px;
   padding: 0;
-  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border: 1px solid var(--cioos-hairline);
   border-radius: 4px;
   background: none;
   cursor: pointer;
@@ -716,7 +727,7 @@
   flex: 0 0 auto;
   width: 48px;
   height: 12px;
-  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border: 1px solid var(--cioos-hairline);
   border-radius: 3px;
 }
 
@@ -738,7 +749,7 @@
 .colorScaleItemName {
   overflow: hidden;
   color: var(--cioos-ink-80);
-  font-size: var(--cioos-font-size-2xs);
+  font-size: var(--cioos-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -849,6 +860,20 @@
 .datasetPreviewPlotArea .scatterlayer .js-line {
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Plotly draws its toolbar buttons 24 x 22; square them up to the 24px floor,
+   and to a fingertip's reach on a touch screen. */
+.datasetPreviewPlotArea .modebar-btn {
+  height: 24px;
+  padding: 4px;
+}
+
+@media (pointer: coarse) {
+  .datasetPreviewPlotArea .modebar-btn {
+    height: 40px;
+    padding: 12px;
+  }
 }
 
 /* Up to tablets (PREVIEW_COMPACT_QUERY): the plot keeps the whole width, and

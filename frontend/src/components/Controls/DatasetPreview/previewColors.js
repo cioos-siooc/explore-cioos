@@ -5,21 +5,25 @@
 
 import { paletteColorFor } from "./erddapPalettes.js";
 
-// For the 82% of variables with no colorBarPalette. Extended past ten so a
-// 14-column selection stays distinguishable.
+// For the 82% of variables with no colorBarPalette. Led by the Okabe-Ito hues,
+// which stay apart under every common colour-vision deficiency, minus its
+// yellow (unreadable as a line on white) and its orange (the app's grid amber).
+// Violet and goldenrod are kept out too: on this app they mean a trajectory and
+// the last map click. Extended past ten so a 14-column selection stays
+// distinguishable.
 export const SWATCHES = [
-  "#2ca02c",
-  "#1f77b4",
-  "#d62728",
-  "#ff7f0e",
-  "#9467bd",
-  "#8c564b",
-  "#17becf",
-  "#e377c2",
-  "#bcbd22",
-  "#7f7f7f",
-  "#393b79",
-  "#637939",
+  "#0072b2",
+  "#d55e00",
+  "#009e73",
+  "#cc79a7",
+  "#56b4e9",
+  "#882255",
+  "#8c510a",
+  "#5c6b20",
+  "#4b5d8a",
+  "#c26a77",
+  "#2e6b5e",
+  "#7a6a4f",
 ];
 
 export function defaultColorFor(variable, index) {
