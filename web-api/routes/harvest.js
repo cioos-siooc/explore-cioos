@@ -417,7 +417,13 @@ async function ckanLinkedRecords() {
   const sql = `
     SELECT ckan_id,
            bool_or(source_type IS DISTINCT FROM 'obis') AS erddap,
-           bool_or(source_type = 'obis') AS obis
+           bool_or(source_type = 'obis') AS obis,
+           COALESCE(
+             array_agg(DISTINCT erddap_url)
+               FILTER (WHERE source_type IS DISTINCT FROM 'obis'
+                         AND erddap_url IS NOT NULL),
+             '{}'
+           ) AS erddap_urls
     FROM cde.datasets
     WHERE ckan_id IS NOT NULL
     GROUP BY ckan_id
@@ -469,11 +475,26 @@ async function ckanRecordSources() {
   return sources;
 }
 
+// A record pointing to several servers counts once for each.
+function erddapServers(rows) {
+  const counts = new Map();
+  for (const r of rows)
+    for (const url of r.erddap_urls || [])
+      counts.set(url, (counts.get(url) || 0) + 1);
+  return [...counts]
+    .map(([erddap_url, n_records]) => ({ erddap_url, n_records }))
+    .sort(
+      (a, b) =>
+        b.n_records - a.n_records || a.erddap_url.localeCompare(b.erddap_url),
+    );
+}
+
 function tallyCkanCoverage(linkedRows, recordSources) {
   const tally = (rows) => ({
     n_linked: rows.length,
     n_erddap: rows.filter((r) => r.erddap).length,
     n_obis: rows.filter((r) => r.obis).length,
+    erddap_servers: erddapServers(rows),
   });
   if (!recordSources) {
     return {

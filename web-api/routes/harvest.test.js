@@ -247,12 +247,14 @@ test("GET /harvest/warnings/:slug returns the per-code breakdown for one server"
 });
 
 const ckanPage = (count, results) => ({ data: { result: { count, results } } });
+const ATL = "https://erddap.atlantic.example/erddap";
+const PAC = "https://erddap.pacific.example/erddap";
 
 test("GET /harvest/ckan-coverage splits linked records by the catalogue's harvest source", async () => {
   db.queueRaw([
-    { ckan_id: "a1", erddap: true, obis: false },
-    { ckan_id: "a2", erddap: true, obis: true },
-    { ckan_id: "p1", erddap: false, obis: true },
+    { ckan_id: "a1", erddap: true, obis: false, erddap_urls: [ATL] },
+    { ckan_id: "a2", erddap: true, obis: true, erddap_urls: [ATL] },
+    { ckan_id: "p1", erddap: false, obis: true, erddap_urls: [] },
   ]);
   db.queueRaw([]);
   axios.queueResponse(
@@ -273,6 +275,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
     n_linked: 3,
     n_erddap: 2,
     n_obis: 2,
+    erddap_servers: [{ erddap_url: ATL, n_records: 2 }],
     n_linked_stale: 0,
     sources: [
       {
@@ -281,6 +284,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
         n_linked: 2,
         n_erddap: 2,
         n_obis: 1,
+        erddap_servers: [{ erddap_url: ATL, n_records: 2 }],
       },
       {
         source: "CIOOS Pacific",
@@ -288,6 +292,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
         n_linked: 1,
         n_erddap: 0,
         n_obis: 1,
+        erddap_servers: [],
       },
       {
         source: "DataStream",
@@ -295,6 +300,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
         n_linked: 0,
         n_erddap: 0,
         n_obis: 0,
+        erddap_servers: [],
       },
     ],
     harvested: [],
@@ -304,6 +310,36 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
     /catalogue\.cioos\.ca\/api\/3\/action\/package_search$/,
   );
   assert.equal(axios.calls[0].config.params.fl, "id,harvest_source_title");
+});
+
+test("GET /harvest/ckan-coverage names the ERDDAP servers each source's records point to", async () => {
+  db.queueRaw([
+    { ckan_id: "p1", erddap: true, obis: false, erddap_urls: [PAC] },
+    { ckan_id: "p2", erddap: true, obis: true, erddap_urls: [PAC, ATL] },
+    { ckan_id: "p3", erddap: true, obis: false, erddap_urls: [PAC] },
+    { ckan_id: "p4", erddap: false, obis: true, erddap_urls: [] },
+  ]);
+  db.queueRaw([]);
+  axios.queueResponse(
+    ckanPage(
+      4,
+      ["p1", "p2", "p3", "p4"].map((id) => ({
+        id,
+        harvest_source_title: "CIOOS Pacific",
+      })),
+    ),
+  );
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.deepEqual(res.body.sources[0].erddap_servers, [
+    { erddap_url: PAC, n_records: 3 },
+    { erddap_url: ATL, n_records: 1 },
+  ]);
+  assert.match(
+    db.queries[0],
+    /array_agg\(DISTINCT erddap_url\)\s+FILTER \(WHERE source_type IS DISTINCT FROM 'obis'/,
+  );
 });
 
 test("GET /harvest/ckan-coverage pages through the whole catalogue", async () => {
@@ -339,7 +375,14 @@ test("GET /harvest/ckan-coverage keeps links to records the catalogue dropped ou
   assert.equal(res.body.n_linked, 1);
   assert.equal(res.body.n_linked_stale, 1);
   assert.deepEqual(res.body.sources, [
-    { source: null, n_records: 1, n_linked: 1, n_erddap: 1, n_obis: 0 },
+    {
+      source: null,
+      n_records: 1,
+      n_linked: 1,
+      n_erddap: 1,
+      n_obis: 0,
+      erddap_servers: [],
+    },
   ]);
 });
 
@@ -377,6 +420,7 @@ test("GET /harvest/ckan-coverage keeps the linked counts when CKAN fails mid-lis
     n_linked: 2,
     n_erddap: 1,
     n_obis: 1,
+    erddap_servers: [],
     n_linked_stale: null,
     sources: null,
     harvested: [],
