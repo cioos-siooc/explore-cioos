@@ -51,7 +51,9 @@ const FORMATS = [
   "kml",
 ];
 // OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition.
-const OBIS_FORMATS = ["csv", "parquet"];
+const OBIS_FORMATS = ["csv", "parquet", "dwca"];
+// OBIS's curated values, or the provider's as submitted to OBIS.
+const OBIS_VALUES = ["curated", "submitted"];
 // Past this many matched features, a bounding-box request beats a regex over
 // their IDs (the downloader also caps the number of requests it splits into).
 const MAX_FEATURE_IDS = 5000;
@@ -95,8 +97,12 @@ const DOWNLOADER_URL = `https://github.com/cioos-siooc/explore-cioos/archive/${D
  *         description: Only csv, parquet, odv and nccf are clipped to a polygon; the other ERDDAP file types cover its bounding box.
  *       - in: query
  *         name: obisFormat
- *         schema: { type: string, enum: [csv, parquet] }
+ *         schema: { type: string, enum: [csv, parquet, dwca] }
  *         description: Format for OBIS datasets; defaults to format, as CSV when OBIS has no such rendition.
+ *       - in: query
+ *         name: obisValues
+ *         schema: { type: string, enum: [curated, submitted], default: curated }
+ *         description: OBIS's curated Darwin Core values, or the provider's as submitted.
  *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
@@ -150,6 +156,7 @@ async function downloadSelection(query) {
     lang = "en",
     format = "csv",
     obisFormat,
+    obisValues = "curated",
   } = query;
 
   const filters = await createDBFilter(query);
@@ -228,17 +235,21 @@ async function downloadSelection(query) {
     polygon_region: polygon ? polygonJSONToWKT(polygon) : null,
     format,
     obis_format: obisFormat || null,
+    obis_values: obisValues,
     // Every filter as the Data Explorer sent it, for the package README.
     filters: Object.fromEntries(
       Object.entries(query).filter(
-        ([key]) => !["polygon", "lang", "format", "obisFormat"].includes(key),
+        ([key]) =>
+          !["polygon", "lang", "format", "obisFormat", "obisValues"].includes(
+            key,
+          ),
       ),
     ),
     // The explorer reads these same parameters back from its URL, so the
     // package can link to the selection it was made from.
     explorer_url: `${EXPLORER_URL}/?${new URLSearchParams(
       Object.entries(query).filter(
-        ([key]) => !["format", "obisFormat"].includes(key),
+        ([key]) => !["format", "obisFormat", "obisValues"].includes(key),
       ),
     )}`,
     job_id: randomUUID(),
@@ -259,6 +270,7 @@ router.post(
       check("lang").isIn(["en", "fr"]).optional(),
       check("format").isIn(FORMATS).optional(),
       check("obisFormat").isIn(OBIS_FORMATS).optional(),
+      check("obisValues").isIn(OBIS_VALUES).optional(),
     ],
     cacheFor: null,
   }),

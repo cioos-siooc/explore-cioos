@@ -159,6 +159,20 @@ describe("DownloadProvider", () => {
       expect(params.get("format")).toBe("csv");
     });
 
+    it("asks for OBIS's curated values unless the provider's are chosen", async () => {
+      await submit(false);
+      expect(new URL(requests[0].url).searchParams.get("obisValues")).toBe(
+        "curated",
+      );
+
+      act(() => download.setObisValues("submitted"));
+      act(() => download.handleSubmission());
+      await waitFor(() => expect(requests).toHaveLength(2));
+      expect(new URL(requests[1].url).searchParams.get("obisValues")).toBe(
+        "submitted",
+      );
+    });
+
     it("names the basket once when the Datasets filter is also narrowing", async () => {
       await renderReady("/?datasetPKs=2337");
       // query is debounced: submitting before it lands sends no Datasets

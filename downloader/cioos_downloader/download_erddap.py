@@ -18,7 +18,6 @@ from erddapy import ERDDAP
 from loguru import logger
 
 from cioos_downloader.formats import (
-    CLIPPABLE_FORMATS,
     RAW_FORMATS,
     REQUEST_HEADERS,
     polygon_regions,
@@ -75,11 +74,14 @@ FORMATS = {
         Format("nccf", "ncCF", "application/x-netcdf", True, "NetCDF CF (DSG)"),
         # Not parsed, so a cut-off response can't be trimmed to its last whole record.
         *(Format(key, key, mediatype, True, label) for key, (_, mediatype, label) in RAW_FORMATS.items()),
+        Format("dwca", None, "application/zip", True, "Darwin Core Archive"),
     )
 }
 DEFAULT_FORMAT = "csv"
 # OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition of it.
-OBIS_FORMATS = ("csv", "parquet")
+OBIS_FORMATS = ("csv", "parquet", "dwca")
+# Darwin Core describes biodiversity records, which only OBIS serves.
+ERDDAP_FORMATS = tuple(key for key in FORMATS if key != "dwca")
 
 
 # Jobs queued before obis_format existed carry one format for every source.
@@ -343,8 +345,12 @@ def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
     row["download_url_list"] = [url]
     _stage(dataset, f"querying the OBIS export {url}")
 
-    files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
+    values = user_query.get("obis_values") or "curated"
+    eml = folder / "metadata" / "eml.xml"
+    files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset), values, eml)
     row["files"] = files
+    # The first file holds the occurrences; the others are their measurements and DNA.
+    row["n_records"] = files[0]["n_rows"] if files else 0
     row["status"] = COMPLETED if files else EMPTY
 
 
@@ -352,7 +358,7 @@ def download_dataset(dataset, user_query, regions, root: Path, budget):
     source_type = dataset.get("source_type") or "erddap"
     requested = requested_format(user_query, source_type)
     fmt = requested
-    if source_type == "obis" and fmt not in OBIS_FORMATS:
+    if fmt not in (OBIS_FORMATS if source_type == "obis" else ERDDAP_FORMATS):
         fmt = DEFAULT_FORMAT
 
     folder_name = dataset_folder_name(dataset)
@@ -361,7 +367,10 @@ def download_dataset(dataset, user_query, regions, root: Path, budget):
     row = _row(dataset, fmt, folder_name)
     row["requested_format"] = requested
     row["format_fallback"] = fmt != requested
-    row["polygon_box_only"] = bool(regions) and fmt not in CLIPPABLE_FORMATS
+    row["polygon_box_only"] = bool(regions) and fmt in RAW_FORMATS
+    # Before the data: an OBIS Darwin Core Archive carries the EML record.
+    _stage(dataset, "fetching the source metadata records")
+    row["warnings"] += save_source_metadata(dataset, folder / "metadata")
 
     try:
         if source_type == "obis":
@@ -379,8 +388,6 @@ def download_dataset(dataset, user_query, regions, root: Path, budget):
             "Downloader failed for dataset {}", dataset["dataset_id"]
         )
 
-    _stage(dataset, "fetching the source metadata records")
-    row["warnings"] += save_source_metadata(dataset, folder / "metadata")
     row["file_size"] = sum(f["bytes"] for f in row["files"])
     counts = [f["n_rows"] for f in row["files"]]
     row["n_records"] = row["n_records"] or (None if None in counts else sum(counts))
