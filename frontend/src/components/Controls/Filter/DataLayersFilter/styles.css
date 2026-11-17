@@ -4,3 +4,14 @@
   color: var(--cioos-ink-80);
   margin-top: 1px;
 }
+
+/* The same glyphs the dataset cards use, so they can be learned here. */
+.dataLayersFilter .dataLayerIcon {
+  flex: 0 0 auto;
+  margin: 2px 0 0 10px;
+  color: var(--cioos-ink-60);
+}
+
+.dataLayersFilter .dataLayerIcon + .optionName {
+  margin-left: 8px;
+}

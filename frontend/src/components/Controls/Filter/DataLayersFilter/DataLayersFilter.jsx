@@ -7,6 +7,7 @@ import {
   DATA_LAYER_LABEL_KEYS,
 } from "../../../../state/dataLayers.js";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
+import DataTypeIcon from "../../../ui/DataTypeIcon.jsx";
 import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
@@ -31,6 +32,7 @@ export default function DataLayersFilter() {
             onInclude={() => toggleDataLayer(key, "include")}
             onExclude={() => toggleDataLayer(key, "exclude")}
           >
+            <DataTypeIcon layerKey={key} size={16} className="dataLayerIcon" />
             <span className="optionName">
               {t(DATA_LAYER_LABEL_KEYS[key])}
               <span className="optionHint">{t(DATA_LAYER_HINT_KEYS[key])}</span>
