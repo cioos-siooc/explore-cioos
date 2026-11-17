@@ -9,7 +9,7 @@ const Sentry = require("@sentry/node");
  *     summary: Preview sample records for a dataset record
  *     tags: [Preview]
  *     description: >
- *       Returns up to 5000 representative rows for one record of an ERDDAP
+ *       Returns up to `limit` (default 5000) representative rows for one record of an ERDDAP
  *       dataset. A "record" is the dataset's CF discrete-sampling feature: a
  *       station for TimeSeries/TimeSeriesProfile, a cast for Profile, a
  *       mission/deployment for Trajectory/TrajectoryProfile.
@@ -33,6 +33,16 @@ const Sentry = require("@sentry/node");
  *         name: timeMax
  *         schema: { type: string, format: date-time }
  *       - in: query
+ *         name: before
+ *         schema: { type: string, format: date-time }
+ *         description: >
+ *           Ends the record's window here instead of at its newest row, to page
+ *           back through it. Ignored with `at` or timeMin/timeMax.
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 50000, default: 5000 }
+ *         description: How many rows to draw at most.
+ *       - in: query
  *         name: allProfiles
  *         schema: { type: boolean }
  *         description: >
@@ -51,6 +61,8 @@ const Sentry = require("@sentry/node");
  *           cdm_altitude_proxy says stands in for depth; absent when none.
  *           `sample` is { rowCount, totalRowCount }: the rows sent and the rows
  *           the request covers, which differ when only part of it is sent.
+ *           `startOfRecord` is true when a window's rows reach back to the
+ *           record's first row, so there is nothing earlier to page to.
  *       400:
  *         description: Missing or invalid parameters.
  *       404:
@@ -94,9 +106,10 @@ const constraintFor = (column, value) =>
 const steppedRecord = (recordColumn, stepColumn) =>
   Boolean(stepColumn) && stepColumn !== recordColumn;
 
-// How many rows one preview draws. Module level because both handlers bind it
-// into FEATURE_SQL, which sizes its time window against it.
+// How many rows one preview draws unless it asks for more. Module level because
+// both handlers bind it into FEATURE_SQL, which sizes its time window against it.
 const PREVIEW_ROW_LIMIT = 5000;
+const MAX_PREVIEW_ROW_LIMIT = 50000;
 
 // Every profile of a record, past this, is more than a slider can address and
 // more than is worth sending: mpoSgdoADCP's longest record has 48166 of them,
@@ -121,7 +134,11 @@ const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(
 
 // Trajectories never get a cde.profiles row, hence the two branches.
 const FEATURE_SQL = `
-WITH ds AS (
+WITH params AS (
+  SELECT CAST(:BEFORE AS timestamptz) AS before,
+         (CAST(:BEFORE AS timestamptz) AT TIME ZONE 'UTC')::date AS before_day
+),
+ds AS (
   SELECT pk, dataset_id, erddap_url, cdm_data_type, table_variables,
          timeseries_id_variable, profile_id_variable, trajectory_id_variable,
          cdm_altitude_proxy
@@ -136,7 +153,9 @@ profile_feature AS (
          p.n_records,
          p.records_per_day,
          p.profile_id AS cast_id,
-         p.timeseries_id AS station_id
+         p.timeseries_id AS station_id,
+         (SELECT MAX(upper(r)) FROM unnest(p.day_ranges) r, params
+          WHERE  lower(r) < params.before_day) AS data_end
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
   WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
@@ -156,7 +175,9 @@ station_feature AS (
            / GREATEST(EXTRACT(EPOCH FROM MAX(p.time_max) - MIN(p.time_min))
                         / 86400, 1) AS records_per_day,
          NULL::text AS cast_id,
-         f.station_id
+         f.station_id,
+         MAX((SELECT MAX(upper(r)) FROM unnest(p.day_ranges) r, params
+              WHERE  lower(r) < params.before_day)) AS data_end
   FROM   profile_feature f
   JOIN   ds ON ds.pk = f.dataset_pk
   JOIN   cde.profiles p
@@ -176,12 +197,14 @@ trajectory_feature AS (
          SUM(td.n_records)::double precision
            / GREATEST(COUNT(DISTINCT td.day), 1) AS records_per_day,
          NULL::text AS cast_id,
-         NULL::text AS station_id
+         NULL::text AS station_id,
+         MAX(td.day) FILTER (WHERE td.day < params.before_day) + 1 AS data_end
   FROM   cde.trajectory_track_stats s
   JOIN   ds ON ds.pk = s.dataset_pk
   JOIN   cde.trajectory_days td
          ON  td.dataset_pk    = s.dataset_pk
          AND td.trajectory_id = s.trajectory_id
+  CROSS JOIN params
   WHERE  s.trajectory_id = :profile
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
 ),
@@ -232,11 +255,22 @@ CROSS JOIN LATERAL (
          AND f.cast_id IS NOT NULL
          AND f.station_id IS NOT NULL AS is_cast
 ) cast_record
+CROSS JOIN params
+CROSS JOIN LATERAL (
+  -- Where the window is sized back from: the newest row, or the requested
+  -- bound pulled back to the end of the data on the days before its own, so a
+  -- page that would land in a gap in the record lands on the data before the
+  -- gap. Only the lower bound moves; ERDDAP is still asked for everything
+  -- before the requested bound. LEAST skips NULLs, so no bound (or no
+  -- harvested day set) leaves the other two.
+  SELECT LEAST(f.time_max, params.before,
+               f.data_end::timestamp AT TIME ZONE 'UTC') AS window_end
+) anchor
 CROSS JOIN LATERAL (
   -- A zero or NULL cadence cannot size a window; it falls through to
   -- fetching the whole record.
   SELECT CASE WHEN COALESCE(f.records_per_day, 0) > 0
-                THEN f.time_max
+                THEN anchor.window_end
                      - (interval '1 hour'
                         * CEIL(:NUM_RECORDS / (f.records_per_day / 24)))
          END AS new_start_time
@@ -246,14 +280,18 @@ LIMIT 1`;
 const PREVIEW_CHECKS = [
   check(["dataset", "profile", "at"]).isLength({ max: 256 }),
   check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
+  check("before").optional().isISO8601({ strict: true }),
+  check("limit").optional().isInt({ min: 1, max: MAX_PREVIEW_ROW_LIMIT }),
   check("allProfiles").optional().isIn(["true", "false"]),
 ];
+
+const rowLimitOf = (query) => Number(query.limit) || PREVIEW_ROW_LIMIT;
 
 // The ERDDAP request /preview makes for this record, or the refusal it sends
 // instead. Shared with /preview/query, so the link the UI shows while waiting
 // is the request actually running.
 async function resolvePreview(query) {
-  const { dataset, profile, at, timeMin, timeMax } = query;
+  const { dataset, profile, at, timeMin, timeMax, before } = query;
   const allProfiles = query.allProfiles === "true";
 
   // NOTE: filtered by dataset_id alone, so a dataset_id published on two
@@ -261,8 +299,9 @@ async function resolvePreview(query) {
   const rows = await db.raw(FEATURE_SQL, {
     profile,
     dataset,
-    NUM_RECORDS: PREVIEW_ROW_LIMIT,
+    NUM_RECORDS: rowLimitOf(query),
     WHOLE_STATION: allProfiles,
+    BEFORE: before ?? null,
   });
 
   if (!rows.rows?.length) {
@@ -309,20 +348,29 @@ async function resolvePreview(query) {
     steppedRecord(profile_variable, step_variable) && !allProfiles
       ? at || record_step
       : null;
-  const windowed = !step && !timeMin && !timeMax && !use_whole_profile;
+  const tailWindow = !step && !timeMin && !timeMax;
+  const windowed = tailWindow && (!use_whole_profile || Boolean(before));
   if (step) {
     erddapQuery += `&${constraintFor(step_variable, step)}`;
   } else if (timeMin || timeMax) {
     if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
     if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
-  } else if (!use_whole_profile) {
-    // Lower bound only, so near-real-time records newer than the last
-    // harvest still show. Anchored on this record's own time_max, not the
-    // dataset's, whose newest data usually belongs to another record.
-    erddapQuery += `&time>${new_start_time}`;
+  } else {
+    // Without `before`, lower bound only, so near-real-time records newer
+    // than the last harvest still show. Anchored on this record's own
+    // time_max, not the dataset's, whose newest data usually belongs to
+    // another record.
+    if (!use_whole_profile) erddapQuery += `&time>${new_start_time}`;
+    // Strict, so the row the previous page started on is not drawn twice.
+    if (before) erddapQuery += `&time<${new Date(before).toISOString()}`;
   }
 
-  return { record, erddapQuery, windowed };
+  return {
+    record,
+    erddapQuery,
+    windowed,
+    reachesBack: tailWindow && use_whole_profile,
+  };
 }
 
 router.get(
@@ -335,9 +383,9 @@ router.get(
     checks: PREVIEW_CHECKS,
   }),
   async (req, res, next) => {
-    const { refusal, record, erddapQuery, windowed } = await resolvePreview(
-      req.query,
-    );
+    const { refusal, record, erddapQuery, windowed, reachesBack } =
+      await resolvePreview(req.query);
+    const rowLimit = rowLimitOf(req.query);
     if (refusal) return res.status(refusal.status).send(refusal.body);
 
     const {
@@ -366,7 +414,7 @@ router.get(
         });
       }
       const fetchedRowCount = data.table.rows.length;
-      trimPreviewRows(data.table, PREVIEW_ROW_LIMIT);
+      trimPreviewRows(data.table, rowLimit);
       // A window's rows are a part of the record whatever ERDDAP sent, so its
       // whole is the harvested count.
       data.sample = {
@@ -374,6 +422,7 @@ router.get(
         totalRowCount: windowed
           ? Math.max(Number(n_records) || 0, fetchedRowCount)
           : fetchedRowCount,
+        startOfRecord: reachesBack && fetchedRowCount <= rowLimit,
       };
       // Attached here rather than in shapeQuery.js, which would then carry
       // ~15 KB per dataset to /pointQuery. Kept positionally aligned with
@@ -470,7 +519,7 @@ router.get(
  *     description: >
  *       A TimeSeriesProfile record is a station holding many casts, and a
  *       TrajectoryProfile record is a track holding many profiles; /preview
- *       returns a 5000-row window of one, which is the tail of the record and
+ *       returns a row-limited window of one, which is the tail of the record and
  *       may hold a handful of them. This lists what is there, so the preview can
  *       step to any of them with /preview?at=.
  *
@@ -518,6 +567,7 @@ router.get(
       dataset,
       NUM_RECORDS: PREVIEW_ROW_LIMIT,
       WHOLE_STATION: false,
+      BEFORE: null,
     });
 
     if (!rows.rows?.length) {
