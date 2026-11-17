@@ -755,14 +755,24 @@ a.harvest-link:hover {
 /* ── Catalogue section (overview) ────────────────────────────────────────── */
 
 /* The max() floor caps the grid at two columns, one below ~632px. */
+.harvest-columns,
 .harvest-catalogue {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(max(300px, calc((100% - 2rem) / 2)), 1fr)
-  );
-  gap: 0 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 0 2.5rem;
   margin-bottom: 1rem;
+}
+
+.harvest-columns > section,
+.harvest-catalogue > div {
+  min-width: 0;
+}
+
+.harvest-column-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  margin: 1.5rem 0 0.5rem;
 }
 
 .harvest-ckan-pct {
@@ -795,27 +805,32 @@ a.harvest-link:hover {
   color: var(--cioos-ink);
 }
 
-.harvest-unmatched-bar {
+.harvest-unmatched-bar,
+.harvest-stack-bar {
   display: flex;
   gap: 2px;
   height: 12px;
   margin: 0.35rem 0 0.5rem;
 }
 
-.harvest-unmatched-bar span {
+.harvest-unmatched-bar span,
+.harvest-stack-bar span {
   flex-basis: 0;
   min-width: 2px;
 }
 
-.harvest-unmatched-bar span:first-child {
+.harvest-unmatched-bar span:first-child,
+.harvest-stack-bar span:first-child {
   border-radius: 4px 0 0 4px;
 }
 
-.harvest-unmatched-bar span:last-child {
+.harvest-unmatched-bar span:last-child,
+.harvest-stack-bar span:last-child {
   border-radius: 0 4px 4px 0;
 }
 
-.harvest-unmatched-bar span:only-child {
+.harvest-unmatched-bar span:only-child,
+.harvest-stack-bar span:only-child {
   border-radius: 4px;
 }
 
@@ -834,13 +849,33 @@ a.harvest-link:hover {
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.5rem;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.6rem;
 }
 
-.harvest-ckan-sources .harvest-ckan-meter {
+.harvest-ckan-sources .harvest-stack-bar {
   flex-basis: 100%;
-  height: 4px;
+  height: 6px;
   margin: 0.15rem 0 0;
+}
+
+.harvest-link-legend {
+  font-size: 0.8rem;
+}
+
+.harvest-server-links {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 0 0.75rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+}
+
+.harvest-pie-bar {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .harvest-bars {

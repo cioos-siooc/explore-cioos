@@ -39,6 +39,10 @@ const CKAN_COVERAGE = {
   n_linked: 100,
   n_erddap: 70,
   n_obis: 35,
+  erddap_servers: [
+    { erddap_url: "https://data.cioospacific.ca/erddap", n_records: 55 },
+    { erddap_url: "https://erddap.example.org/erddap", n_records: 15 },
+  ],
   n_linked_stale: 0,
   sources: [
     {
@@ -47,8 +51,19 @@ const CKAN_COVERAGE = {
       n_linked: 90,
       n_erddap: 60,
       n_obis: 35,
+      erddap_servers: [
+        { erddap_url: "https://data.cioospacific.ca/erddap", n_records: 50 },
+        { erddap_url: "https://erddap.example.org/erddap", n_records: 10 },
+      ],
     },
-    { source: null, n_records: 100, n_linked: 10, n_erddap: 10, n_obis: 0 },
+    {
+      source: null,
+      n_records: 100,
+      n_linked: 10,
+      n_erddap: 10,
+      n_obis: 0,
+      erddap_servers: [],
+    },
   ],
   harvested: [
     {
@@ -196,10 +211,11 @@ describe("HarvestOverview", () => {
     renderWithProviders(<HarvestOverview />);
     const pacific = (await screen.findByText("CIOOS Pacific")).closest("li");
     expect(within(pacific).getByText("90 / 300 (30%)")).toBeInTheDocument();
-    expect(pacific).toHaveAttribute(
-      "title",
-      "60 linked through ERDDAP, 35 through OBIS",
-    );
+    expect(
+      within(pacific).getByRole("img", {
+        name: "data.cioospacific.ca: 50, erddap.example.org: 10, OBIS: 30, No harvested data: 210",
+      }),
+    ).toBeInTheDocument();
     const unknown = screen.getByText("Unknown source").closest("li");
     expect(within(unknown).getByText("10 / 100 (10%)")).toBeInTheDocument();
     expect(
@@ -207,25 +223,118 @@ describe("HarvestOverview", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("splits each catalogue's ERDDAP records by server, linking each", async () => {
+    renderWithProviders(<HarvestOverview />);
+    const pacific = (await screen.findByText("CIOOS Pacific")).closest("li");
+    const legend = within(pacific).getByRole("list", { name: "Data from" });
+    expect(
+      within(legend)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["data.cioospacific.ca50", "erddap.example.org10", "OBIS30"]);
+    expect(
+      within(legend).getByRole("link", { name: "data.cioospacific.ca" }),
+    ).toHaveAttribute("href", "/harvest/server/data-cioospacific-ca-erddap");
+    expect(
+      within(legend).queryByRole("link", { name: "OBIS" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("folds a catalogue's servers past the third into one segment", async () => {
+    const erddap_servers = Array.from({ length: 6 }, (_, i) => ({
+      erddap_url: `https://s${i}.example.org/erddap`,
+      n_records: 10 - i,
+    }));
+    stubRoutes({
+      "/ckan-coverage": {
+        ...CKAN_COVERAGE,
+        sources: [{ ...CKAN_COVERAGE.sources[1], erddap_servers }],
+      },
+    });
+    renderWithProviders(<HarvestOverview />);
+    const row = (await screen.findByText("Unknown source")).closest("li");
+    const items = within(
+      within(row).getByRole("list", { name: "Data from" }),
+    ).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      "s0.example.org10",
+      "s1.example.org9",
+      "s2.example.org8",
+      "3 other ERDDAP servers18",
+    ]);
+    expect(items[3]).toHaveAttribute(
+      "title",
+      "s3.example.org: 7\ns4.example.org: 6\ns5.example.org: 5",
+    );
+  });
+
+  it("keeps the CKAN columns on top and the harvest outcome above the sources", async () => {
+    renderWithProviders(<HarvestOverview />);
+    const metadata = await screen.findByRole("region", { name: "Metadata" });
+    const data = screen.getByRole("region", { name: "Data" });
+    expect(
+      await within(metadata).findByRole("img", {
+        name: "100 of 400 catalogue records linked to a harvested dataset",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(data).getByRole("img", {
+        name: "31 of 50 harvested datasets linked to a CKAN record",
+      }),
+    ).toBeInTheDocument();
+    const outcome = await screen.findByText("Latest harvest outcome");
+    const sources = screen.getByRole("heading", { name: "Sources" });
+    expect(data.contains(outcome)).toBe(false);
+    expect(
+      data.compareDocumentPosition(outcome) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      outcome.compareDocumentPosition(sources) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("splits the whole catalogue's records by ERDDAP server and OBIS", async () => {
+    renderWithProviders(<HarvestOverview />);
+    const metadata = await screen.findByRole("region", { name: "Metadata" });
+    const legend = (
+      await within(metadata).findAllByRole("list", { name: "Data from" })
+    )[0];
+    expect(
+      within(legend)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual([
+      "data.cioospacific.ca55",
+      "erddap.example.org15",
+      "OBIS30",
+      "No harvested data300",
+    ]);
+  });
+
   it("shows how many of each source's harvested datasets are in the catalogue", async () => {
     renderWithProviders(<HarvestOverview />);
     expect(
-      await screen.findByText("Harvested datasets with a CKAN record"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", {
+      await screen.findByRole("img", {
         name: "31 of 50 harvested datasets linked to a CKAN record",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Harvested datasets with a CKAN record"),
     ).toBeInTheDocument();
     expect(screen.getByText("62%")).toBeInTheDocument();
     const erddap = screen.getByText("30 / 40 (75%)").closest("li");
     expect(
       within(erddap).getByText("data.cioospacific.ca"),
     ).toBeInTheDocument();
-    expect(erddap).toHaveAttribute("title", "10 datasets not in the catalogue");
+    expect(
+      within(erddap).getByText("10 datasets not in the catalogue"),
+    ).toBeInTheDocument();
     const obis = screen.getByText("1 / 10 (10%)").closest("li");
     expect(within(obis).getByText("obis.org")).toBeInTheDocument();
-    expect(obis).toHaveAttribute("title", "9 datasets not in the catalogue");
+    expect(
+      within(obis).getByText("9 datasets not in the catalogue"),
+    ).toBeInTheDocument();
   });
 
   it("splits the harvested datasets missing from CKAN by source", async () => {

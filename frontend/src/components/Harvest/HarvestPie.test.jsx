@@ -153,3 +153,22 @@ describe("HarvestPie", () => {
     expect(container.querySelector(".harvest-pie")).toBeNull();
   });
 });
+
+describe("HarvestPie as a bar", () => {
+  it("stacks the same slices in one bar, with the legend and no pie", () => {
+    const { container } = renderPie(
+      8,
+      [{ status: "error", reason_code: "HTTP_ERROR", n: 2 }],
+      { bar: true },
+    );
+    const bar = screen.getByRole("img", {
+      name: "8 of 10 datasets harvested in the last run",
+    });
+    expect(container.querySelector("svg")).toBeNull();
+    expect([...bar.children].map((s) => s.title)).toEqual([
+      "Harvested: 8 (80%)",
+      "HTTP error: 2 (20%)",
+    ]);
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+});
