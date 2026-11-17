@@ -28,6 +28,7 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
 import {
+  CATALOGUE_KEY,
   GRID_KEY,
   GROUP_NONE,
   groupKeysFor,
@@ -44,6 +45,7 @@ import {
   pinnedPksOf,
   sortDatasets,
 } from "../../../state/datasetSort.js";
+import { isCatalogueRecord } from "../../../state/dataLayers.js";
 import { useChanged } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
@@ -246,7 +248,26 @@ export default function DatasetsTable({
   // dataset under each of its values, so row entries can exceed the unique
   // dataset count; a parent header's count is its unique datasets.
   const renderItems = useMemo(() => {
-    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
+    if (!isGroupDimension(groupBy)) {
+      // Catalogue records sort last; ungrouped, they still get a section of
+      // their own, as they hold no data.
+      const firstCatalogue = visibleRows.findIndex(isCatalogueRecord);
+      if (firstCatalogue === -1) return visibleRows.map((row) => ({ row }));
+      const catalogue = visibleRows.slice(firstCatalogue);
+      return [
+        ...visibleRows.slice(0, firstCatalogue).map((row) => ({ row })),
+        {
+          header: true,
+          group: CATALOGUE_KEY,
+          count: catalogue.length,
+          depth: 0,
+          expandable: true,
+        },
+        ...(isExpanded(CATALOGUE_KEY)
+          ? catalogue.map((row) => ({ row, group: CATALOGUE_KEY }))
+          : []),
+      ];
+    }
     const rowsOf = (key) => byGroup.get(key) ?? [];
     const sortKeys = (keys, sizeOf) => {
       const sorted = sortGroupKeys(keys, groupBy, t, i18n.language);
@@ -257,6 +278,10 @@ export default function DatasetsTable({
       if (gridFirst && sorted.includes(GRID_KEY)) {
         sorted.splice(sorted.indexOf(GRID_KEY), 1);
         sorted.unshift(GRID_KEY);
+      }
+      if (sorted.includes(CATALOGUE_KEY)) {
+        sorted.splice(sorted.indexOf(CATALOGUE_KEY), 1);
+        sorted.push(CATALOGUE_KEY);
       }
       // The groups the results no longer hold go under the ones they do.
       return [

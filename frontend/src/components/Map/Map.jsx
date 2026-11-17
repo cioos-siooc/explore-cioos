@@ -61,6 +61,7 @@ import DepthProbe from "./DepthProbe.jsx";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
+  isFootprintOnly,
 } from "../../state/dataLayers.js";
 import {
   buildBasemapStyle,
@@ -1606,13 +1607,13 @@ export default function CreateMap({
       // The ramp follows the open page only: rescaling per hovered row would
       // set the whole map moving as the cursor swept the list.
       const rampPk =
-        inspectDataset && inspectDataset.cdm_data_type !== "Grid"
+        inspectDataset && !isFootprintOnly(inspectDataset)
           ? inspectDataset.pk
           : undefined;
       rampFocusPk.current = rampPk;
-      if (focusedDataset?.cdm_data_type === "Grid") {
-        // A griddap dataset has no map features: highlighting its pk would grey
-        // the whole map. Draw its bbox instead.
+      if (isFootprintOnly(focusedDataset)) {
+        // A grid or catalogue record has no map features: highlighting its pk
+        // would grey the whole map. Draw its bbox instead.
         focusedDatasetPk.current = undefined;
         hoverHighlightPoints();
         setGriddapHighlight(focusedDataset.coverage_bbox_geojson);

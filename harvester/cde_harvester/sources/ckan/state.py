@@ -35,3 +35,26 @@ def load_previous_ckan(erddap_urls):
     except Exception as e:
         logger.warning("Could not load previous CKAN metadata: %s", e)
         return pd.DataFrame(columns=PREVIOUS_CKAN_COLUMNS)
+
+
+def load_catalogue_state(source_url):
+    """(ckan_ids another source's dataset cites, {dataset_id: content_hash} of
+    the catalogue's own rows); empty on any error, which only costs a full
+    reload: ckan_process() drops cited records in the same load."""
+    logger = run_logger(_module_logger)
+    try:
+        engine = create_db_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT erddap_url = :source AS own, dataset_id, ckan_id, content_hash "
+                    "FROM cde.datasets WHERE ckan_id IS NOT NULL OR erddap_url = :source"
+                ),
+                {"source": source_url},
+            ).all()
+    except Exception as e:
+        logger.warning("Could not load stored catalogue records: %s", e)
+        return set(), {}
+    cited = {r.ckan_id for r in rows if not r.own and r.ckan_id}
+    hashes = {r.dataset_id: r.content_hash for r in rows if r.own}
+    return cited, hashes

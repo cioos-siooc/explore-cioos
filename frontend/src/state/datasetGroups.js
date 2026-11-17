@@ -7,12 +7,13 @@ import erddapServers from "../erddapServers.json";
 import platforms from "../platforms.json";
 import { platformCategory, platformLabel } from "../platformVocab.js";
 import { formatErddapServerName } from "../utilities.jsx";
-import { cdmDataTypeLabel } from "./dataLayers.js";
+import { cdmDataTypeLabel, isCatalogueRecord } from "./dataLayers.js";
 
 export const GROUP_NONE = "none";
 
 // Prefixed so they can't collide with a real organization / EOV / platform name.
 export const GRID_KEY = "__grid__";
+export const CATALOGUE_KEY = "__catalogue__";
 export const OTHER_KEY = "__other__";
 export const UNCATEGORIZED_KEY = "__uncategorized__";
 
@@ -29,8 +30,11 @@ export function eovCategory(eov) {
   return eovs.find((e) => e.value === eov)?.category || "Other";
 }
 
-// Groups that sort last regardless of their label.
+// Groups that sort last regardless of their label, catalogue records (no
+// data) after the rest.
 const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY]);
+const lastRank = (key) =>
+  key === CATALOGUE_KEY ? 2 : LAST_KEYS.has(key) ? 1 : 0;
 
 const DIMENSIONS = new Set([
   "type",
@@ -60,6 +64,12 @@ export function isGroupDimension(groupBy) {
 // Array-valued dimensions return several, so a dataset shows under each.
 export function groupKeysFor(row, groupBy) {
   const isGrid = row.cdm_data_type === "Grid";
+  if (
+    isCatalogueRecord(row) &&
+    ["type", "platform", "source"].includes(groupBy)
+  ) {
+    return [CATALOGUE_KEY];
+  }
   switch (groupBy) {
     case "type":
       return [isGrid ? GRID_KEY : row.cdm_data_type || OTHER_KEY];
@@ -112,6 +122,7 @@ export function groupLabel(key, groupBy, t, language = "en") {
       : groupLabel(child, groupBy, t, language);
   }
   if (key === GRID_KEY) return t("griddapTypeLabel");
+  if (key === CATALOGUE_KEY) return t("catalogueRecordsGroupLabel");
   if (key === OTHER_KEY) return t("datasetsCardGroupOtherText");
   if (key === UNCATEGORIZED_KEY) return t("datasetsCardGroupUncategorizedText");
   switch (groupBy) {
@@ -130,12 +141,12 @@ export function groupLabel(key, groupBy, t, language = "en") {
   }
 }
 
-// Alphabetical by label, with Other/Uncategorized pinned to the bottom.
+// Alphabetical by label, with Other/Uncategorized then catalogue records
+// pinned to the bottom.
 export function sortGroupKeys(keys, groupBy, t, language) {
   return [...keys].sort((a, b) => {
-    const aLast = LAST_KEYS.has(a);
-    const bLast = LAST_KEYS.has(b);
-    if (aLast !== bLast) return aLast ? 1 : -1;
+    const rank = lastRank(a) - lastRank(b);
+    if (rank) return rank;
     return groupLabel(a, groupBy, t, language).localeCompare(
       groupLabel(b, groupBy, t, language),
       language,

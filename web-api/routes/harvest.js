@@ -413,13 +413,14 @@ async function oldestLastHarvest() {
 
 // One row per CKAN record, however many datasets share it. source_type is
 // NULL on some ERDDAP rows, so ERDDAP is "not OBIS" rather than = 'erddap'.
+// A catalogue record loaded on its own (source_type 'ckan') links nothing.
 async function ckanLinkedRecords() {
   const sql = `
     SELECT ckan_id,
            bool_or(source_type IS DISTINCT FROM 'obis') AS erddap,
            bool_or(source_type = 'obis') AS obis
     FROM cde.datasets
-    WHERE ckan_id IS NOT NULL
+    WHERE ckan_id IS NOT NULL AND source_type IS DISTINCT FROM 'ckan'
     GROUP BY ckan_id
   `;
   const result = await db.raw(sql);
@@ -434,6 +435,7 @@ async function ckanMatchedBySource() {
            COUNT(*)::int       AS n_datasets,
            COUNT(ckan_id)::int AS n_matched
     FROM cde.datasets
+    WHERE source_type IS DISTINCT FROM 'ckan'
     GROUP BY erddap_url
     ORDER BY n_datasets DESC, erddap_url
   `;

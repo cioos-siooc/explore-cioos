@@ -49,6 +49,20 @@ const GRIDDAP_EXACT_TIME_DEPTH_COLUMNS = `d.coverage_time_min AS time_min,
 const GRIDDAP_FROM = `FROM cde.datasets d
         WHERE d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL`;
 
+// CKAN records no harvested dataset cites: listed like grids, from their
+// footprint, but never drawn as a layer, estimated or counted in day metrics.
+const CATALOGUE_FROM = `FROM cde.datasets d
+        WHERE d.source_type = 'ckan' AND d.coverage_bbox IS NOT NULL`;
+
+// Unlike a timeless grid, a record without a start date has no time range: its
+// NULL bounds fail any time filter. One without an end is ongoing.
+const CATALOGUE_TIME_DEPTH_COLUMNS = `d.coverage_time_min AS time_min,
+               CASE WHEN d.coverage_time_min IS NOT NULL
+                    THEN coalesce(d.coverage_time_max, 'infinity'::timestamptz)
+               END AS time_max,
+               coalesce(d.coverage_depth_min, 0) AS depth_min,
+               coalesce(d.coverage_depth_max, 0) AS depth_max`;
+
 // The loader can leave a dataset row with no features (all dropped, or
 // skipped upstream); /pointQuery never returns one, so a catalog total
 // counting it would read "N-1 / N".
@@ -56,7 +70,8 @@ const DATASET_HAS_FEATURES = `(EXISTS (SELECT 1 FROM cde.profiles p WHERE p.data
         OR EXISTS (SELECT 1 FROM cde.trajectory_hexes t
                    WHERE t.dataset_pk = d.pk AND t.hex_tier = ${FINE.tier})
         OR EXISTS (SELECT 1 FROM cde.obis_cells o WHERE o.dataset_pk = d.pk)
-        OR (d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL))`;
+        OR ((d.cdm_data_type = 'Grid' OR d.source_type = 'ckan')
+            AND d.coverage_bbox IS NOT NULL))`;
 
 // Only valid when createDBFilter's datasetLevelOnly holds: nothing else can
 // be answered from a per-(hex, dataset) row. Each sourceCond starts
@@ -87,6 +102,8 @@ module.exports = {
   GRIDDAP_TIME_DEPTH_COLUMNS,
   GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
+  CATALOGUE_FROM,
+  CATALOGUE_TIME_DEPTH_COLUMNS,
   DATASET_HAS_FEATURES,
   coarseRollupBranch,
   unionBranches,

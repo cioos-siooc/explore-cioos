@@ -2,6 +2,7 @@
 
     ckan_process()
 
+    - drops the catalogue records a harvested dataset now cites
     - updates datasets with data from CKAN
     - rewrites the organization table
 
@@ -10,6 +11,13 @@
 CREATE OR REPLACE FUNCTION ckan_process() RETURNS VOID AS $$
 BEGIN
 
+-- A catalogue record is shown through the ERDDAP/OBIS dataset citing it. The
+-- catalogue harvest skips cited records, but the citing load may land after it.
+DELETE FROM cde.datasets c
+WHERE c.source_type = 'ckan'
+  AND EXISTS (SELECT 1 FROM cde.datasets d
+              WHERE d.ckan_id = c.ckan_id
+                AND d.source_type IS DISTINCT FROM 'ckan');
 
 insert into cde.organizations (name)
 select distinct unnest(organizations) from cde.datasets ON CONFLICT DO NOTHING;

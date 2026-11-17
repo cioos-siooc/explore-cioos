@@ -25,6 +25,41 @@ test("grids join the union only when not estimating", async () => {
   assert.match(sql, GRIDDAP);
 });
 
+const CATALOGUE =
+  /WHERE d\.source_type = 'ckan' AND d\.coverage_bbox IS NOT NULL/;
+
+test("catalogue records join the list but never an estimate", async () => {
+  assert.match((await build({}, { doEstimate: false })).sql, CATALOGUE);
+  assert.doesNotMatch((await build({})).sql, CATALOGUE);
+});
+
+test("a scientific-name selection drops catalogue records, which carry no taxa", async () => {
+  const { sql } = await build(
+    { scientificNames: "Gadus morhua" },
+    { doEstimate: false, fetchAphiaIds: async () => [126436] },
+  );
+  assert.doesNotMatch(sql, CATALOGUE);
+});
+
+test("a catalogue record without a start date has no time range to pass a time filter", async () => {
+  const { sql } = await build({}, { doEstimate: false });
+  const branch = sql.slice(sql.lastIndexOf("SELECT d.pk AS dataset_pk"));
+  assert.match(branch, /d\.coverage_time_min AS time_min/);
+  assert.match(
+    branch,
+    /CASE WHEN d\.coverage_time_min IS NOT NULL\s+THEN coalesce\(d\.coverage_time_max, 'infinity'::timestamptz\)\s+END AS time_max/,
+  );
+});
+
+test("a catalogue record links only to its CKAN page and carries its footprint", async () => {
+  const { sql } = await build({}, { doEstimate: false });
+  assert.match(sql, /WHEN d\.source_type = 'ckan' THEN NULL/);
+  assert.match(
+    sql,
+    /CASE WHEN d\.cdm_data_type = 'Grid' OR d\.source_type = 'ckan'\s+THEN ST_AsGeoJSON/,
+  );
+});
+
 test("includeObis=false drops the obis arm and nothing else", async () => {
   const { sql } = await build({ includeObis: "false" });
   assert.doesNotMatch(sql, OBIS);

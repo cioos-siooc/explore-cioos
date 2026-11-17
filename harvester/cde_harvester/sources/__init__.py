@@ -1,5 +1,6 @@
 """Harvest sources: ``erddap`` (one per server URL), ``obis`` (one monolithic
-source) and ``ckan`` (metadata enrichment, not a BaseHarvester)."""
+source) and ``ckan`` (metadata enrichment of the others, plus the catalogue
+records none of them cite)."""
 
 import base64
 from urllib.parse import urlparse
@@ -7,11 +8,15 @@ from urllib.parse import urlparse
 # Spellings of the OBIS sentinel erddap_url (sources.obis.harvester.OBIS_SOURCE_URL)
 # so a dashboard caller needn't know it exactly.
 OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
+# Likewise sources.ckan.catalogue_records.CKAN_SOURCE_URL.
+CKAN_ALIASES = {
+    "ckan", "https://catalogue.cioos.ca", "http://catalogue.cioos.ca", "catalogue.cioos.ca",
+}
 
 
 def resolve_source(source, erddap_urls_list):
     """Resolve ``source`` (URL, hostname, dashboard slug or OBIS alias) to one
-    ERDDAP url or 'obis'; None when falsy (= full harvest).
+    ERDDAP url, 'obis' or 'ckan'; None when falsy (= full harvest).
 
     Raises ValueError unless exactly one source matches: a typo MUST hard-fail
     before any DB write, or an empty harvest could read as "no datasets".
@@ -28,6 +33,8 @@ def resolve_source(source, erddap_urls_list):
         pass
     if candidates & OBIS_ALIASES:
         return "obis"
+    if candidates & CKAN_ALIASES:
+        return "ckan"
 
     def _host(u):
         try:

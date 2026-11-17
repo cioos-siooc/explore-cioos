@@ -389,6 +389,42 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     );
   });
 
+  it("lists catalogue records last, under a header of their own that closes", async () => {
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={[
+          ...ROWS,
+          makeRow({
+            pk: 4,
+            title: "Aardvark record",
+            source_type: "ckan",
+            cdm_data_type: "Other",
+          }),
+        ]}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    const cards = await screen.findAllByTestId("dataset-card");
+    expect(
+      cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
+    ).toEqual([
+      "Alpha station",
+      "Beta station",
+      "Gamma grid",
+      "Aardvark record",
+    ]);
+
+    const header = screen.getByRole("button", {
+      name: /Catalogue records \(metadata only\)/,
+    });
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    await user.click(header);
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(ROWS.length);
+  });
+
   it("groups by data portal under ERDDAP and OBIS", async () => {
     const erddap = "https://erddap.ogsl.ca/erddap";
     const rows = [

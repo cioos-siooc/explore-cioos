@@ -1,3 +1,5 @@
+import { isFootprintOnly } from "./state/dataLayers.js";
+
 // Direct links to each dataset's source server. The ERDDAP query is
 // deliberately variable-less, returning every variable: a user following a
 // link to the source wants the source.
@@ -123,14 +125,14 @@ export function erddapServerBase(row) {
 }
 
 // Grids are skipped: griddap subsets by index ranges, so the map's filters
-// can't be carried into one. `unapplied` names each download filter the link
+// can't be carried into one. Catalogue records hold no data to link to. `unapplied` names each download filter the link
 // leaves out, for the card and the list to flag.
 export function buildDownloadLinks(rows, packageFormat, constraints = {}) {
   const byTime = Boolean(constraints.startDate || constraints.endDate);
   const byDepth =
     constraints.startDepth != null || constraints.endDepth != null;
   return (rows || [])
-    .filter((row) => row?.cdm_data_type !== "Grid")
+    .filter((row) => !isFootprintOnly(row))
     .map((row) => {
       const link = {
         pk: row.pk,

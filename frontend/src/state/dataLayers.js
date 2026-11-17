@@ -101,6 +101,13 @@ const TYPE_TO_KEY = new Map([
 
 // undefined when no switch governs it. griddapCoverageVisible is map
 // appearance, independent of this filter.
+// A CKAN record no harvested dataset cites: a footprint and metadata, no data.
+export const isCatalogueRecord = (row) => row?.source_type === "ckan";
+
+// Neither has map features, only a coverage footprint.
+export const isFootprintOnly = (row) =>
+  row?.cdm_data_type === "Grid" || isCatalogueRecord(row);
+
 export function dataLayerKeyForDataset(row) {
   return TYPE_TO_KEY.get(row.cdm_data_type);
 }

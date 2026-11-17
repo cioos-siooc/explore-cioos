@@ -163,7 +163,10 @@ def main():
 
     config = load_config(resolve_harvest_config_file(args.file))
     obis = resolve_obis_config(config)
-    configured = _configured_sources(config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery)
+    configured = _configured_sources(
+        config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery,
+        bool(config.get("ckan_catalogue")),
+    )
 
     with get_client(sync_client=True) as client:
         orphans = _read_orphans(client)
