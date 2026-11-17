@@ -16,6 +16,14 @@ export const LAYOUT_PARAM = "playout";
 export const COLOR_LAYOUT = "color";
 export const PANELS_LAYOUT = "panels";
 
+// How many rows /preview draws (see its `limit`), and the instant its window
+// ends at instead of the record's newest row (its `before`). Read by
+// SelectionProvider, because they change what is fetched.
+export const ROWS_PARAM = "prows";
+export const DEFAULT_ROW_LIMIT = 5000;
+export const ROW_LIMITS = [DEFAULT_ROW_LIMIT, 20000, 50000];
+export const BEFORE_PARAM = "pbefore";
+
 // `YYYY-MM-DD~YYYY-MM-DD` (inclusive UTC days), set when a trajectory pass is
 // plotted. Absent means the record's most recent data.
 export const PERIOD_PARAM = "pperiod";
@@ -27,6 +35,12 @@ export const TAB_PARAM = "tab";
 // `1` when the sidebar card (the list or a dataset page) is widened over the
 // map; absent is the sidebar.
 export const WIDE_PARAM = "wide";
+
+// Anything else in the address reads as the default, not as a request for it.
+export function parseRowLimit(value) {
+  const limit = Number(value);
+  return ROW_LIMITS.includes(limit) ? limit : DEFAULT_ROW_LIMIT;
+}
 
 export function parsePeriod(value) {
   const [start, end] = (value || "").split("~");
@@ -84,6 +98,10 @@ export function parsePeriod(value) {
 //                                  (default: none, meaning the window
 //                                  /preview returns on its own — every profile
 //                                  in the tail of the record at once)
+//   prows    how many rows are fetched, one of ROW_LIMITS
+//                                  (default: DEFAULT_ROW_LIMIT)
+//   pbefore  the instant the fetched window ends at, exclusive
+//                                  (default: none, the record's newest row)
 export const PLOT_PARAMS = [
   "vis",
   "pvars",
@@ -101,6 +119,8 @@ export const PLOT_PARAMS = [
   "pstack",
   "pyflip",
   STEP_PARAM,
+  ROWS_PARAM,
+  BEFORE_PARAM,
 ];
 
 // Never read back; kept only so old links don't leave orphans in the address

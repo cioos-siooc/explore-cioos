@@ -29,6 +29,10 @@ import {
   PANELS_LAYOUT,
   PLOT_PARAMS,
   STEP_PARAM,
+  ROWS_PARAM,
+  BEFORE_PARAM,
+  DEFAULT_ROW_LIMIT,
+  parseRowLimit,
 } from "../../../state/selection/previewParams.js";
 import {
   autoScaleNameFor,
@@ -84,10 +88,11 @@ const paramToList = (value) =>
         .map((name) => name.trim())
         .filter(Boolean);
 
-// The view (plot or table) and the profile drawn say WHICH data, not how it is
-// drawn, so a reset leaves them alone.
+// The view (plot or table), the profile drawn and the rows fetched say WHICH
+// data, not how it is drawn, so a reset leaves them alone.
+const DATA_PARAMS = new Set(["vis", STEP_PARAM, ROWS_PARAM, BEFORE_PARAM]);
 const RESETTABLE_PARAMS = PLOT_PARAMS.filter(
-  (param) => param !== "vis" && param !== STEP_PARAM,
+  (param) => !DATA_PARAMS.has(param),
 );
 
 const sameList = (a, b) =>
@@ -566,6 +571,20 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams],
   );
 
+  // How much of the record is fetched, and from where back. SelectionProvider
+  // reads the same params to build the fetch.
+  const rowLimit = parseRowLimit(searchParams.get(ROWS_PARAM));
+  const setRowLimit = useCallback(
+    (limit) =>
+      setParams({ [ROWS_PARAM]: limit === DEFAULT_ROW_LIMIT ? null : limit }),
+    [setParams],
+  );
+  const before = searchParams.get(BEFORE_PARAM) || null;
+  const setBefore = useCallback(
+    (instant) => setParams({ [BEFORE_PARAM]: instant }),
+    [setParams],
+  );
+
   // Changes with the axis set, so Plotly does not restore a zoom onto an axis
   // that no longer exists. A flipped Y counts too: a kept zoom would hold the
   // old direction's range.
@@ -638,6 +657,10 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setPlotType,
       step,
       setStep,
+      rowLimit,
+      setRowLimit,
+      before,
+      setBefore,
       uirevision,
       linkKey,
       plotCustomized,
@@ -691,6 +714,10 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setPlotType,
       step,
       setStep,
+      rowLimit,
+      setRowLimit,
+      before,
+      setBefore,
       uirevision,
       linkKey,
       plotCustomized,

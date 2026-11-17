@@ -193,6 +193,48 @@
   min-width: 88px;
 }
 
+/* Paging a window of the record, above the plot or table. */
+.previewWindowPager {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+}
+
+/* Above the table, at the same left edge it has over the plot. */
+.tableAndPlot > .previewWindowPager {
+  padding-bottom: var(--cioos-space-xs);
+}
+
+.previewWindowButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.previewWindowButton:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+}
+
+.previewWindowButton:disabled {
+  color: var(--cioos-ink-40);
+  cursor: default;
+}
+
+.previewWindowButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 /* Phones take the whole screen: the plot needs every pixel, and a framed
    dialog over the map leaves nothing to tap behind it anyway. */
 @media (max-width: 700px), (max-height: 500px) {

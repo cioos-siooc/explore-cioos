@@ -70,11 +70,11 @@ const DATASET = {
 // The colour plot is offered only for a record holding many profiles.
 const STATION = { ...DATASET, cdm_data_type: "TimeSeriesProfile" };
 
-function open(url = "/", dataset = DATASET, table = TABLE) {
+function open(url = "/", dataset = DATASET, table = TABLE, sample) {
   const user = userEvent.setup({ delay: null });
   renderWithProviders(
     <DatasetPreview
-      datasetPreview={{ table }}
+      datasetPreview={{ table, sample }}
       previewError={null}
       inspectDataset={dataset}
       inspectRecordID="record-1"
@@ -780,5 +780,37 @@ describe("DatasetPreviewPlot", () => {
     expect(screen.getByText("Plot type")).toBeVisible();
     expect(screen.getByRole("separator")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Plot settings" })).toBeNull();
+  });
+});
+
+describe("a window of the record", () => {
+  const TIMESERIES = { ...DATASET, cdm_data_type: "TimeSeries" };
+  const PARTIAL = { rowCount: 2, totalRowCount: 26131 };
+  const search = () => new URLSearchParams(window.location.search);
+
+  it("pages back from above the plot", async () => {
+    const user = open("/", TIMESERIES, TABLE, PARTIAL);
+    await plotted();
+    await user.click(screen.getByRole("button", { name: "Earlier" }));
+    expect(search().get("pbefore")).toBe("2024-01-01T00:00:00.000Z");
+  });
+
+  it("sets the row count in the parameters pane, writing only a non-default one", async () => {
+    const user = open("/", TIMESERIES, TABLE, PARTIAL);
+    await plotted();
+    const rows = within(screen.getByTestId("preview-row-limit"));
+    await user.click(rows.getByRole("button", { name: "20,000" }));
+    expect(search().get("prows")).toBe("20000");
+    await user.click(rows.getByRole("button", { name: "5,000" }));
+    expect(search().get("prows")).toBeNull();
+  });
+
+  it("offers neither when the rows are the whole record", async () => {
+    open("/", TIMESERIES, TABLE, { rowCount: 2, totalRowCount: 2 });
+    await plotted();
+    expect(
+      screen.queryByRole("button", { name: "Earlier" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("preview-row-limit")).not.toBeInTheDocument();
   });
 });

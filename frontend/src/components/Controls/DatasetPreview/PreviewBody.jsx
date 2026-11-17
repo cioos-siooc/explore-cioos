@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
 import { usePreviewPlot } from "./PreviewPlotProvider.jsx";
+import PreviewWindowPager from "./PreviewWindowPager.jsx";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
 import { PREVIEW_ERROR } from "./previewErrors.js";
 import {
@@ -146,12 +147,15 @@ export default function PreviewBody({
 
   if (selectedVis === "table") {
     return (
-      <DatasetPreviewTable
-        datasetPreview={datasetPreview}
-        data={rows}
-        variables={variables}
-        availableHeight={availableHeight}
-      />
+      <>
+        <PreviewWindowPager />
+        <DatasetPreviewTable
+          datasetPreview={datasetPreview}
+          data={rows}
+          variables={variables}
+          availableHeight={availableHeight}
+        />
+      </>
     );
   }
 

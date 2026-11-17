@@ -27,6 +27,7 @@ import VariableColorPicker from "./VariableColorPicker.jsx";
 import ColorScalePicker from "./ColorScalePicker.jsx";
 import ColorScaleLegend from "./ColorScaleLegend.jsx";
 import ProfileSlice from "./ProfileSlice.jsx";
+import PreviewWindowPager from "../DatasetPreview/PreviewWindowPager.jsx";
 import "./styles.css";
 
 import Plotly from "./previewPlotly.js";
@@ -84,6 +85,7 @@ import {
   PLOT_MODES,
 } from "../DatasetPreview/usePreviewPlotParams.js";
 import { usePreviewPlot } from "../DatasetPreview/PreviewPlotProvider.jsx";
+import { ROW_LIMITS } from "../../../state/selection/previewParams.js";
 
 const PARAMS_PANE_ID = "datasetPreviewParamsPane";
 const SETTINGS_TITLE_ID = "datasetPreviewSettingsTitle";
@@ -154,6 +156,9 @@ export default function DatasetPreviewPlot() {
     profiles,
     step,
     setStep,
+    previewWindow,
+    rowLimit,
+    setRowLimit,
     customLabels,
     setCustomLabels,
     uirevision,
@@ -855,6 +860,21 @@ export default function DatasetPreviewPlot() {
         </>
       )}
 
+      {previewWindow.offersRows && (
+        <ControlRow caption={t("previewWindowRows")} startsGroup>
+          <SegmentedToggle
+            label={t("previewWindowRows")}
+            data-testid="preview-row-limit"
+            options={ROW_LIMITS.map((limit) => ({
+              value: String(limit),
+              label: limit.toLocaleString(i18n.language),
+            }))}
+            value={String(rowLimit)}
+            onChange={(value) => setRowLimit(Number(value))}
+          />
+        </ControlRow>
+      )}
+
       <button
         type="button"
         className="labelEditorToggle"
@@ -1040,6 +1060,8 @@ export default function DatasetPreviewPlot() {
         <div
           className={`datasetPreviewPlotBody ${pinnedLeft ? "isPinnedLeft" : "isPinnedBelow"}`}
         >
+          {/* Over the figure's top-left corner, which a plot rarely uses. */}
+          <PreviewWindowPager />
           <div
             className="datasetPreviewPlotArea"
             ref={plotAreaRef}

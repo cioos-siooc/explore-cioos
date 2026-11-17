@@ -16,9 +16,12 @@ import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import usePreviewProfiles from "./usePreviewProfiles.js";
-import { previewSampleFor } from "./previewSample.js";
+import { previewSampleFor, previewWindowFor } from "./previewSample.js";
 import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
-import { COLOR_LAYOUT } from "../../../state/selection/previewParams.js";
+import {
+  COLOR_LAYOUT,
+  DEFAULT_ROW_LIMIT,
+} from "../../../state/selection/previewParams.js";
 import "./styles.css";
 
 const NO_CUSTOM_LABELS = {};
@@ -60,7 +63,15 @@ export default function DatasetPreview({
     datasetPreview?.table,
     rows,
   );
-  const { selectedVis, setSelectedVis, linkKey, plotLayout, step } = plotParams;
+  const {
+    selectedVis,
+    setSelectedVis,
+    linkKey,
+    plotLayout,
+    step,
+    before,
+    rowLimit,
+  } = plotParams;
 
   // Fetched separately from the rows and independent of them: a record whose
   // list fails simply gets no slider.
@@ -69,6 +80,8 @@ export default function DatasetPreview({
     inspectRecordID,
   );
 
+  const drawsOneProfile =
+    plotLayout !== COLOR_LAYOUT && Boolean(step || profiles.current);
   // Said beside the title, so the table and both plot layouts all say it.
   const sample = useMemo(
     () =>
@@ -76,10 +89,30 @@ export default function DatasetPreview({
         sample: datasetPreview?.sample,
         rows,
         profiles,
-        drawsOneProfile:
-          plotLayout !== COLOR_LAYOUT && Boolean(step || profiles.current),
+        drawsOneProfile,
       }),
-    [datasetPreview, rows, profiles, plotLayout, step],
+    [datasetPreview, rows, profiles, drawsOneProfile],
+  );
+  // Shared by the pager above the plot or table and the row count in the
+  // parameters pane.
+  const previewWindow = useMemo(
+    () =>
+      previewWindowFor({
+        sample: datasetPreview?.sample,
+        rows,
+        drawsOneProfile,
+        hasPeriod: Boolean(inspectRecordPeriod),
+        before,
+        rowLimitChanged: rowLimit !== DEFAULT_ROW_LIMIT,
+      }),
+    [
+      datasetPreview,
+      rows,
+      drawsOneProfile,
+      inspectRecordPeriod,
+      before,
+      rowLimit,
+    ],
   );
   const formatCount = (count) => count.toLocaleString(i18n.language);
 
@@ -124,6 +157,7 @@ export default function DatasetPreview({
       inspectDataset,
       inspectRecordID,
       profiles,
+      previewWindow,
       customLabels,
       setCustomLabels,
       paneWidth,
@@ -139,6 +173,7 @@ export default function DatasetPreview({
       inspectDataset,
       inspectRecordID,
       profiles,
+      previewWindow,
       customLabels,
       paneWidth,
       paneCollapsed,

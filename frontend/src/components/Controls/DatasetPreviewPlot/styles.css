@@ -107,6 +107,18 @@
   padding-left: 32px;
 }
 
+/* Floats over the plot's top-left corner, clear of the pane toggle there. */
+.datasetPreviewPlotBody > .previewWindowPager {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+}
+
+.isPaneHidden .datasetPreviewPlotBody > .previewWindowPager {
+  left: 32px;
+}
+
 .paneCollapseToggle:hover {
   background-color: var(--cioos-surface-2);
   color: var(--cioos-primary-800);
@@ -481,6 +493,7 @@
 /* The scroller and the pinned shared axis beside it: below a stack, left of a
  * profile — the edge whose axis would otherwise scroll out of view. */
 .datasetPreviewPlotBody {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;

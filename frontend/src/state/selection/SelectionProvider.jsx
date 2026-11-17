@@ -34,6 +34,10 @@ import {
   COLOR_LAYOUT,
   LAYOUT_PARAM,
   PERIOD_PARAM,
+  BEFORE_PARAM,
+  DEFAULT_ROW_LIMIT,
+  ROWS_PARAM,
+  parseRowLimit,
   RECORD_PARAM,
   STEP_PARAM,
   TAB_PARAM,
@@ -397,6 +401,7 @@ export default function SelectionProvider({ children }) {
           // the next station names a cast that station never took, and
           // /preview answers NO_DATA for it.
           next.delete(STEP_PARAM);
+          next.delete(BEFORE_PARAM);
           if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
           else next.delete(PERIOD_PARAM);
           return next;
@@ -695,6 +700,12 @@ export default function SelectionProvider({ children }) {
   const inspectRecordStep = inspectAllProfiles
     ? undefined
     : searchParams.get(STEP_PARAM) || undefined;
+  const inspectRowLimit = parseRowLimit(searchParams.get(ROWS_PARAM));
+  // A step or a period already says which rows; /preview would ignore it.
+  const inspectBefore =
+    inspectRecordStep || inspectRecordPeriod
+      ? undefined
+      : searchParams.get(BEFORE_PARAM) || undefined;
 
   useEffect(() => {
     if (!inspectDatasetId || !inspectRecordID) return;
@@ -707,6 +718,10 @@ export default function SelectionProvider({ children }) {
         ? `&at=${encodeURIComponent(inspectRecordStep)}`
         : "") +
       (inspectAllProfiles ? "&allProfiles=true" : "") +
+      (inspectRowLimit !== DEFAULT_ROW_LIMIT
+        ? `&limit=${inspectRowLimit}`
+        : "") +
+      (inspectBefore ? `&before=${encodeURIComponent(inspectBefore)}` : "") +
       (inspectRecordPeriod
         ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
         : "");
@@ -764,6 +779,8 @@ export default function SelectionProvider({ children }) {
     inspectRecordStep,
     inspectAllProfiles,
     inspectRecordPeriod,
+    inspectRowLimit,
+    inspectBefore,
     previewAttempt,
   ]);
 

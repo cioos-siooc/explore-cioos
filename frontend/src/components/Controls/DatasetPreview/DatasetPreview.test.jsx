@@ -347,4 +347,67 @@ describe("DatasetPreview", () => {
       expect(screen.getByText("Sample: 3 of 1,500 rows")).toBeInTheDocument();
     });
   });
+
+  // The plot is a stand-in here, so these go through the Table view; the
+  // plot's own header and pane are covered in DatasetPreviewPlot.test.jsx.
+  describe("paging a window of the record from the table", () => {
+    const TIMESERIES_TABLE = {
+      columnNames: ["time", "temperature"],
+      columnTypes: ["String", "float"],
+      columnUnits: ["UTC", "degree_C"],
+      rows: [
+        ["2024-03-01T12:00:00Z", 10],
+        ["2024-03-01T06:00:00Z", 9],
+      ],
+    };
+    const TIMESERIES = { ...DATASET, cdm_data_type: "TimeSeries" };
+    const openWindow = ({ url = "/?vis=table", ...options } = {}) =>
+      open({ table: TIMESERIES_TABLE, dataset: TIMESERIES, url, ...options });
+    const search = () => new URLSearchParams(window.location.search);
+    const earlier = () => screen.queryByRole("button", { name: "Earlier" });
+
+    it("offers nothing when the rows are the whole record", () => {
+      openWindow({ sample: { rowCount: 2, totalRowCount: 2 } });
+      expect(earlier()).not.toBeInTheDocument();
+    });
+
+    it("pages back from the earliest row shown, then back to the latest", async () => {
+      const { user } = openWindow({
+        sample: { rowCount: 2, totalRowCount: 26131 },
+      });
+      await user.click(earlier());
+      expect(search().get("pbefore")).toBe("2024-03-01T06:00:00.000Z");
+
+      await user.click(await screen.findByRole("button", { name: "Latest" }));
+      expect(search().get("pbefore")).toBeNull();
+    });
+
+    it("stops at the start of the record", () => {
+      openWindow({
+        url: "/?vis=table&pbefore=2024-03-02T00:00:00.000Z",
+        sample: { rowCount: 2, totalRowCount: 26131, startOfRecord: true },
+      });
+      expect(earlier()).toBeDisabled();
+    });
+
+    it("does not page a period, whose window is fixed", () => {
+      renderWithProviders(
+        <DatasetPreview
+          datasetPreview={{
+            table: TIMESERIES_TABLE,
+            sample: { rowCount: 2, totalRowCount: 900 },
+          }}
+          inspectDataset={TIMESERIES}
+          inspectRecordID="record-1"
+          inspectRecordPeriod={{ start: "2024-03-01", end: "2024-03-02" }}
+          setInspectRecordID={vi.fn()}
+          showModal
+          recordLoading={false}
+          setRecordLoading={vi.fn()}
+        />,
+        { url: "/?vis=table" },
+      );
+      expect(earlier()).not.toBeInTheDocument();
+    });
+  });
 });
