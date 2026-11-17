@@ -108,12 +108,12 @@ test("each orientation reserves the edge its labels actually use", () => {
 });
 
 test("the pinned strip reserves the room the figure gave up", () => {
-  // Its tick labels, then the title: one line along a left axis, two under a
+  // Its tick labels, then the title's two lines, beside a left axis or under a
   // bottom one.
   assert.equal(PINNED_AXIS_LINES, 2);
-  assert.equal(pinnedAxisSizeFor(COLUMNS), TICK_ROOM_PX + LABEL_LINE_PX);
-  assert.equal(pinnedAxisSizeFor(COLUMNS), 72);
-  assert.equal(pinnedAxisSizeFor(ROWS), 76);
+  assert.equal(pinnedAxisSizeFor(COLUMNS), TICK_ROOM_PX + 2 * LABEL_LINE_PX);
+  assert.equal(pinnedAxisSizeFor(COLUMNS), 88);
+  assert.equal(pinnedAxisSizeFor(ROWS), 68);
 });
 
 test("a profile's top margin pays for every line of its panel titles", () => {

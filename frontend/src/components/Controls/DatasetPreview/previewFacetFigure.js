@@ -25,7 +25,7 @@ import { colorGridFor } from "./previewColorGrid.js";
 import {
   axisLabelFor,
   ellipsize,
-  inlineLabel,
+  sideLabel,
   maxCharsFor,
   titleLinesFor,
   wrapLabel,
@@ -358,15 +358,46 @@ const columnHeaderFor = (text, domain, labelFont) => ({
   font: { size: labelFont },
 });
 
+// Room for one rank label laid flat across an X axis. Crowded closer, Plotly
+// turns them on their side, where a two-line label runs into the axis title
+// and out of a pinned strip.
+const RANK_TICK_PX = 80;
+
+// A rank has no quantity to tick at: every label is named by the caller, and
+// Plotly's own round numbers would be positions nobody sampled. Across an X
+// axis of known length they are thinned to what lies flat, the first and last
+// labelled ones always kept; a tick with no label (a row with no position)
+// would only spend a place.
+export function rankTicksFor(ticks, letter, lengthPx) {
+  if (!ticks) return {};
+  const labelled = ticks.tickvals
+    .map((value, index) => ({ value, text: ticks.ticktext[index] }))
+    .filter(({ text }) => text);
+  const count = labelled.length;
+  const fits =
+    letter === "x" && lengthPx > 0
+      ? Math.max(2, Math.floor(lengthPx / RANK_TICK_PX))
+      : count;
+  const kept =
+    count <= fits
+      ? labelled
+      : Array.from(
+          { length: fits },
+          (_, index) =>
+            labelled[Math.round((index * (count - 1)) / (fits - 1))],
+        );
+  return {
+    tickmode: "array",
+    tickvals: kept.map(({ value }) => value),
+    ticktext: kept.map(({ text }) => text),
+  };
+}
+
 // The rank axis of a track: ticks named by the caller, and the place each row
 // is in the hover.
-const positionTicksFor = (position, columnName) =>
+const positionTicksFor = (position, columnName, letter, lengthPx) =>
   position && position.column === columnName
-    ? {
-        tickmode: "array",
-        tickvals: position.ticks.tickvals,
-        ticktext: position.ticks.ticktext,
-      }
+    ? rankTicksFor(position.ticks, letter, lengthPx)
     : {};
 
 // title.automargin deliberately unset: it would grow the margin inside a fixed
@@ -544,15 +575,7 @@ export function buildFigure({
   }
 
   const sharedTitle = titleFor(sharedAxis);
-  // A rank has no quantity to tick at: every label is named by the caller, and
-  // Plotly's own round numbers would be positions nobody sampled.
-  const tickOverride = sharedTicks
-    ? {
-        tickmode: "array",
-        tickvals: sharedTicks.tickvals,
-        ticktext: sharedTicks.ticktext,
-      }
-    : {};
+  const tickOverride = rankTicksFor(sharedTicks, sharedLetter, plottingWidth);
 
   layout[`${sharedLetter}axis`] = {
     ...AXIS_LINE,
@@ -785,13 +808,11 @@ export function buildOverlayFigure({
     zeroline: false,
     gridcolor: OVERLAY_GRID_COLOR,
     ...sharedAxisSpike,
-    ...(sharedTicks
-      ? {
-          tickmode: "array",
-          tickvals: sharedTicks.tickvals,
-          ticktext: sharedTicks.ticktext,
-        }
-      : {}),
+    ...rankTicksFor(
+      sharedTicks,
+      sharedLetter,
+      plottingWidth * (plotDomain[1] - plotDomain[0]),
+    ),
     unifiedhovertitle: { text: hoverLine(sharedAxis, `%{${sharedLetter}}`) },
     ...(sharedLetter === "y" && reversedYAxes.has(sharedAxis)
       ? { autorange: "reversed" }
@@ -987,7 +1008,12 @@ export function buildGridFigure({
       automargin: true,
       zeroline: false,
       ...(matches ? { matches } : {}),
-      ...positionTicksFor(position, xAxis),
+      ...positionTicksFor(
+        position,
+        xAxis,
+        "x",
+        plottingWidth * (domain[1] - domain[0]),
+      ),
       title: axisTitle(
         wrapAlong(
           titleFor(xAxis),
@@ -1006,10 +1032,10 @@ export function buildGridFigure({
       anchor: "x",
       automargin: true,
       zeroline: false,
-      ...positionTicksFor(position, yAxis),
+      ...positionTicksFor(position, yAxis, "y"),
       ...(reversedYAxes.has(yAxis) ? { autorange: "reversed" } : {}),
       title: axisTitle(
-        inlineLabel(
+        sideLabel(
           titleFor(yAxis),
           maxCharsFor(plottingHeight * (domain[1] - domain[0]), labelFont),
         ),
@@ -1239,12 +1265,17 @@ export function buildColorFigure({
       domain,
       anchor: axisRef("y", rowCount - 1), // the bottom row
       ...(column === 0 && sharedTicks
-        ? {
-            tickmode: "array",
-            tickvals: sharedTicks.tickvals,
-            ticktext: sharedTicks.ticktext,
-          }
-        : positionTicksFor(position, columnName)),
+        ? rankTicksFor(
+            sharedTicks,
+            "x",
+            plottingWidth * (domain[1] - domain[0]),
+          )
+        : positionTicksFor(
+            position,
+            columnName,
+            "x",
+            plottingWidth * (domain[1] - domain[0]),
+          )),
       title: axisTitle(
         wrapAlong(
           titleFor(columnName),
@@ -1313,7 +1344,7 @@ export function buildColorFigure({
         ...(row >= yAxes.length ? { matches: axisRef("y", yIndex) } : {}),
         ...(isReversed(yColumn, yIndex) ? { autorange: "reversed" } : {}),
         title: axisTitle(
-          inlineLabel(
+          sideLabel(
             titleFor(yColumn),
             maxCharsFor(plottingHeight * spanOf(domain), labelFont),
           ),

@@ -6,15 +6,15 @@
 
 // Every label is drawn at this size explicitly, rather than at Plotly's default
 // for an axis title, which is what lets maxCharsFor predict how wide a label
-// will render. Half again the ticks, so a label reads as the heading of its
-// numbers.
-export const LABEL_FONT_PX = 18;
+// will render. A quarter again the ticks, so a label reads as the heading of
+// its numbers, and below the figure's title, which heads them all.
+export const LABEL_FONT_PX = 15;
 // On a phone the panels are narrow and the label's lines come out of the plot.
-export const MOBILE_LABEL_FONT_PX = 14;
+export const MOBILE_LABEL_FONT_PX = 13;
 export const MOBILE_LABEL_LINES = 2;
 export const TICK_FONT_PX = 12;
-export const HOVER_FONT_PX = 12; // the hover box is read, not scanned: not tick-sized
-export const TITLE_FONT_PX = 14;
+export const HOVER_FONT_PX = 13; // the hover box is read, not scanned: not tick-sized
+export const TITLE_FONT_PX = 18;
 export const MAX_TITLE_LINES = 2;
 
 // The app's body face and ink (--cioos-font-body, --cioos-ink-80) rather than
@@ -29,6 +29,9 @@ export const PLOT_FONT = {
 // underestimating puts two panel titles on top of each other.
 const CHAR_PX_PER_FONT_PX = 0.62;
 export const MAX_LABEL_LINES = 3;
+// A label along a vertical axis: every line costs the margin a line's width,
+// so it gets two, and the name gives way before the unit does.
+export const SIDE_LABEL_LINES = 2;
 
 // labelFor writes "long_name (unit)", and the unit group is both the tail of
 // every label and the part that collides first, so it gets its own line.
@@ -96,24 +99,13 @@ export function wrapLabel(text, maxChars, maxLines = MAX_LABEL_LINES) {
   return [...lines, ...(unit ? [unit] : [])].join("<br>");
 }
 
-/**
- * One line, for a title running along a vertical axis: there the margin pays
- * for every extra line, while length along the axis is cheap. The name is cut
- * short so the unit always fits — the same reason wrapLabel keeps it.
- */
-export function inlineLabel(text, maxChars) {
-  const label = (text || "").trim();
-  if (!maxChars || label.length <= maxChars) return label;
-  const match = label.match(UNIT_SUFFIX);
-  if (!match) return ellipsize(label, maxChars);
-  const unit = match[0].trim();
-  const name = label.slice(0, match.index).trim();
-  return `${ellipsize(name, Math.max(1, maxChars - unit.length - 1))} ${unit}`;
-}
+// A title running along a vertical axis, held to the lines its margin keeps.
+export const sideLabel = (text, maxChars) =>
+  wrapLabel(text, maxChars, SIDE_LABEL_LINES);
 
 export function axisLabelFor(letter, text, maxChars, maxLines) {
   return letter === "y"
-    ? inlineLabel(text, maxChars)
+    ? sideLabel(text, maxChars)
     : wrapLabel(text, maxChars, maxLines);
 }
 

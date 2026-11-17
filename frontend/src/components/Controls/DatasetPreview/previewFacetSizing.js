@@ -10,12 +10,14 @@ import {
   LABEL_FONT_PX,
   MAX_LABEL_LINES,
   MAX_TITLE_LINES,
+  SIDE_LABEL_LINES,
+  TITLE_FONT_PX,
 } from "./previewLabelText.js";
 
 // Above a profile's panels: their tick labels and the title standoff. The panel
 // titles' own lines are added per line, so they never reach the figure title.
 export const TOP_TICK_ROOM_PX = 32;
-// A label's line at Plotly's LINE_SPACING of 1.3: 18px is 23.4, so 24. Every
+// A label's line at Plotly's LINE_SPACING of 1.3: 15px is 19.5, so 20. Every
 // margin a label sits in is counted in these, so a phone's smaller labels
 // (MOBILE_LABEL_FONT_PX) buy back the room around them; each margin function
 // takes the `labelFont` the figure is drawn with.
@@ -23,11 +25,20 @@ export const labelLineFor = (labelFont = LABEL_FONT_PX) =>
   Math.ceil(labelFont * 1.3);
 export const LABEL_LINE_PX = labelLineFor();
 
-// Left of every vertical axis: room for its tick labels, then one line for the
-// axis's own label, which runs along the axis with its unit inline (axisLabelFor).
-// Reserved by a stack's margin and by a profile's pinned strip.
+// A profile's pinned strip, left of its panels: room for the widest tick
+// labels, then every line its title may wrap to (axisLabelFor). Fixed, because
+// nothing inside the strip may push it.
 export const TICK_ROOM_PX = 48;
-const sideAxisRoomFor = (labelFont) => TICK_ROOM_PX + labelLineFor(labelFont);
+const pinnedSideRoomFor = (labelFont) =>
+  TICK_ROOM_PX + SIDE_LABEL_LINES * labelLineFor(labelFont);
+
+// Left of a vertical axis the figure keeps: room for short tick labels and a
+// one-line title to start from, which Plotly's automargin grows to whatever the
+// drawn axis turns out to need. Reserving the worst case instead left a blank
+// band beside every short label.
+const SHORT_TICK_ROOM_PX = 28;
+const sideAxisRoomFor = (labelFont) =>
+  SHORT_TICK_ROOM_PX + labelLineFor(labelFont);
 
 // Right of every figure: Plotly's toolbar runs down that edge, its buttons 40px
 // wide on a touch screen (DatasetPreviewPlot/styles.css), and would sit on the
@@ -49,7 +60,7 @@ const bottomAxisRoomFor = (labelFont) =>
 
 export function pinnedAxisSizeFor(orientation, labelFont) {
   return orientation === COLUMNS
-    ? sideAxisRoomFor(labelFont)
+    ? pinnedSideRoomFor(labelFont)
     : bottomAxisRoomFor(labelFont);
 }
 
@@ -74,9 +85,8 @@ const ROWS_MARGIN = {
 // its sideways title.
 export const COLORBAR_ROOM_PX = 96;
 
-// 14px at Plotly's LINE_SPACING of 1.3 is 18.2; 19 buys a pixel of clearance
-// rather than spending one.
-const TITLE_LINE_PX = 19;
+// TITLE_FONT_PX at Plotly's LINE_SPACING of 1.3, rounded up.
+const TITLE_LINE_PX = Math.ceil(TITLE_FONT_PX * 1.3);
 export const TITLE_PAD_PX = 10;
 
 // Nothing at all when there is no title — a record whose columns carry no
@@ -90,10 +100,6 @@ export function titleRoomFor(lineCount) {
  * for labels they cannot measure; buildFigure passes the counts it wrapped to.
  * `panelTitleLines` only counts for a profile, whose panel titles are on top.
  */
-// A shared axis the figure keeps rather than pinning (`pinned` false): room
-// for short tick labels and a one-line title to start from, which Plotly's
-// automargin grows to whatever the drawn axis turns out to need.
-const SHORT_TICK_ROOM_PX = 28;
 const SHORT_BOTTOM_TICK_ROOM_PX = 22;
 
 export function marginFor(
@@ -115,7 +121,7 @@ export function marginFor(
   }
   return {
     ...COLUMNS_MARGIN,
-    ...(pinned ? {} : { l: SHORT_TICK_ROOM_PX + labelLineFor(labelFont) }),
+    ...(pinned ? {} : { l: sideAxisRoomFor(labelFont) }),
     t:
       COLUMNS_MARGIN.t +
       panelTitleLines * labelLineFor(labelFont) +

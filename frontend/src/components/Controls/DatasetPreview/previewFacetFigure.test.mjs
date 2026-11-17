@@ -13,6 +13,7 @@ import {
   buildFigure,
   TICK_SPACING_PX,
   buildGridFigure,
+  rankTicksFor,
   buildOverlayFigure,
   gridBoxFor,
   plotBoxFor,
@@ -279,7 +280,7 @@ test("every stacked panel is titled on its own y axis", () => {
   }
 });
 
-test("a vertical axis title fits its own panel's height on one line once it is known", () => {
+test("a vertical axis title fits its own panel's height in two lines once it is known", () => {
   const size = { width: 900, height: 1300 };
   const { layout } = figure("TimeSeries", ALL_SIX, { size });
   const margin = marginFor(ROWS, 1);
@@ -290,11 +291,16 @@ test("a vertical axis title fits its own panel's height on one line once it is k
       layout[index === 0 ? "yaxis" : `yaxis${index + 1}`].title.text,
   );
   titles.forEach((text) => {
-    assert.ok(!text.includes("<br>"), text);
-    assert.ok(text.length <= fits, `"${text}" (${text.length} > ${fits})`);
+    const lines = text.split("<br>");
+    assert.ok(lines.length <= 2, text);
+    lines
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
+      .forEach((line) =>
+        assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`),
+      );
   });
   assert.ok(
-    titles.some((text) => text.includes("…")),
+    titles.some((text) => text.includes("<br>")),
     titles.join(" | "),
   );
   // Unmeasured, nothing is cut.
@@ -315,10 +321,10 @@ test("a profile titles its panels on top and its shared axis beside them", () =>
   assert.ok(layout.yaxis.title.text);
 });
 
-test("labels are twice the ticks, at the size the wrap estimate assumes", () => {
+test("labels head their ticks and the title heads the labels, at the size the wrap estimate assumes", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
   assert.equal(layout.font.size, TICK_FONT_PX);
-  assert.equal(LABEL_FONT_PX, 2 * TICK_FONT_PX);
+  assert.ok(TICK_FONT_PX < LABEL_FONT_PX && LABEL_FONT_PX < TITLE_FONT_PX);
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
   assert.equal(layout.yaxis.title.font.size, LABEL_FONT_PX);
 });
@@ -1274,13 +1280,13 @@ const LONG_NAME =
   "a renamed axis whose label keeps going well past any line it could fit on";
 const lineCount = (text) => text.split("<br>").length;
 
-test("a profile's shared title fits its pinned strip: one line, unit kept", () => {
+test("a profile's shared title fits its pinned strip: two lines, unit kept", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
     labels: { depth: LONG_NAME },
     size: { width: 600, height: 400 },
   });
-  assert.equal(lineCount(layout.yaxis.title.text), 1);
-  assert.match(layout.yaxis.title.text, /… \(m\)$/);
+  assert.equal(lineCount(layout.yaxis.title.text), 2);
+  assert.ok(layout.yaxis.title.text.endsWith("<br>(m)"));
 });
 
 test("a colour plot's X title fits its pinned strip: two lines, unit kept", () => {
@@ -1569,8 +1575,29 @@ test("an unpinned figure keeps its shared axis, starting from a small margin", (
   });
   assert.notEqual(pinned.pinnable, false);
   assert.equal(kept.pinnable, false);
-  // Room for short ticks and the title; automargin grows it from there.
+  // Room for short ticks and the title; automargin grows it from there, the
+  // same floor every vertical axis the figure keeps starts from.
   assert.ok(kept.layout.margin.l > pinned.layout.margin.l);
-  assert.ok(kept.layout.margin.l < marginFor(ROWS, 0).l);
+  assert.equal(kept.layout.margin.l, marginFor(ROWS, 0).l);
   assert.equal(kept.layout.yaxis.automargin, true);
+});
+
+// --- rank ticks --------------------------------------------------------------
+
+test("rank ticks thin to what lies flat across an X axis, keeping both ends", () => {
+  const ticks = {
+    tickvals: [0, 1, 2, 3, 4, 5, 6, 7],
+    ticktext: ["a", "b", "c", "d", "e", "f", "g", ""],
+  };
+  // The unlabelled last tick is dropped, so "g" is the end kept.
+  assert.deepEqual(rankTicksFor(ticks, "x", 240), {
+    tickmode: "array",
+    tickvals: [0, 3, 6],
+    ticktext: ["a", "d", "g"],
+  });
+  assert.equal(rankTicksFor(ticks, "x", 2000).tickvals.length, 7);
+  // Unmeasured, or along Y where labels stack, nothing is thinned.
+  assert.equal(rankTicksFor(ticks, "x", 0).tickvals.length, 7);
+  assert.equal(rankTicksFor(ticks, "y", 240).tickvals.length, 7);
+  assert.deepEqual(rankTicksFor(null, "x", 240), {});
 });

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  inlineLabel,
+  sideLabel,
   maxCharsFor,
   titleLinesFor,
   wrapLabel,
@@ -89,14 +89,24 @@ test("the title wraps at the line cap rather than overflowing the figure", () =>
   assert.ok(titleLinesFor(TITLE, 1140) < titleLinesFor(TITLE, 400));
 });
 
-test("inlineLabel keeps one line and the whole unit, cutting the name", () => {
-  assert.equal(inlineLabel("Depth (m)", 20), "Depth (m)");
-  const cut = inlineLabel("Sea Water Practical Salinity (PSS-78)", 20);
-  assert.equal(cut, "Sea Water… (PSS-78)");
-  assert.ok(cut.length <= 20);
-  assert.equal(inlineLabel("Sea Water Practical Salinity", 12), "Sea Water P…");
+test("sideLabel takes a second line before cutting, and keeps the whole unit", () => {
+  assert.equal(sideLabel("Depth (m)", 20), "Depth (m)");
+  // The name gets the whole first line, the unit the second.
   assert.equal(
-    inlineLabel("Sea Water Practical Salinity (PSS-78)", 0),
+    sideLabel("Sea Water Practical Salinity (PSS-78)", 30),
+    "Sea Water Practical Salinity<br>(PSS-78)",
+  );
+  assert.equal(
+    sideLabel("Sea Water Practical Salinity (PSS-78)", 20),
+    "Sea Water Practical…<br>(PSS-78)",
+  );
+  // Without a unit, the name has both lines.
+  assert.equal(
+    sideLabel("Sea Water Practical Salinity", 12),
+    "Sea Water<br>Practical S…",
+  );
+  assert.equal(
+    sideLabel("Sea Water Practical Salinity (PSS-78)", 0),
     "Sea Water Practical Salinity (PSS-78)",
   );
 });

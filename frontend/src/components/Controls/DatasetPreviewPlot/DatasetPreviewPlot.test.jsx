@@ -297,7 +297,7 @@ describe("DatasetPreviewPlot", () => {
       document.querySelector(".datasetPreviewPlotArea").contains(strip),
     ).toBe(false);
     expect(strip.parentElement).toHaveClass("isPinnedLeft");
-    expect(strip).toHaveStyle({ width: "72px" });
+    expect(strip).toHaveStyle({ width: "88px" });
   });
 
   it("pins a stack's shared axis below the scroller", async () => {
@@ -305,7 +305,7 @@ describe("DatasetPreviewPlot", () => {
     await plotted();
     const strip = document.querySelector(".pinnedAxis");
     expect(strip.parentElement).toHaveClass("isPinnedBelow");
-    expect(strip).toHaveStyle({ height: "76px" });
+    expect(strip).toHaveStyle({ height: "68px" });
   });
 
   it("names a record of many casts in a header row above the figure", async () => {
