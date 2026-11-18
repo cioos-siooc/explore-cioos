@@ -24,8 +24,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 
-# The harvest config is deliberately NOT baked in; it arrives at runtime (see
-# cde_harvester/core/config.py:resolve_harvest_config_file).
+# Every committed config under its own name, so a merged edit ships on the next
+# build. HARVEST_CONFIG_FILE picks one; HARVEST_CONFIG_B64 overrides them all
+# (see cde_harvester/core/config.py:resolve_harvest_config_file).
+COPY ./harvest_config.*.yaml ./
+ENV HARVEST_CONFIG_FILE=/app/harvester/harvest_config.production.yaml
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
 # For the "Rebuild Database" flow (cde_harvester/core/schema.py).

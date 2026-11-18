@@ -102,20 +102,25 @@ More in the [harvester README](harvester/README.md) and the
 
 ### Harvest configuration
 
-`harvest_config.yaml` is never baked into the image. The worker reads it at
-startup and again at the start of every flow run, from the first of:
+The worker image bakes every committed `harvest_config.*.yaml` under its own
+name in `/app/harvester/`. The worker reads its config at startup and again at
+the start of every flow run, from the first of:
 
 1. `HARVEST_CONFIG_B64` — the whole YAML, base64 on one line
-   (`base64 < harvest_config.yaml | tr -d '\n'`). Use this under Coolify.
-2. `HARVEST_CONFIG_FILE` — path to a mounted file
-   (`/app/harvester/harvest_config.yaml` in the compose files).
-3. A file mounted at `/app/harvester/harvest_config.yaml`.
+   (`base64 < harvest_config.yaml | tr -d '\n'`). Overrides everything; use it
+   only for an instance that must harvest an uncommitted list.
+2. `HARVEST_CONFIG_FILE` — a baked file, e.g.
+   `/app/harvester/harvest_config.sample.yaml`, or a mounted one. Defaults to
+   `/app/harvester/harvest_config.production.yaml`; the override sample and
+   `docker-compose.production.yaml` point it at their mounted
+   `/app/harvester/harvest_config.yaml`.
 
-With none of these — or a value that fails to decode — the worker refuses to
-start rather than harvest the wrong thing.
+A `HARVEST_CONFIG_B64` that fails to decode stops the worker rather than
+falling back to another config.
 
 | What changed                                                                | What's needed                                                                                |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| A committed `harvest_config.*.yaml` (selected, no B64 override)             | Merge it; the next image build ships it (Coolify rebuilds on push)                           |
 | Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …)       | Nothing — the next run re-reads it                                                           |
 | `erddap_urls`, or `obis_discovery.enabled`                                  | `docker compose restart prefect_worker` (re-registers per-source deployments)                |
 | Which OBIS datasets exist                                                   | Nothing — discovery re-queries the OBIS API every run                                        |
@@ -127,7 +132,8 @@ start rather than harvest the wrong thing.
   idempotent).
 - Another host: the Prefect API and DB must be reachable, and the `cde-harvester`
   image available there. Remote workers only poll (`REGISTER_DEPLOYMENTS=false`)
-  and need the same harvest config as the primary stack:
+  and need the same harvest config as the primary stack (the baked one, unless the
+  primary overrides it):
 
   ```sh
   PREFECT_API_URL=https://<prefect-host>/api DB_HOST_EXTERNAL=<db-host> \
@@ -303,15 +309,17 @@ already carries Coolify's magic variables (`SERVICE_FQDN_NGINX_4000`,
 `docker-compose.override.yaml`.
 
 Paste `.env.coolify.sample` into the resource's environment ("Developer view"):
-`DB_PASSWORD` is required; `HARVEST_CONFIG_B64`, `ENVIRONMENT`, `SENTRY_DSN`,
+`DB_PASSWORD` is required; `HARVEST_CONFIG_FILE`, `HARVEST_CONFIG_B64`, `ENVIRONMENT`, `SENTRY_DSN`,
 `HARVESTER_CRON`, `INCREMENTAL_MODE` and `RUN_ON_DEPLOY` are optional. **Don't set
 `APP_URL` or `API_URL`** — Coolify's `SERVICE_URL_NGINX` provides the public URL.
 
-Relative bind mounts don't work under Coolify, so provide the harvest config
-either as `HARVEST_CONFIG_B64` (then **redeploy** — a restart keeps the old
-environment; check it with `echo "$HARVEST_CONFIG_B64" | base64 -d`) or as a
-Coolify **Persistent Storage file mount** at `/app/harvester/harvest_config.yaml`
-if you want it editable in the UI.
+Leave `HARVEST_CONFIG_B64` unset to harvest the committed
+`harvest_config.production.yaml`, which each deploy rebuilds into the image; set
+`HARVEST_CONFIG_FILE=/app/harvester/harvest_config.sample.yaml` (or another baked
+file) to pick a different committed config. Set `HARVEST_CONFIG_B64` only for an
+uncommitted list. It then overrides everything until you remove it, and a change
+to it needs a **redeploy** (a restart keeps the old environment; check it with
+`echo "$HARVEST_CONFIG_B64" | base64 -d`).
 
 ### Frontend PR previews (Coolify)
 

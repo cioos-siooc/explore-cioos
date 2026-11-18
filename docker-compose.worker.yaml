@@ -10,11 +10,13 @@
 #      load it manually:  docker save cde-harvester:latest | ssh host docker load
 #   2. PREFECT_API_URL must reach the central Prefect server (public/VPN URL).
 #   3. DB_HOST_EXTERNAL must reach the central Postgres over the network.
-#   4. A harvest config: the image does not bake one, and flows read it at run
-#      time on WHICHEVER worker executes them — so it must match the primary
-#      stack's config. Set HARVEST_CONFIG_B64 in .env (the whole YAML file
-#      base64-encoded on one line: `base64 < harvest_config.yaml | tr -d '\n'`),
-#      or copy the file here and mount it (see the volumes section below).
+#   4. The same harvest config as the primary stack: flows read it at run time
+#      on WHICHEVER worker executes them. The image bakes every committed
+#      harvest_config.*.yaml and defaults to the production one; match the
+#      primary's HARVEST_CONFIG_FILE / HARVEST_CONFIG_B64 in .env (B64 = the
+#      whole YAML file base64-encoded on one line:
+#      `base64 < harvest_config.yaml | tr -d '\n'`), or copy the file here and
+#      mount it (see the volumes section below).
 #
 # Usage:
 #   PREFECT_API_URL=https://prefect.example/api \
@@ -55,7 +57,8 @@ services:
       RUN_ON_DEPLOY: "false"
     volumes:
       # Alternative to HARVEST_CONFIG_B64: copy the primary stack's config to
-      # this host and uncomment (must stay in sync with the primary).
+      # this host, uncomment, and set HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
+      # in .env (must stay in sync with the primary).
       # - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
       - harvest_data:/app/harvester/harvest
       - harvester_logs:/app/harvester/logs

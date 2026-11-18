@@ -244,15 +244,14 @@ services:
       retries: 3
       start_period: 300s
     volumes:
-      # The harvest config is neither bind-mounted nor baked; provide it at
-      # runtime (a relative bind-mount resolves to an empty dir under Coolify):
+      # The image bakes every committed harvest_config.*.yaml; HARVEST_CONFIG_FILE
+      # below picks one (a relative bind-mount resolves to an empty dir under
+      # Coolify). To harvest something else:
       #   - under Coolify: set HARVEST_CONFIG_B64 to the YAML base64-encoded on
       #     ONE line (`base64 < harvest_config.yaml | tr -d '\n'`); Coolify's env
-      #     editor mangles raw multi-line YAML. Or add a Persistent Storage FILE
-      #     mount onto /app/harvester/harvest_config.yaml;
+      #     editor mangles raw multi-line YAML. It overrides everything;
       #   - locally: mount ./harvest_config.yaml via docker-compose.override.yaml
       #     (see docker-compose.override.yaml.sample).
-      # Re-read on every start and flow run, so updates never need a rebuild.
       # Shared output sinks — every replica on this host writes here, and nginx
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest
@@ -267,7 +266,8 @@ services:
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_LOGGING_LEVEL: INFO
-      HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
+      # Any baked /app/harvester/harvest_config.*.yaml, or a mounted file.
+      HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-/app/harvester/harvest_config.production.yaml}
       # In-process flows inherit this container's env for DB / redis access.
       # The harvester reads DB_HOST_EXTERNAL rather than DB_HOST (it also runs
       # outside compose); the production overlay repoints it across the VPN.
