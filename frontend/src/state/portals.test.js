@@ -24,6 +24,19 @@ describe("buildPortals", () => {
     ]);
   });
 
+  it("names a known portal in French", () => {
+    const owner = (title) => ({
+      portalOwners: [{ pk: title, title, erddapServers: ["https://a"] }],
+      erddapServersSelected: [server(0, "https://a")],
+    });
+    const name = "St. Lawrence Global Observatory (SLGO)";
+    expect(buildPortals(owner(name), "fr")[0].label).toBe(
+      "Observatoire global du Saint-Laurent (OGSL)",
+    );
+    expect(buildPortals(owner(name), "en")[0].label).toBe(name);
+    expect(buildPortals(owner("DataStream"), "fr")[0].label).toBe("DataStream");
+  });
+
   it("reads include or exclude only when every leaf has it", () => {
     const portal = (servers) =>
       buildPortals({ erddapServersSelected: servers })[0];

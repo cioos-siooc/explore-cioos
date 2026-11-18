@@ -30,6 +30,18 @@ export function setLeaves(leaves, next) {
   }
 }
 
+// Keyed by the harvester's CKAN_OWNER_NAMES; unlisted owners keep their name.
+const PORTAL_NAMES_FR = {
+  "St. Lawrence Global Observatory (SLGO)":
+    "Observatoire global du Saint-Laurent (OGSL)",
+  "CIOOS Pacific": "SIOOC Pacifique",
+  "CIOOS Atlantic": "SIOOC Atlantique",
+  "Fisheries and Oceans Canada": "Pêches et Océans Canada",
+};
+
+const portalName = (name, locale) =>
+  (locale === "fr" && PORTAL_NAMES_FR[name]) || name;
+
 // The Data Portal filter as a tree: each portal (a CKAN owner such as SLGO,
 // OBIS, or an ERDDAP server no owner claims) over its ERDDAP / OBIS leaves.
 // A leaf `id` is its option's id in useFilterModel. Sorted by label.
@@ -62,7 +74,7 @@ export function buildPortals(
       const obis = obisCataloguesSelected.find((o) => o.pk === owner.pk);
       return {
         key: `ckan-${owner.pk}`,
-        label: owner.title,
+        label: portalName(owner.title, locale),
         leaves: [
           ...servers.map((s) =>
             serverLeaf(s, servers.length > 1 ? `ERDDAP: ${s.title}` : "ERDDAP"),
