@@ -82,10 +82,13 @@ const { ALL_TRAJECTORY_TYPES } = require("../utils/dataTypes");
 const { trimPreviewRows } = require("../utils/previewRows");
 
 // ERDDAP regex constraints match the whole value, so escaping metacharacters
-// turns `=~` back into exact equality.
-const REGEX_METACHARACTERS = /[.\\+*?[\]^$(){}|]/g;
+// turns `=~` back into exact equality. Bracketing rather than backslashing,
+// because erddap.ogsl.ca's Cloudflare WAF 403s any query holding a `%5C`; only
+// the characters a bracket class can't hold keep the backslash.
 const escapeErddapRegex = (value) =>
-  String(value).replace(REGEX_METACHARACTERS, "\\$&");
+  String(value).replace(/[.\\+*?[\]^$(){}|]/g, (char) =>
+    "[]^\\".includes(char) ? `\\${char}` : `[${char}]`,
+  );
 
 // The destination name ERDDAP gives the T axis. Assumed rather than looked up,
 // which is the same assumption the time-window constraint below already makes.

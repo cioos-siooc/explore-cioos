@@ -216,8 +216,9 @@ test("escapes ERDDAP regex metacharacters in the profile id constraint", async (
 
   await agent.get("/preview").query({ dataset: "obs_270", profile: "a.b+c" });
 
-  // encodeURIComponent turns the escaped "\+" into "%5C%2B".
-  assert.match(axios.calls[0].url, /a%5C\.b%5C%2Bc/);
+  // Bracketed, not backslashed: a `%5C` gets the request 403'd by Cloudflare.
+  assert.match(axios.calls[0].url, /a%5B\.%5Db%5B%2B%5Dc/);
+  assert.ok(!axios.calls[0].url.includes("%5C"));
 });
 
 // --- stepping to one profile inside a record ---------------------------------
