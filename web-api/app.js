@@ -22,6 +22,7 @@ const griddapTimeRangeRouter = require("./routes/griddapTimeRange");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
 const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
+const cataloguesRouter = require("./routes/catalogues");
 const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
 const trajectoriesRouter = require("./routes/trajectories");
@@ -91,6 +92,7 @@ app.use("/griddapTimeRange", griddapTimeRangeRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
 app.use("/scientificNames", scientificNamesRouter);
 app.use("/obisNodes", obisNodesRouter);
+app.use("/catalogues", cataloguesRouter);
 app.use("/erddapServers", erddapServersRouter);
 // Mounted before /harvest so its literal paths aren't matched by that
 // router's /:runId-style routes.

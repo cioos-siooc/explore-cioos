@@ -5,12 +5,13 @@ const { metricValueExpr, metricJoin } = require("./hexMetric");
 // feature sources are in it; those shared parts live here, while each route
 // keeps its own projection (`SELECT <cols> ${rowSetFromHere}`).
 
-// Taxa are OBIS-only, so a taxon selection hides ERDDAP data. An OBIS-node
-// selection does too, unless paired with erddapServers: that pair is the
-// combined "Data Source" OR filter in dbFilter, which needs both sets.
+// Taxa are OBIS-only, so a taxon selection hides ERDDAP data. An OBIS-only
+// Data Portal pick (nodes, a portal's OBIS records) does too, unless paired
+// with erddapServers, the part of that OR that matches ERDDAP.
 function erddapVisible(query) {
   return (
-    !query.scientificNames && (!query.obisNodes || Boolean(query.erddapServers))
+    !query.scientificNames &&
+    (!(query.obisNodes || query.obisCatalogues) || Boolean(query.erddapServers))
   );
 }
 

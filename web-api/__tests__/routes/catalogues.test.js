@@ -1,0 +1,31 @@
+jest.mock("../../db");
+jest.mock("../../utils/cache", () => ({
+  route: () => (_req, _res, next) => next(),
+}));
+jest.mock("../../utils/redis", () => ({
+  connect: jest.fn().mockRejectedValue(new Error("no redis")),
+}));
+
+const request = require("supertest");
+const app = require("../../app");
+const db = require("../../db");
+const { setupDbMock } = require("../helpers/mockDb");
+
+const { setRawRows } = setupDbMock(db);
+
+beforeEach(() => setRawRows([]));
+
+describe("GET /catalogues", () => {
+  it("returns 200", async () => {
+    const res = await request(app).get("/catalogues");
+    expect(res.status).toBe(200);
+  });
+
+  it("queries non-null CKAN owners in name order", async () => {
+    await request(app).get("/catalogues");
+    const [sql] = db.raw.mock.calls[0];
+    expect(sql).toContain("SELECT ckan_owner AS name");
+    expect(sql).toContain("ckan_owner IS NOT NULL");
+    expect(sql).toContain("ORDER BY o.name");
+  });
+});

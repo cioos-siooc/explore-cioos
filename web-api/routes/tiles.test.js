@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { createTestApp } = require("../test/testApp");
+const createDBFilter = require("../utils/dbFilter");
 
 const { agent, db, resetCache } = createTestApp();
 
@@ -171,6 +172,42 @@ test("GET /tiles/tracks/:z/:x/:y.mvt returns a binary MVT tile with both track l
   assert.equal(res.text, FAKE_TILE.toString());
   assert.match(db.queries[0], /track-lines/);
   assert.match(db.queries[0], /track-heads/);
+});
+
+test("GET /tiles/tracks/:z/:x/:y.mvt carries every dataset column the shared filter reads", async () => {
+  const datasetLevel = {
+    platforms: "p",
+    organizations: "1",
+    realtimeOnly: "true",
+    obisNodes: "n1",
+    erddapServers: "https://e",
+    obisCatalogues: "SLGO",
+    excludeObisCatalogues: "DataStream",
+    datasetPKs: "1",
+  };
+  db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+  const res = await agent.get("/tiles/tracks/6/20/20.mvt").query({
+    timeMin: "2020-01-01T00:00:00Z",
+    timeMax: "2020-02-01T00:00:00Z",
+    ...datasetLevel,
+  });
+  assert.equal(res.status, 200);
+
+  const sql = db.queries[0];
+  const candRows = sql.slice(
+    sql.indexOf("cand_rows AS"),
+    sql.indexOf("FROM cde.trajectory_track_stats"),
+  );
+  const filter = (await createDBFilter(datasetLevel)).shared.toString();
+  const read = new Set([...filter.matchAll(/\bd\.(\w+)/g)].map((m) => m[1]));
+  assert.ok(read.has("ckan_owner"));
+  for (const column of read) {
+    assert.match(
+      candRows,
+      new RegExp(`\\bd\\.${column}\\b`),
+      `cand_rows lacks d.${column}`,
+    );
+  }
 });
 
 test("GET /tiles/tracks/:z/:x/:y.mvt keeps every head, flagging the ones seen in the window's last week", async () => {

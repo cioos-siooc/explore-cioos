@@ -193,6 +193,35 @@ describe("createDataFilterQueryString", () => {
       expect(params.has("obisNodes")).toBe(false);
       expect(params.has("includeObis")).toBe(false);
     });
+
+    it("a portal's OBIS records keep OBIS in view, alone or beside its servers", () => {
+      const alone = new URLSearchParams(
+        createDataFilterQueryString(
+          makeQuery({
+            erddapServersSelected: servers(false),
+            obisCataloguesSelected: [selected("SLGO")],
+          }),
+        ),
+      );
+      expect(alone.get("obisCatalogues")).toBe("SLGO");
+      expect(alone.has("includeObis")).toBe(false);
+
+      const withServer = new URLSearchParams(
+        createDataFilterQueryString(
+          makeQuery({
+            erddapServersSelected: servers(true, false),
+            obisCataloguesSelected: [
+              selected("SLGO"),
+              excluded("CIOOS Pacific"),
+            ],
+          }),
+        ),
+      );
+      expect(withServer.get("erddapServers")).toBe("https://erddap0.example");
+      expect(withServer.get("obisCatalogues")).toBe("SLGO");
+      expect(withServer.get("excludeObisCatalogues")).toBe("CIOOS Pacific");
+      expect(withServer.has("includeObis")).toBe(false);
+    });
   });
 
   it("sends included and excluded options of one filter side by side", () => {

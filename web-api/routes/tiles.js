@@ -686,7 +686,7 @@ router.get(
                s.median_gap_secs, s.time_min, s.time_max, s.n_points
              ) AS gap_secs,
              d.pk_url, d.eovs, d.platform, d.organization_pks,
-             d.obis_nodes, d.erddap_url,
+             d.obis_nodes, d.erddap_url, d.ckan_owner, d.source_type,
              d.coverage_time_max, d.verified_at, d.cdm_data_type
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk, te

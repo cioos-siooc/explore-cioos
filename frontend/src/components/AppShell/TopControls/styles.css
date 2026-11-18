@@ -622,6 +622,55 @@
   text-decoration: underline;
 }
 
+/* "or" / "and" between values, and "and" between groups: the logic the
+   list follows, written out. A clickable one flips the group's match-all. */
+.activeFilterConnectorItem {
+  display: inline-flex;
+}
+
+.activeFilterConnector {
+  font: inherit;
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  line-height: 1.4;
+}
+
+.activeFilterConnector.between {
+  color: var(--cioos-ink-80);
+}
+
+.activeFilterConnector.toggle {
+  border-style: dashed;
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
+  background-color: var(--cioos-white);
+  cursor: pointer;
+}
+
+.activeFilterConnector.toggle.all {
+  border-style: solid;
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.activeFilterConnector.toggle:hover {
+  background-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
+}
+
+.activeFilterConnector.toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 .activeFilterItem {
   display: inline-flex;
   align-items: center;

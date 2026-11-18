@@ -1,0 +1,16 @@
+[
+  {
+    "name": "CIOOS Atlantic",
+    "hasObis": false,
+    "erddapServers": ["https://cioosatlantic.ca/erddap"]
+  },
+  {
+    "name": "CIOOS Pacific",
+    "hasObis": true,
+    "erddapServers": [
+      "https://catalogue.hakai.org/erddap",
+      "https://data.cioospacific.ca/erddap"
+    ]
+  },
+  { "name": "SLGO", "hasObis": true, "erddapServers": [] }
+]
