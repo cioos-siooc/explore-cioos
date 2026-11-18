@@ -1,5 +1,6 @@
 import { expect, test } from "../support/test.js";
 import { openApp } from "../support/appPage.js";
+import { VIEWPORTS } from "../support/constants.js";
 import { resolveFixture } from "../support/fixtureStore.js";
 
 // The record preview modal, opened the way a shared link opens it: every plot
@@ -40,14 +41,21 @@ async function openPreview(page, extra = "") {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
-// Phones fold the plot settings above the plot; the folding stays open across
-// the Table/Plot flip, so this is needed once per test.
+// Compact screens keep the plot settings behind a button, opened as a dialog.
 async function showSettings(page) {
   const settings = page.getByRole("button", {
     name: "Plot settings",
     exact: true,
   });
   if (await settings.isVisible()) await settings.click();
+}
+
+// The settings dialog covers the Plot/Table switch.
+async function closeSettings(page) {
+  const dialog = page.getByRole("dialog", { name: "Plot settings" });
+  if (await dialog.isVisible()) {
+    await dialog.getByRole("button", { name: "Close" }).click();
+  }
 }
 
 test.describe("record preview", () => {
@@ -63,7 +71,8 @@ test.describe("record preview", () => {
   test("a changed setting rides the URL, and a default stays out of it", async ({
     page,
   }) => {
-    await openPreview(page);
+    // A multi-profile record opens on the colour plot, which has no plot type.
+    await openPreview(page, "&playout=panels");
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);
 
@@ -98,13 +107,14 @@ test.describe("record preview", () => {
   test("a setting survives the Table/Plot flip that unmounts the plot", async ({
     page,
   }) => {
-    await openPreview(page, "&pmode=lines");
+    await openPreview(page, "&playout=panels&pmode=lines");
     await expect(plot(page).first()).toBeVisible();
     const lineMode = page
       .getByTestId("preview-mode-toggle")
       .getByRole("button", { name: "Line", exact: true });
     await showSettings(page);
     await expect(lineMode).toHaveAttribute("aria-pressed", "true");
+    await closeSettings(page);
 
     await page.getByRole("button", { name: "Table" }).click();
     await expect(plot(page)).toHaveCount(0);
@@ -247,6 +257,8 @@ test.describe("record preview labels", () => {
   test("a profile's panel titles never reach the figure title", async ({
     page,
   }) => {
+    // Compact screens move the record title out of the figure, into a header.
+    await page.setViewportSize(VIEWPORTS.desktop);
     await openApp(
       page,
       `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&pvars=CHLA,PSAL,SIGT`,
@@ -376,7 +388,7 @@ test.describe("record preview pinned axis", () => {
   test("a wide profile's depth axis stays in view while its panels scroll sideways", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 900, height: 700 });
+    await page.setViewportSize({ width: 480, height: 700 });
     await openApp(
       page,
       `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&pvars=CHLA,PSAL,SIGT`,

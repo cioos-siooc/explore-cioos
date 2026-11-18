@@ -135,10 +135,15 @@ test.describe("the record preview on a phone", () => {
   const RECORD = "STATION_001-21/05/20-23:01:41";
   const PREVIEW = {
     table: {
-      columnNames: ["depth", "SVELCV01", "profile"],
-      columnTypes: ["float", "float", "String"],
-      columnUnits: ["m", "m s-1", null],
-      rows: Array.from({ length: 12 }, (_, i) => [i + 1, 1478 + i, RECORD]),
+      columnNames: ["depth", "time", "SVELCV01", "profile"],
+      columnTypes: ["float", "String", "float", "String"],
+      columnUnits: ["m", "UTC", "m s-1", null],
+      rows: Array.from({ length: 12 }, (_, i) => [
+        i + 1,
+        `2021-05-20T23:0${i % 10}:41Z`,
+        1478 + i,
+        RECORD,
+      ]),
     },
   };
 
