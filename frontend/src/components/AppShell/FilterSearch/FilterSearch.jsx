@@ -22,6 +22,7 @@ import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
 import {
+  closestOption,
   matchFilterOptions,
   parseFilterQuery,
   parsePartialRangeQuery,
@@ -308,6 +309,31 @@ export default function FilterSearch({
         ],
       },
       ...shown.filter((g) => g.key !== "text"),
+    ];
+  }
+  // A term only the text search answers ("dissolved oxygen levels") still
+  // offers the variable it most resembles, so it does not read as no data.
+  const eovGroup = groups.find((g) => g.key === "eovs");
+  const closest =
+    term &&
+    eovGroup &&
+    shown.every((g) => g.key === "text" || g.key === "region") &&
+    closestOption(
+      eovGroup.options.filter((o) => !o.shortcut),
+      term,
+    );
+  if (closest) {
+    shown = [
+      {
+        ...eovGroup,
+        options: [
+          {
+            ...closest,
+            label: t("filterSearchClosestOption", { label: closest.label }),
+          },
+        ],
+      },
+      ...shown,
     ];
   }
   // Places come after the filter values, where their slower answer lands

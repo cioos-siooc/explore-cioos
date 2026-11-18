@@ -22,7 +22,7 @@
 .gridSliceDateInput:focus-visible,
 .gridSliceDepthInput:focus-visible {
   border-color: var(--cioos-grid);
-  box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
+  box-shadow: 0 0 0 3px var(--cioos-grid-ring);
 }
 
 /* content-box so 5ch is the digits alone, not digits plus padding. */

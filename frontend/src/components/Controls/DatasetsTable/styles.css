@@ -18,9 +18,17 @@
 
 .datasetsCardToolbar {
   display: flex;
-  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+}
+
+/* The toolbar stays one row; on a narrow sidebar the values truncate. */
+.datasetsCardToolbar .selectPill {
+  flex: 0 1 auto;
+}
+
+.datasetsCardToolbar .selectPillLabel {
+  font-size: var(--cioos-font-size-xs);
 }
 
 /* Keeps its label at every width: it is the one control here that commits
@@ -71,7 +79,7 @@
 }
 
 .selectAllToggle input:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
+  outline: 2px solid var(--cioos-primary-800);
   outline-offset: 2px;
 }
 
@@ -195,27 +203,26 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--cioos-ink-40);
+
+  /* The way into a download: teal like the footer hint that names it, not a
+     faint grey that reads as decoration. */
+  color: var(--cioos-primary-800);
   cursor: pointer;
   transition: color var(--cioos-transition-fast);
 }
 
-.datasetCardSelect.checked {
-  color: var(--cioos-primary-700);
-}
-
 @media (hover: hover) {
   .datasetCardSelect:not(:disabled):hover {
-    color: var(--cioos-primary-700);
+    color: var(--cioos-navy);
   }
 }
 
 .datasetCardSelect:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
+  outline: 2px solid var(--cioos-primary-800);
   outline-offset: 2px;
   border-radius: 50%;
 }
@@ -356,8 +363,25 @@ button.datasetCardTitle:focus-visible {
   transition: transform var(--cioos-transition-fast);
 }
 
+/* Grid navy, the glyph the gridded dataset cards and the map's coverage use. */
+.datasetsCardGroupIcon {
+  flex: 0 0 auto;
+  color: var(--cioos-grid-700);
+}
+
+/* How many of the folded grids the latest map click found. */
+.datasetsCardGroupHere {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 6px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
 .datasetsCardGroupHeader.open .datasetsCardGroupCaret {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   transform: rotate(90deg);
 }
 
@@ -379,7 +403,7 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetsCardGroupFilter:hover {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   background-color: var(--cioos-white);
 }
 
@@ -388,7 +412,7 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetsCardGroupHeader.included .datasetsCardGroupFilter:not(.exclude) {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .datasetsCardGroupHeader.excluded {
@@ -453,7 +477,7 @@ button.datasetCardTitle:focus-visible {
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   cursor: pointer;
@@ -516,7 +540,7 @@ button.datasetCardTitle:focus-visible {
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
@@ -606,7 +630,7 @@ button.datasetCardTitle:focus-visible {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
 }
 
 .datasetCardTitle {
@@ -616,7 +640,7 @@ button.datasetCardTitle:focus-visible {
   font-family: var(--cioos-font-display);
   font-weight: 600;
   font-size: var(--cioos-font-size-base);
-  line-height: 1.25;
+  line-height: 1.35;
   color: var(--cioos-ink);
   overflow-wrap: anywhere;
 }
@@ -661,7 +685,7 @@ button.datasetCardTitle:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
   white-space: nowrap;
@@ -671,7 +695,7 @@ button.datasetCardTitle:focus-visible {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.35);
   padding: 0;
   border: none;
   background: transparent;
@@ -687,7 +711,7 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetCardRemove:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
+  outline: 2px solid var(--cioos-primary-800);
   outline-offset: 2px;
   border-radius: 50%;
 }
@@ -750,7 +774,7 @@ button.datasetCardTitle:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -834,7 +858,7 @@ button.datasetCardTitle:focus-visible {
 .datasetCardLinkButton:hover {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .datasetCardLinkCopied {
@@ -890,7 +914,13 @@ button.datasetCardTitle:focus-visible {
   font-size: var(--cioos-font-size-xs);
 }
 
+.datasetsCardList.compact .datasetCardMeta {
+  mask-image: linear-gradient(to left, transparent, #000 24px);
+}
+
+/* Shrinking a nowrap item would spill its text over the next item's icon. */
 .datasetsCardList.compact .datasetCardMetaItem {
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
@@ -932,11 +962,6 @@ button.datasetCardTitle:focus-visible {
 
   .sidebar .datasetsCardList:not(.compact) .datasetCard {
     padding: 8px 10px;
-  }
-
-  .sidebar .datasetCardMeta {
-    flex-wrap: nowrap;
-    overflow: hidden;
   }
 
   .sidebar .datasetCardMetaItem {

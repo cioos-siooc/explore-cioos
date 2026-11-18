@@ -7,8 +7,9 @@
   justify-content: center;
 
   /* Room for the captions under each button (20px), plus a gap before the
-     filter chips below. */
-  gap: 28px 36px;
+     filter chips below. The column gap fits the widest caption in either
+     language ("Tracer une zone"), so the row is the same in both. */
+  gap: 28px 56px;
   padding-bottom: 28px;
 }
 
@@ -26,7 +27,7 @@
   /* No --cioos-radius-circle token; circles draw their own, as .brandMinorItem. */
   border-radius: 50%;
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   box-shadow: var(--cioos-shadow-float);
   transition:
@@ -37,7 +38,6 @@
 
 .quickFilterButton:hover {
   background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary-800);
 }
 
 /* Same raised treatment as .topBarButton.active. Icons draw with currentColor,
@@ -53,7 +53,7 @@
 }
 
 .quickFilterButton.applied:hover {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
   color: var(--cioos-white);
 }
 
@@ -116,6 +116,14 @@
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
   pointer-events: none;
+}
+
+/* A searched place names the area it applied; capped so a long name doesn't
+   push the row apart. */
+.quickFilterCaptionPlace {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Area control: the caption steps aside while its menu (hung where the

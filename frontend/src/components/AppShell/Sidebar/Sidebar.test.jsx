@@ -73,6 +73,36 @@ describe("Sidebar tips", () => {
   });
 });
 
+describe("Sidebar download footer", () => {
+  beforeEach(() => {
+    installMockFetch();
+    window.localStorage.setItem("cde.introSeen", "true");
+  });
+
+  it("adds a short result list in one tap, grids aside", async () => {
+    const { user } = renderWithProviders(
+      <>
+        <Sidebar />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("state")).toHaveTextContent("ready"),
+    );
+    const addable = latestSelection.filteredDatasets.filter(
+      (row) => row.cdm_data_type !== "Grid",
+    );
+    const addAll = screen.getByTestId("sidebar-add-all");
+    expect(addAll).toHaveTextContent(`Add all ${addable.length} datasets`);
+
+    await user.click(addAll);
+
+    expect(latestSelection.pointsToReview).toHaveLength(addable.length);
+    expect(screen.queryByTestId("sidebar-add-all")).not.toBeInTheDocument();
+  });
+});
+
 describe("Sidebar wide view", () => {
   beforeEach(() => {
     installMockFetch();

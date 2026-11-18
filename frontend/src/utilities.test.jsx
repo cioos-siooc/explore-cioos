@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import {
+  formatDepthRange,
   abbreviateString,
   applyDatasetPKs,
   areaFromBounds,
@@ -13,6 +14,7 @@ import {
   formatDatasetCount,
   formatErddapServerName,
   formatSizeEstimate,
+  generateColorStops,
   getCurrentRangeLevel,
   parseArea,
   toggleOptionExcluded,
@@ -21,6 +23,7 @@ import {
   sumSizeEstimates,
   polygonToWkt,
   quantizeCountRange,
+  viewportCountRange,
   rangesEqual,
   rangeLevelHasData,
   revealOffset,
@@ -29,7 +32,7 @@ import {
   splitTrackRuns,
   validateEmail,
 } from "./utilities.jsx";
-import { defaultQuery } from "./components/config.js";
+import { colorScale, defaultQuery } from "./components/config.js";
 import erddapServers from "./erddapServers.json";
 
 // defaultQuery lacks the *Selected arrays FilterProvider always supplies.
@@ -747,5 +750,71 @@ describe("sumSizeEstimates", () => {
       size: null,
       partial: false,
     });
+  });
+});
+
+describe("generateColorStops", () => {
+  it.each([
+    [1, 1500],
+    [1, 2047],
+    [1, 100],
+    [3, 95_000],
+  ])("keeps every colour of a log ramp over [%d, %d]", (lo, hi) => {
+    const stops = generateColorStops(colorScale, [lo, hi]);
+    expect(stops.map((s) => s.color)).toEqual(colorScale);
+    stops
+      .slice(1)
+      .forEach((s, i) => expect(s.stop).toBeGreaterThan(stops[i].stop));
+    expect(stops[0].stop).toBe(lo);
+    expect(stops.at(-1).stop).toBe(hi);
+  });
+
+  it("samples the upper two thirds of the ramp across a narrow range", () => {
+    const last = colorScale.length - 1;
+    const first = Math.round(last / 3);
+    const stops = generateColorStops(colorScale, [1, 3]);
+    expect(stops.map((s) => s.stop)).toEqual([1, 2, 3]);
+    expect(stops.map((s) => s.color)).toEqual([
+      colorScale[first],
+      colorScale[Math.round((first + last) / 2)],
+      colorScale[last],
+    ]);
+  });
+
+  it("gives a one-value range the top colour", () => {
+    expect(generateColorStops(colorScale, [4, 4])).toEqual([
+      { stop: 4, color: colorScale.at(-1) },
+    ]);
+  });
+});
+
+describe("formatDepthRange", () => {
+  it("drops float noise: tenths near the surface, whole metres below 10 m", () => {
+    expect(formatDepthRange(0.079366, 9701.095795)).toBe("0.1 – 9701 m");
+    expect(formatDepthRange(1.9791, 691.5805)).toBe("2 – 692 m");
+  });
+
+  it("collapses a range that rounds to one depth", () => {
+    expect(formatDepthRange(0, 0.02)).toBe("0 m");
+  });
+
+  it("has nothing to say without depths", () => {
+    expect(formatDepthRange(null, undefined)).toBeUndefined();
+  });
+});
+
+describe("viewportCountRange", () => {
+  it("ramps to the 99th percentile and keeps the true max for the legend", () => {
+    const counts = [...Array.from({ length: 199 }, (_, i) => i + 1), 1e9];
+    // p99 of 200 cells is the 198th smallest (198), snapped up to 200.
+    expect(viewportCountRange(counts)).toEqual([1, 200, 1e9]);
+  });
+
+  it("is the plain min/max when too few cells to clamp", () => {
+    expect(viewportCountRange([40, 7, 900])).toEqual([7, 1000, 900]);
+  });
+
+  it("has no range without counts", () => {
+    expect(viewportCountRange([])).toBeUndefined();
   });
 });

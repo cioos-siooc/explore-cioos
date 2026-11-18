@@ -26,14 +26,44 @@ const OPERATORS = /['"!^=$|]/g;
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// A word met inside another ("sea" in "Research") reads less like what was
-// meant than one met at a word's start, so it ranks after.
-function startsWords(option, words) {
-  const text = deburr(optionText(option)).toLowerCase();
+// Every word met at the start of one in the text; with `whole`, a word of
+// one or two letters ("DO", "pH") only as a word of its own.
+function hasWords(text, words, whole = false) {
+  const plain = deburr(text).toLowerCase();
   return words.every((word) =>
-    new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(word)}`).test(text),
+    new RegExp(
+      `(?:^|[^a-z0-9])${escapeRegExp(word)}${whole && word.length < 3 ? "(?![a-z0-9])" : ""}`,
+    ).test(plain),
   );
 }
+
+// A word met inside another ("sea" in "Research") reads less like what was
+// meant than one met at a word's start, so it ranks after.
+const startsWords = (option, words) => hasWords(optionText(option), words);
+
+// An option's `aliasText` (its definition, other names) only matches words
+// at their start, as a long text fuzzily matches almost anything.
+const aliasMatch = (option, words) =>
+  Boolean(option.aliasText) &&
+  hasWords(`${optionText(option)} ${option.aliasText}`, words, true);
+
+// What a variable is also called that its definition does not say.
+const EOV_ALIASES = {
+  oxygen: "DO O2",
+  inorganicCarbon: "pH CO2 pCO2 DIC alkalinity alcalinité",
+  dissolvedOrganicCarbon: "DOC",
+  nutrients: "nitrate nitrite phosphate silicate",
+  phytoplanktonBiomassAndDiversity: "chlorophyll chlorophylle chl chl-a",
+  seaState: "waves",
+  seaSurfaceHeight: "SSH tide tides marée",
+  seaSurfaceSalinity: "SSS",
+  seaSurfaceTemperature: "SST",
+};
+
+export const eovAliasText = (eov) =>
+  [eov["definition EN"], eov["definition FR"], EOV_ALIASES[eov.value]]
+    .filter(Boolean)
+    .join(" ");
 
 // A leading "-", "not" or "sauf" asks for the value to be excluded rather than
 // included, the same include / exclude pair every list filter offers. The
@@ -58,12 +88,13 @@ export function appliedOptions(group) {
   return applied.filter((o) => !covered.has(o.id));
 }
 
-// groups: [{ key, searched?, options: [{ label, matchText?, state, ... }] }]. With
-// no term, the options already applied (see appliedOptions), so the bar doubles
+// groups: [{ key, searched?, options: [{ label, matchText?, aliasText?, state,
+// ... }] }]. With no term, the options already applied (see appliedOptions), so the bar doubles
 // as the list to remove them from (plus any `keep(groupKey, option)` names, so
 // one just removed stays listed); otherwise the options that match the term,
 // closest first, and the groups ordered by their closest match so a group
-// that names the term outright is not listed below loose matches elsewhere. A
+// that names the term outright is not listed below loose matches elsewhere.
+// Options found only through their aliasText come after those that name it. A
 // `searched` group was already matched against the term by the service it came
 // from: its options are kept as it ranked them, and only placed by how closely
 // they read like the term.
@@ -107,8 +138,14 @@ export function matchFilterOptions(
           item,
           score: startsWords(item, words) ? score : 0.5 + score / 2,
         }))
-        .sort((a, b) => a.score - b.score)
-        .slice(0, limit);
+        .sort((a, b) => a.score - b.score);
+      const named = new Set(hits.map(({ item }) => item));
+      hits.push(
+        ...group.options
+          .filter((o) => !named.has(o) && aliasMatch(o, words))
+          .map((item) => ({ item, score: 1 })),
+      );
+      hits.splice(limit);
       const score = hits[0]?.score ?? 1;
       const options = group.searched
         ? group.options.slice(0, limit)
@@ -118,6 +155,39 @@ export function matchFilterOptions(
     .filter(({ group }) => group.options.length > 0)
     .sort((a, b) => a.score - b.score)
     .map(({ group }) => group);
+}
+
+// For a term nothing matched: the option most of whose words of three
+// letters or more turn up, typos allowed, in its text or aliasText, if at
+// least half of them do. Ties go to the one whose label names them.
+export function closestOption(options, term) {
+  const words = deburr(term.replace(OPERATORS, " "))
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length >= 3);
+  if (words.length === 0) return undefined;
+  const found = new Map();
+  for (const word of words) {
+    // As in matchFilterOptions: no typo in a short word ("argo" is not "carbon").
+    const fuse = new Fuse(options, {
+      keys: [
+        { name: "text", getFn: optionText, weight: 2 },
+        { name: "alias", getFn: (o) => o.aliasText ?? "" },
+      ],
+      ignoreDiacritics: true,
+      ignoreLocation: true,
+      includeScore: true,
+      threshold: word.length <= 4 ? 0 : 0.2,
+    });
+    for (const { item, score } of fuse.search(word)) {
+      const seen = found.get(item) ?? { count: 0, score: 0 };
+      found.set(item, { count: seen.count + 1, score: seen.score + score });
+    }
+  }
+  const [best] = [...found].sort(
+    ([, a], [, b]) => b.count - a.count || a.score - b.score,
+  );
+  return best && best[1].count * 2 >= words.length ? best[0] : undefined;
 }
 
 // Matched against deburred text, so the French words are spelled unaccented

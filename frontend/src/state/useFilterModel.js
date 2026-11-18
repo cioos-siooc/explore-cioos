@@ -19,6 +19,7 @@ import {
   DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
 } from "./dataLayers.js";
+import { eovAliasText } from "./filterSearch.js";
 import { SEARCH_ALL, useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
@@ -62,6 +63,7 @@ export default function useFilterModel(
         id: `${idPrefix}${option.pk}`,
         label: filters.optionLabel(option, translatable),
         description: option[`hover_${lang}`] ?? option.url,
+        aliasText: [option.hover_en, option.hover_fr].filter(Boolean).join(" "),
         state,
         toggle: (target) => {
           const next = state === target ? undefined : target;
@@ -279,7 +281,7 @@ export default function useFilterModel(
     ),
     (() => {
       // Also matched on eovs.json names and category, so it is found in either
-      // language.
+      // language, and on its definitions and aliases.
       const group = listGroup(
         "eovs",
         t("oceanVariablesFiltername"),
@@ -312,6 +314,7 @@ export default function useFilterModel(
               ? {
                   ...option,
                   matchText: `${eov["label EN"]} ${eov["label FR"]} ${eovCategoriesJSONfile[eov.category].en} ${eovCategoriesJSONfile[eov.category].fr}`,
+                  aliasText: eovAliasText(eov),
                 }
               : option;
           }),

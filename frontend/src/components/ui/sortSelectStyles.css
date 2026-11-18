@@ -13,7 +13,7 @@
   border-left: 1px solid var(--cioos-hairline);
   border-radius: 0 var(--cioos-radius-pill) var(--cioos-radius-pill) 0;
   background: transparent;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   transition: background-color var(--cioos-transition-fast);
 }

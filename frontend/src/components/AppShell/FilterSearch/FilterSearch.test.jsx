@@ -691,6 +691,37 @@ describe("FilterSearch", () => {
     );
   });
 
+  it("finds a variable by its definition, above the title search", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "dissolved oxygen");
+
+    const labels = options().map((o) => o.textContent);
+    expect(labels[0]).toContain("Oxygen");
+    expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
+    await user.keyboard("{Enter}");
+    expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
+  });
+
+  it("offers the closest variable when only the title search matches", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "dissolved oxygen levels");
+
+    expect(options()[0]).toHaveTextContent("Closest variable: Oxygen");
+    expect(options()[1]).toHaveTextContent("Titles matching");
+    await user.keyboard("{ArrowDown}{ArrowUp}{Enter}");
+    expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
+  });
+
+  it("offers no closest variable when nothing resembles one", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "argo float");
+
+    expect(screen.queryByText(/Closest variable/)).toBeNull();
+  });
+
   it("empties the box on Escape, and closes on the next", async () => {
     const { user, seen, box } = await renderPalette();
 

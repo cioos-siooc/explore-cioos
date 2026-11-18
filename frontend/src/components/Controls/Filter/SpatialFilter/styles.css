@@ -150,7 +150,7 @@
   align-items: center;
   gap: 4px;
   font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .spatialFilterPlacesSource {
@@ -262,7 +262,7 @@
   height: 30px;
   margin-left: auto;
   padding: 0 14px;
-  border: 1px solid var(--cioos-primary-700);
+  border: 1px solid var(--cioos-primary-800);
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
@@ -273,7 +273,7 @@
 }
 
 .spatialFilterApply:hover:not(:disabled) {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 .spatialFilterApply:focus-visible {

@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .timeDistributionPlot > .timeDistributionStatus {

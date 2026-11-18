@@ -76,7 +76,7 @@
 }
 
 .harvest-breadcrumb a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: none;
 }
 
@@ -488,7 +488,7 @@
 }
 
 a.harvest-link {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: none;
 }
 
@@ -581,8 +581,8 @@ a.harvest-link:hover {
 }
 
 .harvest-doc-tab.active {
-  color: var(--cioos-primary-700);
-  border-bottom-color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
+  border-bottom-color: var(--cioos-primary-800);
 }
 
 .harvest-doc {
@@ -613,7 +613,7 @@ a.harvest-link:hover {
 }
 
 .harvest-doc a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .harvest-doc code {

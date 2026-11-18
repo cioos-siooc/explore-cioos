@@ -77,6 +77,7 @@ export default function UrlSync() {
   } = useMapState();
   const {
     polygon,
+    areaPlace,
     onlyInView,
     groupBy,
     highlightedRecord,
@@ -105,6 +106,12 @@ export default function UrlSync() {
       ...mapView,
       ...Object.fromEntries(filterParams),
       ...Object.fromEntries(selectionParams),
+      ...(areaPlace
+        ? {
+            place: areaPlace.name,
+            ...(areaPlace.cgndbid ? { placeId: areaPlace.cgndbid } : {}),
+          }
+        : {}),
       lang,
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
@@ -167,6 +174,7 @@ export default function UrlSync() {
     query,
     mapView,
     polygon,
+    areaPlace,
     onlyInView,
     groupBy,
     tracksMode,

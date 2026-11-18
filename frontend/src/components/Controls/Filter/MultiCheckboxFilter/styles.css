@@ -80,7 +80,7 @@
 }
 
 .multiCheckboxFilter .optionButton.selected .optionToggle > svg:first-child {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .multiCheckboxFilter .optionButton.excluded {

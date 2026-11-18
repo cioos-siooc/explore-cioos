@@ -14,6 +14,7 @@ import {
   bathymetryPalettes,
   bathymetryFadeInZoom,
   bathymetryFullZoom,
+  bathymetryPrewarmZoom,
   defaultBathymetryPalette,
 } from "../config.js";
 
@@ -228,7 +229,7 @@ export function buildBasemapStyle(
       source: "nonna",
       // Mounted early like the imagery: these come through our proxy and are
       // the slowest tiles on the map on a cold cache.
-      minzoom: basemapPrewarmZoom,
+      minzoom: bathymetryPrewarmZoom,
       paint: {
         "color-relief-color": nonnaColorRamp(bathymetryPalette),
         "color-relief-opacity": [
@@ -238,7 +239,7 @@ export function buildBasemapStyle(
           bathymetryFadeInZoom,
           0,
           bathymetryFullZoom,
-          0.7,
+          1,
         ],
         // Linear filtering blends the packed RGB bytes, not the elevations,
         // and smears off-ramp colours along every survey edge.
@@ -249,7 +250,7 @@ export function buildBasemapStyle(
       id: "bathymetry-nonna-hillshade",
       type: "hillshade",
       source: "nonna",
-      minzoom: basemapPrewarmZoom,
+      minzoom: bathymetryPrewarmZoom,
       paint: NONNA_HILLSHADE_PAINT,
     },
     // Pulls the sea toward CIOOS teal while EMODnet is the base; lifts off as

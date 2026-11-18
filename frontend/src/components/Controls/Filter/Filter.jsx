@@ -163,7 +163,7 @@ export default function Filter({
                 >
                   Info&nbsp;
                   <BoxArrowUpRight
-                    color="var(--cioos-primary-700)"
+                    color="var(--cioos-primary-800)"
                     size={17.5}
                   />
                 </a>

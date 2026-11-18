@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
+import classNames from "classnames";
 import { useTranslation } from "react-i18next";
 import {
   BoxArrowUpRight,
   Clipboard,
   ClipboardCheck,
-  Quote,
 } from "react-bootstrap-icons";
 
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
@@ -14,7 +14,7 @@ import {
   localizedCkanUrl,
   localizedErddapUrl,
 } from "../../../downloadLinks.js";
-import { formatRange } from "../../../utilities.jsx";
+import { formatDepthRange, formatRange } from "../../../utilities.jsx";
 import { licenseLabel, licenseText } from "./license.js";
 import { renderMarkdown } from "../../../markdown.js";
 import "./styles.css";
@@ -52,7 +52,7 @@ function useCodeLabel() {
 // ISO dates arrive as a day or a full instant; the day is what reads.
 const day = (value) => value?.slice(0, 10);
 
-const hostOf = (url) => {
+export const hostOf = (url) => {
   try {
     return new URL(url).host;
   } catch {
@@ -115,31 +115,25 @@ export function LicenseCell({ metadata }) {
   );
 }
 
-// Where and when the data is, as cells of the facts sheet: the period and
-// depth the catalogue record declares.
-export function MetadataExtentCells({ metadata }) {
-  const { t } = useTranslation();
+// The period and depth the catalogue record declares, which can disagree with
+// the measurements: the page leads with those and keeps these for the fine
+// print, or as a labelled stand-in when nothing was measured.
+export function catalogueExtent(metadata) {
   const temporal = metadata?.temporal_extent ?? {};
   const vertical = metadata?.vertical_extent ?? {};
-  return [
-    [
-      t("metadataTemporalExtentText"),
-      formatRange(day(temporal.begin), day(temporal.end)),
-    ],
-    [
-      t("metadataVerticalExtentText"),
-      formatRange(vertical.min, vertical.max, "m"),
-    ],
-  ]
-    .filter(([, value]) => value)
-    .map(([label, value]) => (
-      <div className="metaCell" key={label}>
-        <dt className="metadataLabel">{label}</dt>
-        <dd className="metadataValue">
-          <span className="metadataFact">{value}</span>
-        </dd>
-      </div>
-    ));
+  return {
+    period: formatRange(day(temporal.begin), day(temporal.end)),
+    depth: formatDepthRange(vertical.min, vertical.max),
+  };
+}
+
+// GCMD keywords are shouted category paths ("EARTH SCIENCE > OCEANS > ...");
+// the last term is the keyword, the path stays on hover.
+function keywordLeaf(keyword) {
+  const leaf = keyword.split(">").pop().trim();
+  return leaf === leaf.toUpperCase() && /[A-Z]/.test(leaf)
+    ? leaf.charAt(0) + leaf.slice(1).toLowerCase()
+    : leaf;
 }
 
 export function KeywordsCell({ metadata }) {
@@ -155,8 +149,8 @@ export function KeywordsCell({ metadata }) {
       <dt className="metadataLabel">{t("metadataKeywordsTitle")}</dt>
       <dd className="metadataValue">
         {shown.map((keyword) => (
-          <span className="metadataChip" key={keyword}>
-            {keyword}
+          <span className="metadataChip" key={keyword} title={keyword}>
+            {keywordLeaf(keyword)}
           </span>
         ))}
         {(hidden > 0 || expanded) && (
@@ -236,9 +230,9 @@ export function DatasetAbstract({ metadata, loading }) {
   );
 }
 
-function MetadataCard({ title, action, children }) {
+function MetadataCard({ title, action, className, children }) {
   return (
-    <section className="metadataCard">
+    <section className={classNames("metadataCard", className)}>
       <div className="metadataCardHeader">
         <h3 className="metadataCardTitle">{title}</h3>
         {action}
@@ -271,97 +265,63 @@ function CopyButton({ text }) {
   );
 }
 
-// The citation opens on hover and stays open once clicked (Escape or a click
-// outside closes it), so its DOI link and copy button can be reached. The
-// body is positioned against the nearest positioned ancestor (the action
-// row), which lets it span the title block's width.
-const HOVER_OPEN_DELAY_MS = 300;
 const MAX_VISIBLE_ORGANIZATIONS = 3;
 
-function CitationPopover({ citation, doi }) {
-  const { t } = useTranslation();
-  const [pinned, setPinned] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const ref = useRef();
-  const hoverTimer = useRef();
-  const open = pinned || hovered;
+// Shown in full at the top of the page rather than behind a button: how to
+// credit the data is part of deciding to use it. A missing citation is said
+// so, not left out.
+// A web address inside a citation, without the punctuation that ends it.
+const CITATION_URL = /(https?:\/\/[^\s<>"]*[^\s<>".,;:)])/;
 
-  // A pointer passing over the button shouldn't throw the popover open.
-  function hoverStart() {
-    clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(
-      () => setHovered(true),
-      HOVER_OPEN_DELAY_MS,
+export function CitationCard({ metadata, loading, error }) {
+  const { t, i18n } = useTranslation();
+  // A failed load is reported once, by the cards below.
+  if (error) return null;
+  if (loading) {
+    return (
+      <MetadataCard
+        title={t("metadataCitationTitle")}
+        className="metadataCitationCard"
+      >
+        <SkeletonGroup>
+          <Skeleton text width="100%" />
+          <Skeleton text width="70%" />
+        </SkeletonGroup>
+      </MetadataCard>
     );
   }
-
-  function hoverEnd() {
-    clearTimeout(hoverTimer.current);
-    setHovered(false);
-  }
-
-  useEffect(() => () => clearTimeout(hoverTimer.current), []);
-  const missing = !citation && !doi;
+  const citation = localized(metadata?.citation, i18n.language);
+  const doi = metadata?.doi;
+  // Most citations end with their DOI already.
   const doiInCitation =
     doi && citation?.includes(doi.replace(/^https?:\/\/doi\.org\//, ""));
-
-  useEffect(() => {
-    if (!pinned) return undefined;
-    const close = (event) => {
-      const outside =
-        event.type === "keydown"
-          ? event.key === "Escape"
-          : !ref.current?.contains(event.target);
-      if (outside) {
-        // Claimed, so the widened sidebar doesn't also narrow on it.
-        if (event.type === "keydown") event.preventDefault();
-        setPinned(false);
-        setHovered(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [pinned]);
-
   return (
-    <span
-      ref={ref}
-      className="citation"
-      onMouseEnter={hoverStart}
-      onMouseLeave={hoverEnd}
+    <MetadataCard
+      title={t("metadataCitationTitle")}
+      className="metadataCitationCard"
+      action={citation && <CopyButton text={citation} />}
     >
-      <button
-        type="button"
-        className={`citationButton${missing ? " missing" : ""}`}
-        aria-expanded={open}
-        onClick={() => setPinned((value) => !value)}
-      >
-        <Quote size={13} aria-hidden="true" />
-        {t("metadataCitationTitle")}
-      </button>
-      {open && (
-        <div className="citationPopover">
-          <div className="citationPopoverCard" role="region">
-            <p className="metadataCitation">
-              {missing && t("metadataNoCitationText")}
-              {citation}
-              {/* Most citations end with their DOI already. */}
-              {doi && !doiInCitation && (
-                <>
-                  {citation && " "}
-                  <ExternalLink href={doi}>{doi}</ExternalLink>
-                </>
-              )}
-            </p>
-            {citation && <CopyButton text={citation} />}
-          </div>
-        </div>
-      )}
-    </span>
+      <p className="metadataCitation">
+        {!citation && !doi && t("metadataNoCitationText")}
+        {citation &&
+          // split() keeps the captured URLs at odd indexes.
+          citation.split(CITATION_URL).map((part, i) =>
+            i % 2 ? (
+              <ExternalLink key={i} href={part}>
+                {part}
+              </ExternalLink>
+            ) : (
+              part
+            ),
+          )}
+        {doi && !doiInCitation && (
+          <>
+            {citation && " "}
+            <ExternalLink href={doi}>{doi}</ExternalLink>
+          </>
+        )}
+      </p>
+    </MetadataCard>
   );
 }
 
@@ -439,9 +399,6 @@ export function Organizations({ metadata }) {
           type="button"
           className="metadataChip metadataChipToggle"
           aria-expanded={expanded}
-          aria-label={t(
-            expanded ? "metadataShowLessText" : "metadataShowMoreText",
-          )}
           title={t(expanded ? "metadataShowLessText" : "metadataShowMoreText")}
           onClick={() => setExpanded((value) => !value)}
         >
@@ -452,49 +409,28 @@ export function Organizations({ metadata }) {
   );
 }
 
-// The record this dataset was harvested from, and its catalogue entry: one
-// link each to ERDDAP, OBIS and CKAN, whichever the dataset has, as a cell of
-// the facts sheet.
-export function SourceLinksCell({ dataset }) {
-  const { t, i18n } = useTranslation();
-  const links = [
-    dataset.source_type === "obis"
-      ? ["OBIS", `https://obis.org/dataset/${dataset.dataset_id}`]
-      : [
-          "ERDDAP™",
-          localizedErddapUrl(dataset, dataset.erddap_url, i18n.language),
-        ],
-    ["Catalog", localizedCkanUrl(dataset.ckan_url, i18n.language)],
-  ].filter(([, url]) => url);
-  if (!links.length) return null;
-  return (
-    <div className="metaCell">
-      <dt className="metadataLabel">{t("metadataSourcesText")}</dt>
-      <dd className="metadataValue">
-        {links.map(([name, url]) => (
-          <ExternalLink
-            key={name}
-            href={url}
-            className="metadataChip metadataChipLink"
-            title={t("metadataSourceLinkTitle", { source: name })}
-          >
-            {name}
-            <BoxArrowUpRight size={10} aria-hidden="true" />
-          </ExternalLink>
-        ))}
-      </dd>
-    </div>
-  );
-}
-
-// The "Citation" button for the title block's action row.
-export function Citation({ metadata }) {
-  const { i18n } = useTranslation();
-  const citation = localized(metadata?.citation, i18n.language);
-  const doi = metadata?.doi;
-  // Waits for the metadata, so a page still loading doesn't claim there's none.
-  if (!metadata) return null;
-  return <CitationPopover citation={citation} doi={doi} />;
+// Where the dataset lives: the server it was harvested from, else its
+// catalogue record. The page's "open at source" exit.
+export function datasetSource(dataset, t, language) {
+  if (dataset.source_type === "obis") {
+    return {
+      name: "OBIS",
+      url: `https://obis.org/dataset/${dataset.dataset_id}`,
+    };
+  }
+  if (dataset.erddap_url) {
+    return {
+      name: "ERDDAP™",
+      url: localizedErddapUrl(dataset, dataset.erddap_url, language),
+    };
+  }
+  if (dataset.ckan_url) {
+    return {
+      name: t("metadataCatalogueName"),
+      url: localizedCkanUrl(dataset.ckan_url, language),
+    };
+  }
+  return undefined;
 }
 
 // Links that exist for every dataset of its kind, whatever its catalogue
@@ -555,6 +491,12 @@ function datasetResources(dataset, t, language) {
   return resources;
 }
 
+// CKAN resources often carry a MIME type ("application/x-netcdf").
+const formatName = (format) =>
+  format.includes("/")
+    ? format.split("/").pop().replace(/^x-/, "").toUpperCase()
+    : format;
+
 function Resource({ resource }) {
   const { t, i18n } = useTranslation();
   const name = localized(resource.name, i18n.language);
@@ -574,7 +516,9 @@ function Resource({ resource }) {
               : name || resource.url}
           </span>
           {resource.format && (
-            <span className="metadataResourceFormat">{resource.format}</span>
+            <span className="metadataResourceFormat">
+              {formatName(resource.format)}
+            </span>
           )}
           <BoxArrowUpRight
             className="metadataResourceIcon"
@@ -667,9 +611,15 @@ export default function DatasetMetadata({
       m.update_frequency && codeLabel(m.update_frequency),
     ],
   ].filter(([, value]) => value);
+  const extent = catalogueExtent(m);
+  const extentPills = [
+    [t("metadataTemporalExtentText"), extent.period],
+    [t("metadataVerticalExtentText"), extent.depth],
+  ].filter(([, value]) => value);
   const hasFinePrint =
     contacts.length > 0 ||
     datePills.length > 0 ||
+    extentPills.length > 0 ||
     m.projects?.length > 0 ||
     m.lineage ||
     m.acknowledgement;
@@ -687,6 +637,21 @@ export default function DatasetMetadata({
               <h4 className="metadataGroupTitle">{t("metadataDatesTitle")}</h4>
               <div className="metadataTags">
                 {datePills.map(([label, value]) => (
+                  <span className="metadataChip" key={label}>
+                    <span className="metadataDatePillLabel">{label}</span>
+                    {value}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {extentPills.length > 0 && (
+            <div className="metadataContextBlock">
+              <h4 className="metadataGroupTitle">
+                {t("metadataDeclaredExtentTitle")}
+              </h4>
+              <div className="metadataTags">
+                {extentPills.map(([label, value]) => (
                   <span className="metadataChip" key={label}>
                     <span className="metadataDatePillLabel">{label}</span>
                     {value}

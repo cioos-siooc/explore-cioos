@@ -174,8 +174,13 @@ export default function QuickFilters() {
           ) : (
             <BoundingBox size={18} aria-hidden="true" />
           )}
-          <span className="quickFilterCaption" aria-hidden="true">
-            {t("quickFilterCaptionArea")}
+          <span
+            className={classNames("quickFilterCaption", {
+              quickFilterCaptionPlace: areaPlace,
+            })}
+            aria-hidden="true"
+          >
+            {areaPlace ? areaPlace.name : t("quickFilterCaptionArea")}
           </span>
         </button>
         {areaMenuOpen && (

@@ -162,7 +162,7 @@ export default function HarvestServer() {
                         border: 0,
                         padding: 0,
                         textAlign: "left",
-                        color: "var(--cioos-primary-700)",
+                        color: "var(--cioos-primary-800)",
                       }}
                       title={t("harvest.warnings.filterBy")}
                       aria-pressed={warning === w.code}
