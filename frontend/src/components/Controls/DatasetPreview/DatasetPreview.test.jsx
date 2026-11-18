@@ -4,6 +4,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
+import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
 import DatasetPreview from "./DatasetPreview.jsx";
 import { PREVIEW_ERROR } from "./previewErrors.js";
 
@@ -247,7 +248,7 @@ describe("DatasetPreview", () => {
     });
 
     it("titles itself with the dataset and the record", () => {
-      open();
+      open({ url: "/?vis=table" });
       expect(screen.getByText("Test dataset:")).toBeInTheDocument();
       expect(screen.getByText("record-1")).toBeInTheDocument();
     });
@@ -257,6 +258,22 @@ describe("DatasetPreview", () => {
       expect(
         screen.getByRole("dialog", { name: /Test dataset: record-1/ }),
       ).toBeInTheDocument();
+    });
+
+    it("leaves the record to the plot's own title on a desktop plot", () => {
+      open();
+      expect(screen.getByText("record-1")).toHaveClass("sr-only");
+    });
+
+    it("keeps the record in sight over a table, which has no title", () => {
+      open({ url: "/?vis=table" });
+      expect(screen.getByText("record-1")).not.toHaveClass("sr-only");
+    });
+
+    it("keeps the record in sight on a phone, which hides the plot's heading", () => {
+      setViewportWidth(MOBILE_WIDTH);
+      open();
+      expect(screen.getByText("record-1")).not.toHaveClass("sr-only");
     });
   });
 

@@ -11,6 +11,9 @@ import {
 import Modal from "../../ui/Modal.jsx";
 import SegmentedToggle from "../../ui/SegmentedToggle.jsx";
 import useElementSize from "../../ui/useElementSize.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 
 import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
@@ -58,6 +61,7 @@ export default function DatasetPreview({
   // Plot state lives in the query string so a link reproduces the plot and Back
   // closes it. Only the six the header and the body need are read here; the rest
   // goes to the plot through the provider below.
+  const mobile = useMediaQuery(MOBILE_QUERY);
   const plotParams = usePreviewPlotParams(
     inspectDataset,
     datasetPreview?.table,
@@ -190,6 +194,10 @@ export default function DatasetPreview({
     setRecordLoading(false);
   };
   const dataIsReady = !recordLoading && datasetPreview?.table?.rows;
+  // A desktop plot names the record itself (its title, or the heading above a
+  // profile), so the header keeps it only for a screen reader there. A phone
+  // hides that heading for room, and a table has none.
+  const recordNamedBelow = dataIsReady && selectedVis === "plot" && !mobile;
 
   return (
     <Modal
@@ -228,9 +236,18 @@ export default function DatasetPreview({
                 className="datasetPreviewDatasetTitle"
                 title={inspectDataset.title}
               >
-                {inspectDataset.title}:
+                {inspectDataset.title}
+                {recordNamedBelow ? <span className="sr-only">:</span> : ":"}
               </span>{" "}
-              <i className="datasetPreviewRecord">{inspectRecordID}</i>
+              <i
+                className={
+                  recordNamedBelow
+                    ? "datasetPreviewRecord sr-only"
+                    : "datasetPreviewRecord"
+                }
+              >
+                {inspectRecordID}
+              </i>
               {inspectRecordPeriod && (
                 <span className="datasetPreviewPeriod">
                   {t("datasetPreviewPeriodText", inspectRecordPeriod)}
