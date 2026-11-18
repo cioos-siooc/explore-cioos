@@ -7,9 +7,9 @@
     "test": "npm run test:unit && npm run test:routes && npm run test:contract",
     "test:unit": "node --test \"utils/**/*.test.js\"",
     "test:routes": "node --test --test-force-exit \"routes/**/*.test.js\"",
-    "test:contract": "jest",
+    "test:contract": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:api": "npm run test:contract",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
