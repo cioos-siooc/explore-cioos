@@ -61,10 +61,9 @@ harvester/obis
 nginx/logs
 nginx/logrotate_state
 
-# --- Runtime config, never baked into an image ------------------------------
-# The harvest config is supplied at run time on purpose (see harvester/Dockerfile).
+# --- Local runtime config, never baked into an image ------------------------
+# The committed harvest_config.*.yaml files are baked (see harvester/Dockerfile).
 harvest_config.yaml
-harvest_config.production.yaml
 docker-compose.override.yaml
 
 # --- Secrets and local junk -------------------------------------------------
