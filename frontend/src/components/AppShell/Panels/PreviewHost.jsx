@@ -13,6 +13,8 @@ export default function PreviewHost() {
     datasetPreview,
     setDatasetPreview,
     previewError,
+    previewQuery,
+    retryPreview,
     inspectDataset,
     setInspectDataset,
     showPreviewModal,
@@ -32,6 +34,8 @@ export default function PreviewHost() {
         datasetPreview={datasetPreview}
         setDatasetPreview={setDatasetPreview}
         previewError={previewError}
+        previewQuery={previewQuery}
+        retryPreview={retryPreview}
         inspectDataset={inspectDataset}
         setInspectDataset={setInspectDataset}
         showModal={showPreviewModal}

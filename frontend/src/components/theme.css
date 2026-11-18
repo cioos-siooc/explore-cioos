@@ -275,6 +275,13 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Where something does have to scroll, a thin, quiet bar rather than the
+   system's full-width one. Not inherited, hence every element. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cioos-ink-40) transparent;
+}
+
 p,
 ul,
 ol {
@@ -425,7 +432,9 @@ h6 {
   .sidebarFooterHintMore,
   .railStep,
   .sortSelectDirection,
-  .quickFilterButton
+  .quickFilterButton,
+  .variableSelectDragHandle,
+  .copyLinkButton
 ) {
   position: relative;
 }
@@ -444,6 +453,8 @@ h6 {
   .railStep,
   .sortSelectDirection,
   .quickFilterButton,
+  .variableSelectDragHandle,
+  .copyLinkButton,
   .railHandle
 )::before,
 .form-switch .form-check-input::after {

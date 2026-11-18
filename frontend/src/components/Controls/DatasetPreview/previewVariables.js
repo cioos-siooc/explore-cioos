@@ -64,6 +64,14 @@ const COORDINATE_CATEGORIES = new Set(["Time"]);
 const trimmed = (value) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+// Some servers publish long_name with its accents still escaped
+// ("Temp\\u00e9rature"), which would print as written.
+const unescaped = (value) =>
+  value &&
+  value.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
+
 const numberOr = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -152,7 +160,7 @@ export function variablesFrom(table, dataset) {
         trimmed(columnUnits[index]) || (meta && trimmed(meta.units)) || null,
       type,
       isNumeric: NUMERIC_TYPES.has(String(type)),
-      longName: meta && trimmed(meta.long_name),
+      longName: meta && unescaped(trimmed(meta.long_name)),
       standardName: meta && trimmed(meta.standard_name),
       // columnMeta is what ERDDAP publishes; the dataset id fields are inferred.
       cfRole:
@@ -162,6 +170,8 @@ export function variablesFrom(table, dataset) {
         (meta && trimmed(meta.positive)) ||
         (columnName === altitudeProxyColumn ? "down" : null), // ERDDAP's cdm_altitude_proxy stands in for depth
       ioosCategory: meta && trimmed(meta.ioos_category),
+      // The EOVs this column measures; empty until the dataset is reharvested.
+      eovs: (meta && Array.isArray(meta.eovs) && meta.eovs) || [],
       palette: meta && trimmed(meta.colorBarPalette),
       // Read by previewColorScales.js for the colour dimension's ramp.
       colorBarScale: meta && trimmed(meta.colorBarScale),
@@ -185,7 +195,7 @@ export function variablesFrom(table, dataset) {
 export function labelFor(variable) {
   if (!variable) return "";
   const name = shortLabelFor(variable);
-  return variable.unit ? `${name} ( ${variable.unit} )` : name;
+  return variable.unit ? `${name} (${variable.unit})` : name;
 }
 
 export function shortLabelFor(variable) {
@@ -240,4 +250,44 @@ export function isDownwardVertical(variable) {
     name === "sea_water_pressure" ||
     name.startsWith("depth")
   );
+}
+
+const isPresent = (value) =>
+  value !== null &&
+  value !== undefined &&
+  value !== "" &&
+  (typeof value !== "number" || Number.isFinite(value));
+
+// Judged on the rows the preview holds, which is what the plot draws: a column
+// empty there draws an empty panel however full the rest of the record is.
+// `varies`: a column holding one value draws a flat line, so the default
+// panels skip it.
+export function withDataPresence(variables, rows) {
+  if (!rows || !rows.length) return variables;
+  return (variables || []).map((variable) => {
+    let first;
+    let hasData = false;
+    let varies = false;
+    for (const row of rows) {
+      const value = row[variable.columnName];
+      if (!isPresent(value)) continue;
+      if (!hasData) {
+        hasData = true;
+        first = value;
+      } else if (value !== first) {
+        varies = true;
+        break;
+      }
+    }
+    return { ...variable, hasData, varies };
+  });
+}
+
+// Unannotated counts as having data: before /preview lands nothing is known.
+export const hasData = (variable) => variable.hasData !== false;
+
+// The ones with data, or all of them when none has any.
+export function preferWithData(variables) {
+  const withData = (variables || []).filter(hasData);
+  return withData.length ? withData : variables || [];
 }

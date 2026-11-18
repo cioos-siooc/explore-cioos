@@ -34,6 +34,10 @@ import {
   COLOR_LAYOUT,
   LAYOUT_PARAM,
   PERIOD_PARAM,
+  BEFORE_PARAM,
+  DEFAULT_ROW_LIMIT,
+  ROWS_PARAM,
+  parseRowLimit,
   RECORD_PARAM,
   STEP_PARAM,
   TAB_PARAM,
@@ -46,7 +50,10 @@ import {
   networkPreviewError,
   previewErrorFrom,
 } from "../../components/Controls/DatasetPreview/previewErrors.js";
-import { hasColorPlotFor } from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
+import {
+  hasColorPlotFor,
+  plotLayoutFor,
+} from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
 
 const SelectionContext = createContext();
 
@@ -172,6 +179,13 @@ export default function SelectionProvider({ children }) {
   // Set and cleared in the same tick as datasetPreview, so the modal can never
   // hold one record's rows beside another's excuse.
   const [previewError, setPreviewError] = useState();
+  // The ERDDAP request /preview is waiting on, so the modal can show it running.
+  const [previewQuery, setPreviewQuery] = useState();
+  const [previewAttempt, setPreviewAttempt] = useState(0);
+  const retryPreview = useCallback(
+    () => setPreviewAttempt((attempt) => attempt + 1),
+    [],
+  );
   const [combinedQueries, setCombinedQueries] = useState([]);
   const [onlyInView, setOnlyInView] = useState(
     () => initialParams.get("onlyInView") === "true",
@@ -396,6 +410,7 @@ export default function SelectionProvider({ children }) {
           // the next station names a cast that station never took, and
           // /preview answers NO_DATA for it.
           next.delete(STEP_PARAM);
+          next.delete(BEFORE_PARAM);
           if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
           else next.delete(PERIOD_PARAM);
           return next;
@@ -688,11 +703,18 @@ export default function SelectionProvider({ children }) {
   // drawn, so they ride this fetch instead of a second one — one request, one
   // previewError, one recordLoading.
   const inspectAllProfiles =
-    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
-    hasColorPlotFor(inspectDataset);
+    hasColorPlotFor(inspectDataset) &&
+    plotLayoutFor(inspectDataset, searchParams.get(LAYOUT_PARAM)) ===
+      COLOR_LAYOUT;
   const inspectRecordStep = inspectAllProfiles
     ? undefined
     : searchParams.get(STEP_PARAM) || undefined;
+  const inspectRowLimit = parseRowLimit(searchParams.get(ROWS_PARAM));
+  // A step or a period already says which rows; /preview would ignore it.
+  const inspectBefore =
+    inspectRecordStep || inspectRecordPeriod
+      ? undefined
+      : searchParams.get(BEFORE_PARAM) || undefined;
 
   useEffect(() => {
     if (!inspectDatasetId || !inspectRecordID) return;
@@ -705,9 +727,26 @@ export default function SelectionProvider({ children }) {
         ? `&at=${encodeURIComponent(inspectRecordStep)}`
         : "") +
       (inspectAllProfiles ? "&allProfiles=true" : "") +
+      (inspectRowLimit !== DEFAULT_ROW_LIMIT
+        ? `&limit=${inspectRowLimit}`
+        : "") +
+      (inspectBefore ? `&before=${encodeURIComponent(inspectBefore)}` : "") +
       (inspectRecordPeriod
         ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
         : "");
+    // A record switched mid-flight must not show the previous one's request.
+    let current = true;
+    setPreviewQuery(undefined);
+    // Answered from the database alone, so it lands while /preview still waits
+    // on ERDDAP. Best effort: without it the modal just names the step.
+    fetch(previewUrl.replace("/preview?", "/preview/query?"))
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null)
+      .then((body) => {
+        if (current && typeof body?.erddapQuery === "string") {
+          setPreviewQuery(body.erddapQuery);
+        }
+      });
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) {
@@ -740,12 +779,18 @@ export default function SelectionProvider({ children }) {
           reportError("preview upstream failure", new Error(previewUrl));
         }
       });
+    return () => {
+      current = false;
+    };
   }, [
     inspectRecordID,
     inspectDatasetId,
     inspectRecordStep,
     inspectAllProfiles,
     inspectRecordPeriod,
+    inspectRowLimit,
+    inspectBefore,
+    previewAttempt,
   ]);
 
   const value = {
@@ -784,6 +829,8 @@ export default function SelectionProvider({ children }) {
     // dataset never resolves.
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
     previewError,
+    previewQuery,
+    retryPreview,
     recordLoading,
     setRecordLoading,
     datasetPreview,

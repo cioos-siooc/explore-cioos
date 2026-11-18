@@ -1,0 +1,3 @@
+{
+  "erddapQuery": "https://catalogue.hakai.org/erddap/tabledap/HakaiADCPTimeSeriesProfileProvisional.json?depth,time,SVELCV01,PSALST01,profile&profile=%22STATION_001-21/05/20-23:01:41%22&orderByLimit(%22100000%22)"
+}

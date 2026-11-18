@@ -10,6 +10,7 @@ import {
   colorScaleForVariable,
   normalizeColorScale,
   formatScalesParam,
+  legendTicksFor,
   parseScalesParam,
   swatchStopsFor,
   timeTicksFor,
@@ -239,4 +240,19 @@ test("an unknown scale, a rainbow or an unknown column is dropped", () => {
 test("no override at all deletes the param", () => {
   assert.equal(formatScalesParam({}), null);
   assert.equal(formatScalesParam({ TE90_01: "Rainbow" }), null);
+});
+
+test("the legend keeps the record's extent at its ends and round ticks between", () => {
+  const ticks = legendTicksFor({ range: [-0.7867, -0.02933] });
+  assert.deepEqual(
+    ticks.map(({ text }) => text),
+    ["-0.7867", "-0.6", "-0.4", "-0.2", "-0.02933"],
+  );
+  assert.equal(ticks[0].position, 0);
+  assert.equal(ticks.at(-1).position, 1);
+});
+
+test("a round tick crowding an end of the legend is left out", () => {
+  const texts = legendTicksFor({ range: [0.05, 3] }).map(({ text }) => text);
+  assert.deepEqual(texts, ["0.05", "1", "2", "3"]);
 });

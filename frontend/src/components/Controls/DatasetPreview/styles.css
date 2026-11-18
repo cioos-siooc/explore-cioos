@@ -9,13 +9,20 @@
   /* A definite height, not max-height: the plot sizes from this container, so a
    * content-sized modal would grow in visible steps (plot -> modal -> budget).
    * Definite all the way down, so the plot's pane row can use it as a % basis. */
-  height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
+  height: min(1100px, calc(100vh - 2 * var(--cioos-space-lg)));
+}
+
+/* Wider than the shared .modal-xl (1140px): the plot shares its row with the
+   parameters pane. */
+.dataPreviewModal .modal-dialog {
+  max-width: min(1600px, calc(100vw - 2 * var(--cioos-space-lg)));
 }
 
 .dataPreviewModal .modal-body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: var(--cioos-space-sm); /* the figure's own margins are its inset */
 }
 
 .tableAndPlotGridItem.tableAndPlot {
@@ -27,50 +34,16 @@
   /* Horizontal overflow belongs to the plot area, which sizes its own figure. */
 }
 
-.backButton {
-  text-align: center;
-  border: 2px solid var(--cioos-hairline);
-  border-radius: 10px;
-  justify-content: space-between;
-  padding: 5px;
-  margin-right: 10px;
-  min-width: fit-content;
-}
-
-.backButton:hover {
-  background-color: var(--cioos-teal-light);
-  cursor: pointer;
-}
-
-.backButton svg {
-  margin-right: 5px;
+/* The plot view fills this box exactly, so all it could scroll is a sub-pixel
+   of rounding; its panes scroll for themselves. */
+.tableAndPlotGridItem.tableAndPlot:has(> .datasetPreviewPlotPanes) {
+  overflow: hidden;
 }
 
 .tableAndPlotGridContainer {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.tableAndPlotGridContainer .toggleButton {
-  height: 42px;
-  margin: 0 16.5px;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid var(--cioos-hairline);
-  color: var(--cioos-ink);
-  line-height: 15px;
-  min-width: 100px;
-  max-width: 100px;
-}
-
-.toggleButton:hover {
-  background-color: var(--cioos-teal-light);
-}
-
-.toggleButton.selected {
-  background-color: var(--cioos-primary);
-  color: white;
 }
 
 .dataPreviewModal .datasetTitle {
@@ -86,32 +59,109 @@
   margin-top: 0;
 }
 
-/* Copy-link button: an icon-only square at the toggle buttons' height. */
+/* Copy-link button: an icon-only square at the view switch's height. */
 .tableAndPlotGridContainer .copyLinkButton {
-  width: 42px;
-  height: 42px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid var(--cioos-hairline);
-  color: var(--cioos-ink);
-  line-height: 15px;
-  white-space: nowrap;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  transition: background-color 0.15s ease-out;
 }
 
 .tableAndPlotGridContainer .copyLinkButton:hover {
-  background-color: var(--cioos-teal-light);
+  background-color: var(--cioos-surface-2);
 }
 
-/* Without a floor the container is at its minimum when Plotly measures it.
-   Reserves the panes' box so the modal does not jump when the chunk lands. */
-.datasetPreviewPlotLoading {
-  display: grid;
+.tableAndPlotGridContainer .copyLinkButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Loading and failure share the splash's shape: one mark, words beneath.
+   The floor matters while loading: without it the container is at its minimum
+   when Plotly measures it, and the modal jumps when the chunk lands. */
+.previewStatus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cioos-space-md);
   height: 100%;
   min-height: 320px;
+  padding: var(--cioos-space-lg);
+  text-align: center;
+  color: var(--cioos-primary);
+}
+
+.previewStatusSteps,
+.previewStatusDetail,
+.previewStatusQuery {
+  max-width: 60ch;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.previewStatus-error {
+  color: var(--cioos-ink-80);
+}
+
+.previewStatus-error > svg {
+  color: var(--cioos-error-700);
+}
+
+.previewStatusMessage {
+  max-width: 60ch;
+  margin: 0;
+}
+
+.previewStatusDetail {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.previewStatusRetry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.previewStatusRetry:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.previewStatusRetry:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* A URL runs to hundreds of characters; it wraps anywhere and stays a small
+   footnote under the steps rather than the headline. */
+.previewStatusQuery {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.previewStatusQuery a {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+  color: var(--cioos-primary-800);
 }
 
 /* Why a record refused to plot, in the plot's place. The columns it did find are
@@ -123,33 +173,70 @@
 }
 
 .datasetPreviewPlotBlockedColumns {
-  color: var(--cioos-text-muted, #666);
-  font-size: 0.9em;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
   overflow-wrap: anywhere;
-}
-
-.datasetPreviewPlotLoading .cioosSkeleton {
-  height: auto;
-}
-
-.datasetPreviewTableSkeleton {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px 16px;
-  padding: 12px;
 }
 
 .dataPreviewModal .datasetPreviewPeriod,
 .dataPreviewModal .datasetPreviewSample {
   display: block;
   margin-top: 4px;
-  font-size: 0.8em;
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
   font-weight: normal;
   color: var(--cioos-ink-80);
 }
 
-/* Phones: full-screen like the other dialogs, with the title, link and close on
-   the first row and the view toggles wrapping under them. */
+/* The Plot / Table switch (ui/SegmentedToggle), wider than the pane's. */
+.previewViewToggle .toggleButton {
+  min-width: 88px;
+}
+
+/* Paging a window of the record, above the plot or table. */
+.previewWindowPager {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+}
+
+/* Above the table, at the same left edge it has over the plot. */
+.tableAndPlot > .previewWindowPager {
+  padding-bottom: var(--cioos-space-xs);
+}
+
+.previewWindowButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.previewWindowButton:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+}
+
+.previewWindowButton:disabled {
+  color: var(--cioos-ink-40);
+  cursor: default;
+}
+
+.previewWindowButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Phones take the whole screen: the plot needs every pixel, and a framed
+   dialog over the map leaves nothing to tap behind it anyway. */
 @media (max-width: 700px), (max-height: 500px) {
   .dataPreviewModal .modal-dialog {
     width: 100vw;
@@ -164,29 +251,71 @@
     border-radius: 0;
   }
 
-  .tableAndPlotGridContainer {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .dataPreviewModal .datasetTitle,
-  .tableAndPlotGridContainer .copyLinkButton,
-  .tableAndPlotGridContainer > .closeButton {
-    order: -1;
+  /* The figure carries its own margins; the body adds none beside them. */
+  .dataPreviewModal .modal-body {
+    padding: var(--cioos-space-xs) var(--cioos-space-xs)
+      max(var(--cioos-space-xs), env(safe-area-inset-bottom));
   }
 
   .dataPreviewModal .datasetTitle {
-    flex: 1 1 calc(100% - 100px);
+    flex: 1 1 auto;
     min-width: 0;
     margin: 0;
-    font-size: var(--cioos-font-size-md);
-    overflow-wrap: anywhere;
+    font-size: var(--cioos-font-size-sm);
+    line-height: 1.3;
   }
 
-  .tableAndPlotGridContainer .toggleButton {
-    flex: 1 1 0;
-    height: 36px;
-    margin: 0;
-    max-width: none;
+  /* One line each, cut short: the plot needs the height more than the full
+     name, which the title attribute and the dataset page still carry. */
+  .dataPreviewModal .datasetTitle > * {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Two lines for the dataset's name: siblings in a catalogue often differ
+     only at the end ("… 0706a", "… 0706b"), which one line cuts off. */
+  .dataPreviewModal .datasetTitle > .datasetPreviewDatasetTitle {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+
+  .dataPreviewModal .datasetPreviewPeriod,
+  .dataPreviewModal .datasetPreviewSample {
+    margin-top: 0;
+  }
+
+  /* Icon-only: the words stay for screen readers. */
+  .previewViewToggle .toggleButton {
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .previewViewToggle .toggleLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Portrait: the view switch, who and what, then the actions, on one row. */
+@media (max-width: 700px) {
+  .tableAndPlotGridContainer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--cioos-space-sm);
+  }
+
+  .tableAndPlotGridContainer .copyLinkButton {
+    width: 32px;
+    height: 32px;
   }
 }

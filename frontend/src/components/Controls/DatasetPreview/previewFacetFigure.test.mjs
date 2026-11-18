@@ -11,6 +11,11 @@ import {
 import {
   buildColorFigure,
   buildFigure,
+  TICK_SPACING_PX,
+  buildGridFigure,
+  rankTicksFor,
+  buildOverlayFigure,
+  gridBoxFor,
   plotBoxFor,
   recordTitleFor,
 } from "./previewFacetFigure.js";
@@ -31,7 +36,9 @@ import {
   plotWidthFor,
   titleRoomFor,
   COLORBAR_ROOM_PX,
+  COLUMN_GAP,
   MIN_PANEL_PX,
+  TOOLBAR_ROOM_PX,
 } from "./previewFacetSizing.js";
 import { colorScaleFor } from "./previewColorScales.js";
 import { defaultColorFor } from "./previewColors.js";
@@ -65,7 +72,8 @@ const DATA = Array.from({ length: 20 }, (_, i) => {
   return row;
 });
 
-const TITLE = "Station Id: PMZA-RIKI — Profile: PMZA-RIKI-25/09/16-17:35:26";
+const TITLE =
+  "Station Id (timeseries_id): PMZA-RIKI — Profile (profile_id): PMZA-RIKI-25/09/16-17:35:26";
 
 // Publisher palettes on two measurements, to exercise the ERDDAP colour default.
 const VIKING_PALETTES = {
@@ -111,9 +119,56 @@ test("a profile gets one shared y axis and one x axis per panel", () => {
 test("the shared depth axis is reversed, and titled along itself", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
   assert.equal(layout.yaxis.autorange, "reversed");
-  assert.equal(layout.yaxis.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis.title.text, "depth of observation (m)");
   assert.equal(layout.yaxis.automargin, true);
   assert.equal(layout.annotations, undefined);
+});
+
+const withDepths = (from, to) =>
+  DATA.map((row, i) => ({
+    ...row,
+    depth: from + ((to - from) * i) / (DATA.length - 1),
+  }));
+const depthRange = (data) =>
+  figure("TimeSeriesProfile", ALL_SIX, { data }).layout.yaxis.autorangeoptions;
+
+test("a profile starting near 0 stops its depth axis at 0", () => {
+  assert.deepEqual(depthRange(withDepths(2, 100)), {
+    clipmin: 0,
+    clipmax: 100.98,
+  });
+  assert.deepEqual(
+    overlayFrom("Profile", ["TE90_01", "PSAL_01"], { data: withDepths(2, 100) })
+      .layout.yaxis.autorangeoptions,
+    { clipmin: 0, clipmax: 100.98 },
+  );
+});
+
+test("a profile ending near 0 from below stops there too", () => {
+  assert.deepEqual(depthRange(withDepths(-100, -2)), {
+    clipmin: -100.98,
+    clipmax: 0,
+  });
+});
+
+test("a profile far from 0, or across it, hugs its data", () => {
+  assert.deepEqual(depthRange(withDepths(50, 150)), {
+    clipmin: 49,
+    clipmax: 151,
+  });
+  assert.deepEqual(depthRange(withDepths(-50, 50)), {
+    clipmin: -51,
+    clipmax: 51,
+  });
+});
+
+test("a profile at a single depth is left to Plotly", () => {
+  assert.equal(depthRange(withDepths(5, 5)), undefined);
+});
+
+test("a timeseries' shared time axis is left to Plotly", () => {
+  const { layout } = figure("TimeSeries", ["TE90_01"]);
+  assert.equal(layout.xaxis.autorangeoptions, undefined);
 });
 
 test("the user can draw the shared depth axis upwards", () => {
@@ -135,12 +190,9 @@ test("a stack reverses only the panels it is asked to", () => {
 test("profile panel titles sit on top, one per variable", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
   assert.equal(layout.xaxis.side, "top");
-  assert.equal(
-    layout.xaxis.title.text,
-    "Temperature (1990 scale) ( degree_C )",
-  );
+  assert.equal(layout.xaxis.title.text, "Temperature (1990 scale) (degree_C)");
   assert.equal(layout.xaxis2.side, "top");
-  assert.equal(layout.xaxis2.title.text, "Practical Salinity ( PSU )");
+  assert.equal(layout.xaxis2.title.text, "Practical Salinity (PSU)");
 });
 
 test("every profile trace shares y and takes its own x", () => {
@@ -188,14 +240,12 @@ test("every timeseries trace shares x and takes its own y", () => {
   );
 });
 
-test("the first selected variable is drawn at the bottom", () => {
-  // Variable 1 is drawn lowest, so domain order runs opposite to panel order.
+test("the first selected variable is drawn at the top", () => {
+  // Rows read down in the order picked, and the shared axis sits under the last.
   const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01", "DOXY_01"]);
-  assert.ok(layout.yaxis.domain[0] < layout.yaxis3.domain[0]);
-  assert.equal(
-    layout.yaxis.title.text,
-    "Temperature (1990 scale) ( degree_C )",
-  );
+  assert.ok(layout.yaxis.domain[0] > layout.yaxis3.domain[0]);
+  assert.equal(layout.xaxis.anchor, "y3");
+  assert.equal(layout.yaxis.title.text, "Temperature (1990 scale) (degree_C)");
 });
 
 test("a timeseries puts time across and the variable up", () => {
@@ -244,7 +294,7 @@ test("a custom label replaces the name but keeps the unit", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
     labels: { TE90_01: "Temp" },
   });
-  assert.equal(layout.xaxis.title.text, "Temp ( degree_C )");
+  assert.equal(layout.xaxis.title.text, "Temp (degree_C)");
 });
 
 test("no rows yet still produces the full axis skeleton", () => {
@@ -261,7 +311,7 @@ test("no rows yet still produces the full axis skeleton", () => {
   });
   assert.equal(data.length, 2);
   assert.deepEqual(data[0].x, []);
-  assert.equal(layout.xaxis2.title.text, "Practical Salinity ( PSU )");
+  assert.equal(layout.xaxis2.title.text, "Practical Salinity (PSU)");
 });
 
 // --- every label runs along its own axis -----------------------------------
@@ -277,7 +327,7 @@ test("every stacked panel is titled on its own y axis", () => {
   }
 });
 
-test("a vertical axis title wraps to its own panel's height once it is known", () => {
+test("a vertical axis title fits its own panel's height in two lines once it is known", () => {
   const size = { width: 900, height: 1300 };
   const { layout } = figure("TimeSeries", ALL_SIX, { size });
   const margin = marginFor(ROWS, 1);
@@ -288,22 +338,26 @@ test("a vertical axis title wraps to its own panel's height once it is known", (
       layout[index === 0 ? "yaxis" : `yaxis${index + 1}`].title.text,
   );
   titles.forEach((text) => {
-    text.split("<br>").forEach((line) => {
-      assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
-    });
+    const lines = text.split("<br>");
+    assert.ok(lines.length <= 2, text);
+    lines
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
+      .forEach((line) =>
+        assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`),
+      );
   });
   assert.ok(
     titles.some((text) => text.includes("<br>")),
     titles.join(" | "),
   );
-  // Unmeasured, nothing wraps.
+  // Unmeasured, nothing is cut.
   const unsized = figure("TimeSeries", ALL_SIX);
-  assert.ok(!unsized.layout.yaxis2.title.text.includes("<br>"));
+  assert.ok(!unsized.layout.yaxis2.title.text.includes("…"));
 });
 
 test("a stack keeps its shared axis title", () => {
   const { layout } = figure("TimeSeries", ["TE90_01"]);
-  assert.equal(layout.xaxis.title.text, "Time ( UTC )");
+  assert.equal(layout.xaxis.title.text, "Time (UTC)");
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
 });
 
@@ -314,10 +368,10 @@ test("a profile titles its panels on top and its shared axis beside them", () =>
   assert.ok(layout.yaxis.title.text);
 });
 
-test("labels are twice the ticks, at the size the wrap estimate assumes", () => {
+test("labels head their ticks and the title heads the labels, at the size the wrap estimate assumes", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
   assert.equal(layout.font.size, TICK_FONT_PX);
-  assert.equal(LABEL_FONT_PX, 2 * TICK_FONT_PX);
+  assert.ok(TICK_FONT_PX < LABEL_FONT_PX && LABEL_FONT_PX < TITLE_FONT_PX);
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
   assert.equal(layout.yaxis.title.font.size, LABEL_FONT_PX);
 });
@@ -345,7 +399,7 @@ test("panel titles wrap to their own panel once the width is known", () => {
   titles.forEach((text) => {
     text
       .split("<br>")
-      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut, so it alone may run over
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut, so it alone may run over
       .forEach((line) => {
         assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
       });
@@ -563,7 +617,7 @@ test("a catalogue with no columnMeta still names the record", () => {
       variablesByName: byColumnName(variables),
       data: DATA,
     }),
-    "station_id: PMZA-RIKI — profile: PMZA-RIKI-25/09/16-17:35:26",
+    "station_id (timeseries_id): PMZA-RIKI — profile (profile_id): PMZA-RIKI-25/09/16-17:35:26",
   );
 });
 
@@ -812,7 +866,7 @@ test("a colour column costs the panels no width at all", () => {
   // the same width whether or not a colour column is set.
   const margin = marginFor(COLUMNS, MAX_TITLE_LINES);
   const width = plotWidthFor(COLUMNS, 6, 800);
-  const panels = (width - margin.l - margin.r) / panelPitch(6, 0.22);
+  const panels = (width - margin.l - margin.r) / panelPitch(6, COLUMN_GAP);
   assert.ok(panels >= MIN_PANEL_PX, `${panels}px panels`);
   assert.deepEqual(colored(ALL_SIX).layout.margin, {
     ...figure("TimeSeriesProfile", ALL_SIX).layout.margin,
@@ -827,11 +881,15 @@ test("the legend carries the label, the stops and the ticks", () => {
   assert.equal(colorLegend.label, labelFor(depth));
   // The same stops the markers were given, not a second likeness of them.
   assert.deepEqual(colorLegend.stops, layout.coloraxis.colorscale);
-  assert.equal(colorLegend.ticks.length, 4);
+  // The ends are the record's extent; the ticks between them are round.
+  const last = colorLegend.ticks.at(-1);
   assert.equal(colorLegend.ticks[0].position, 0);
-  assert.equal(colorLegend.ticks[3].position, 1);
+  assert.equal(last.position, 1);
   assert.equal(colorLegend.ticks[0].text, "1");
-  assert.equal(colorLegend.ticks[3].text, String(DATA.length));
+  assert.equal(last.text, String(DATA.length));
+  colorLegend.ticks
+    .slice(1, -1)
+    .forEach(({ text }) => assert.match(text, /^-?\d+(\.\d)?$/));
 });
 
 test("no colour column, no legend", () => {
@@ -1142,8 +1200,8 @@ test("every colour panel titles its Y, reverses depth and zooms with the first",
   const { layout } = colorFigure(["TE90_01", "PSAL_01"]);
   assert.equal(layout.yaxis.autorange, "reversed");
   assert.equal(layout.yaxis2.autorange, "reversed");
-  assert.equal(layout.yaxis.title.text, "depth of observation ( m )");
-  assert.equal(layout.yaxis2.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis.title.text, "depth of observation (m)");
+  assert.equal(layout.yaxis2.title.text, "depth of observation (m)");
   assert.equal(layout.yaxis.matches, undefined);
   assert.equal(layout.yaxis2.matches, "y");
 });
@@ -1157,8 +1215,8 @@ test("the user can draw a colour plot's depth upwards", () => {
 test("each panel's colourbar spans exactly its panel and names its variable", () => {
   const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
   [
-    ["coloraxis", layout.yaxis, "Temperature (1990 scale) ( degree_C )"],
-    ["coloraxis2", layout.yaxis2, "Practical Salinity ( PSU )"],
+    ["coloraxis", layout.yaxis, "Temperature (1990 scale) (degree_C)"],
+    ["coloraxis2", layout.yaxis2, "Practical Salinity (PSU)"],
   ].forEach(([name, axis, label], index) => {
     const { colorbar } = layout[name];
     const [start, end] = axis.domain;
@@ -1183,7 +1241,7 @@ test("each colourbar title wraps to its own panel's height", () => {
     const lines = layout[name].colorbar.title.text.split("<br>");
     assert.ok(lines.length > 1, name);
     lines
-      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
       .forEach((line) => assert.ok(line.length <= fits, `${name}: "${line}"`));
   });
 });
@@ -1275,7 +1333,7 @@ test("a profile's shared title fits its pinned strip: two lines, unit kept", () 
     size: { width: 600, height: 400 },
   });
   assert.equal(lineCount(layout.yaxis.title.text), 2);
-  assert.ok(layout.yaxis.title.text.endsWith("<br>( m )"));
+  assert.ok(layout.yaxis.title.text.endsWith("<br>(m)"));
 });
 
 test("a colour plot's X title fits its pinned strip: two lines, unit kept", () => {
@@ -1284,5 +1342,330 @@ test("a colour plot's X title fits its pinned strip: two lines, unit kept", () =
     size: { width: 400, height: 400 },
   });
   assert.equal(lineCount(layout.xaxis.title.text), 2);
-  assert.ok(layout.xaxis.title.text.endsWith("<br>( UTC )"));
+  assert.ok(layout.xaxis.title.text.endsWith("<br>(UTC)"));
+});
+
+// --- grids -------------------------------------------------------------------
+
+function gridFigure(extra = {}) {
+  const variables = variablesFrom(VIKING_PALETTES, VIKING_DATASET);
+  return buildGridFigure({
+    variablesByName: byColumnName(variables),
+    xAxes: ["TE90_01", "PSAL_01"],
+    yAxes: ["depth", "PRES_01"],
+    panelAxis: "x",
+    data: DATA,
+    mode: "markers",
+    uirevision: "test",
+    ...extra,
+  });
+}
+
+test("a grid draws one panel per X and Y pair, X across and Y down", () => {
+  const { data, layout, pinnable } = gridFigure();
+  assert.equal(pinnable, false);
+  assert.equal(data.length, 4);
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis]),
+    [
+      ["x", "y"],
+      ["x2", "y"],
+      ["x", "y2"],
+      ["x2", "y2"],
+    ],
+  );
+  // A column shares its X axis, a row its Y axis, so only the edges tick.
+  // The X axes run under the bottom row, the last Y picked.
+  assert.equal(layout.xaxis2.anchor, "y2");
+  assert.equal(layout.yaxis2.anchor, "x");
+  assert.equal(layout.hovermode, "closest");
+  assert.ok(layout.xaxis.domain[1] < layout.xaxis2.domain[0]);
+  assert.ok(layout.yaxis.domain[0] > layout.yaxis2.domain[1]);
+});
+
+test("a grid draws its panels' missing edges, and only those", () => {
+  const { layout } = gridFigure();
+  // 2 x 2: three panels lack a bottom or a left line, one lacks both.
+  assert.equal(layout.shapes.length, 4);
+});
+
+test("a grid keeps each panel variable's own colour", () => {
+  const { data } = gridFigure({ colors: { PSAL_01: "#123456" } });
+  assert.deepEqual(
+    data.map((trace) => trace.marker.color),
+    [data[0].marker.color, "#123456", data[0].marker.color, "#123456"],
+  );
+});
+
+test("a grid repeats every X column once per colour column, side by side", () => {
+  const { data, layout, colorLegends } = gridFigure({
+    xAxes: ["TE90_01"],
+    yAxes: ["depth", "PRES_01"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+  });
+  assert.equal(data.length, 4);
+  assert.deepEqual(
+    data.map((trace) => trace.marker.coloraxis),
+    ["coloraxis", "coloraxis2", "coloraxis", "coloraxis2"],
+  );
+  // The repeat zooms with the first, and each column says what it is shaded by.
+  assert.equal(layout.xaxis2.matches, "x");
+  const byName = byColumnName(variablesFrom(VIKING_PALETTES, VIKING_DATASET));
+  assert.deepEqual(
+    layout.annotations.map((annotation) => annotation.text),
+    [labelFor(byName.get("PSAL_01")), labelFor(byName.get("DOXY_01"))],
+  );
+  assert.deepEqual(
+    colorLegends.map((legend) => legend.axis),
+    ["coloraxis", "coloraxis2"],
+  );
+  assert.equal(layout.coloraxis.showscale, false);
+});
+
+test("a grid's colour headers wrap within their own column", () => {
+  const { layout } = gridFigure({
+    xAxes: ["TE90_01"],
+    yAxes: ["depth"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+    size: { width: 400, height: 400 },
+  });
+  const plottingWidth = 400 - layout.margin.l - layout.margin.r;
+  layout.annotations.forEach(({ text }, column) => {
+    const [start, end] = layout[column === 0 ? "xaxis" : "xaxis2"].domain;
+    const fits = maxCharsFor(plottingWidth * (end - start));
+    const lines = text.split("<br>");
+    assert.ok(lines.length > 1);
+    lines
+      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
+      .forEach((line) => assert.ok(line.length <= fits, `"${line}"`));
+  });
+});
+
+test("a grid shades each colour column in its own scale", () => {
+  const { layout } = gridFigure({
+    xAxes: ["TE90_01"],
+    yAxes: ["depth"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+    scales: { PSAL_01: "Cividis", DOXY_01: "Viridis" },
+  });
+  assert.deepEqual(layout.coloraxis.colorscale, colorScaleFor("Cividis"));
+  assert.deepEqual(layout.coloraxis2.colorscale, colorScaleFor("Viridis"));
+});
+
+test("a grid reverses each row whose Y is drawn downwards", () => {
+  const { layout } = gridFigure({ reversedYAxes: new Set(["PRES_01"]) });
+  assert.equal(layout.yaxis.autorange, undefined);
+  assert.equal(layout.yaxis2.autorange, "reversed");
+});
+
+test("a grid gives every panel at least its minimum size, and scrolls the rest", () => {
+  const box = gridBoxFor({
+    plan: null,
+    variablesByName: new Map(),
+    data: [],
+    columns: 6,
+    rows: 4,
+    availableHeight: 400,
+    measured: { width: 500, height: 400 },
+    withTitle: false,
+  });
+  assert.ok(box.width >= MIN_PANEL_PX * 6);
+  assert.ok(box.height >= MIN_PANEL_PX * 4);
+});
+
+test("a colour plot with one X stays the pinnable stack", () => {
+  const { pinnable } = colorFigure(["TE90_01"]);
+  assert.equal(pinnable, true);
+});
+
+test("a colour plot grids several X across and several Y down each colour", () => {
+  const { data, layout, pinnable } = colorFigure(["TE90_01", "PSAL_01"], {
+    xAxes: ["time", "PRES_01"],
+    yAxes: ["depth", "DOXY_01"],
+    data: SECTION,
+  });
+  assert.equal(pinnable, false);
+  // 2 colour x 2 Y rows, 2 X columns.
+  assert.equal(data.length, 8);
+  assert.ok(layout.yaxis4);
+  assert.ok(layout.xaxis2);
+  // A Y repeated for the second colour zooms with its first row.
+  assert.equal(layout.yaxis3.matches, "y");
+  assert.equal(layout.yaxis4.matches, "y2");
+  // Each colour's bar spans both of its rows.
+  const bar = layout.coloraxis.colorbar;
+  assert.equal(bar.len, layout.yaxis.domain[1] - layout.yaxis2.domain[0]);
+});
+
+// --- one plot, an axis per variable (pstack) -------------------------------
+
+function overlayFrom(type, panels, extra = {}) {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+  const variables = variablesFrom(VIKING_PALETTES, dataset);
+  const variablesByName = byColumnName(variables);
+  const plan = facetPlanFor(dataset, variables, DATA);
+  return buildOverlayFigure({
+    plan,
+    variablesByName,
+    panels,
+    sharedAxis: plan.sharedAxis,
+    data: DATA,
+    mode: "lines",
+    size: { width: 900, height: 600 },
+    uirevision: "test",
+    ...extra,
+  });
+}
+
+test("a stacked timeseries overlays every y axis on the left, shifting the extras out", () => {
+  const panels = ["TE90_01", "PSAL_01", "CNDC_01", "DOXY_01"];
+  const { data, layout, pinnable } = overlayFrom("TimeSeries", panels);
+  assert.equal(pinnable, false);
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis]),
+    [
+      ["x", "y"],
+      ["x", "y2"],
+      ["x", "y3"],
+      ["x", "y4"],
+    ],
+  );
+  const extras = [layout.yaxis2, layout.yaxis3, layout.yaxis4];
+  assert.equal(layout.yaxis.anchor, "x");
+  assert.equal(layout.yaxis.overlaying, undefined);
+  assert.deepEqual(
+    [layout.yaxis, ...extras].map((axis) => axis.side),
+    ["left", "left", "left", "left"],
+  );
+  extras.forEach((axis) => {
+    assert.equal(axis.anchor, "free");
+    assert.equal(axis.autoshift, true);
+    assert.equal(axis.overlaying, "y");
+  });
+  assert.equal(layout.margin.r, TOOLBAR_ROOM_PX);
+  assert.equal(layout.hovermode, "x unified");
+});
+
+test("each stacked axis takes its curve's colour, and only the first draws a grid", () => {
+  const { data, layout } = overlayFrom("TimeSeries", ["TE90_01", "PSAL_01"], {
+    colors: { PSAL_01: "#123456" },
+  });
+  assert.equal(layout.yaxis2.color, "#123456");
+  assert.equal(layout.yaxis2.linecolor, "#123456");
+  assert.equal(data[1].line.color, "#123456");
+  assert.equal(data[1].marker.color, "#123456");
+  assert.equal(layout.yaxis.color, data[0].line.color);
+  assert.equal(layout.yaxis.linecolor, data[0].line.color);
+  assert.equal(layout.yaxis2.showgrid, false);
+  assert.equal(layout.yaxis.showgrid, undefined);
+});
+
+test("a stacked profile runs every x axis across the top, stacking the extras upward", () => {
+  const panels = ["TE90_01", "PSAL_01", "CNDC_01", "DOXY_01"];
+  const { data, layout } = overlayFrom("Profile", panels);
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis]),
+    [
+      ["x", "y"],
+      ["x2", "y"],
+      ["x3", "y"],
+      ["x4", "y"],
+    ],
+  );
+  const axes = [layout.xaxis, layout.xaxis2, layout.xaxis3, layout.xaxis4];
+  assert.deepEqual(
+    axes.map((axis) => axis.side),
+    ["top", "top", "top", "top"],
+  );
+  const [bottom, top] = layout.yaxis.domain;
+  assert.equal(bottom, 0);
+  assert.ok(top < 1, "the plot shrinks to make room above it");
+  assert.equal(layout.xaxis.anchor, "y");
+  const positions = axes.slice(1).map((axis) => axis.position);
+  axes.slice(1).forEach((axis) => assert.equal(axis.anchor, "free"));
+  assert.ok(positions[0] > top && positions[1] > positions[0]);
+  assert.equal(positions[2], 1);
+  assert.equal(layout.yaxis.autorange, "reversed");
+  assert.equal(layout.hovermode, "y unified");
+});
+
+test("a stacked profile leaves each axis only the room its own title wraps to", () => {
+  const { layout } = overlayFrom("Profile", ["TE90_01", "PSAL_01", "DOXY_01"], {
+    size: { width: 400, height: 600 },
+    labels: {
+      TE90_01: "A much longer temperature label that has to wrap",
+      PSAL_01: "Salinity",
+    },
+  });
+  const top = layout.yaxis.domain[1];
+  const [above, aboveThat] = [layout.xaxis2, layout.xaxis3].map(
+    (axis) => axis.position,
+  );
+  assert.ok(above - top > aboveThat - above);
+});
+
+test("stacked axes past the first pick their own round ticks", () => {
+  const { layout } = overlayFrom("TimeSeries", ["TE90_01", "PSAL_01"]);
+  assert.equal(layout.yaxis2.tickmode, "auto");
+  assert.equal(layout.yaxis.tickmode, undefined);
+});
+
+test("a single stacked variable keeps the full plot height", () => {
+  const { layout } = overlayFrom("Profile", ["TE90_01"]);
+  assert.deepEqual(layout.yaxis.domain, [0, 1]);
+});
+
+test("x tick labels stay level, thinned to the panel's width", () => {
+  const size = { width: 390, height: 600 };
+  const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"], {
+    size,
+  });
+  const xAxes = Object.keys(layout).filter((key) => /^xaxis\d*$/.test(key));
+  assert.ok(xAxes.length > 0);
+  xAxes.forEach((key) => {
+    const axis = layout[key];
+    assert.equal(axis.tickangle, 0, key);
+    const [start, end] = axis.domain ?? [0, 1];
+    assert.ok(
+      axis.nticks <=
+        Math.max(2, (size.width * (end - start)) / TICK_SPACING_PX),
+      `${key}: ${axis.nticks}`,
+    );
+  });
+});
+
+test("an unpinned figure keeps its shared axis, starting from a small margin", () => {
+  const size = { width: 390, height: 600 };
+  const pinned = figure("TimeSeriesProfile", ["TE90_01"], { size });
+  const kept = figure("TimeSeriesProfile", ["TE90_01"], {
+    size,
+    pinned: false,
+  });
+  assert.notEqual(pinned.pinnable, false);
+  assert.equal(kept.pinnable, false);
+  // Room for short ticks and the title; automargin grows it from there, the
+  // same floor every vertical axis the figure keeps starts from.
+  assert.ok(kept.layout.margin.l > pinned.layout.margin.l);
+  assert.equal(kept.layout.margin.l, marginFor(ROWS, 0).l);
+  assert.equal(kept.layout.yaxis.automargin, true);
+});
+
+// --- rank ticks --------------------------------------------------------------
+
+test("rank ticks thin to what lies flat across an X axis, keeping both ends", () => {
+  const ticks = {
+    tickvals: [0, 1, 2, 3, 4, 5, 6, 7],
+    ticktext: ["a", "b", "c", "d", "e", "f", "g", ""],
+  };
+  // The unlabelled last tick is dropped, so "g" is the end kept.
+  assert.deepEqual(rankTicksFor(ticks, "x", 240), {
+    tickmode: "array",
+    tickvals: [0, 3, 6],
+    ticktext: ["a", "d", "g"],
+  });
+  assert.equal(rankTicksFor(ticks, "x", 2000).tickvals.length, 7);
+  // Unmeasured, or along Y where labels stack, nothing is thinned.
+  assert.equal(rankTicksFor(ticks, "x", 0).tickvals.length, 7);
+  assert.equal(rankTicksFor(ticks, "y", 240).tickvals.length, 7);
+  assert.deepEqual(rankTicksFor(null, "x", 240), {});
 });

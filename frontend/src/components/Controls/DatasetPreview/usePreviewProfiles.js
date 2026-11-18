@@ -23,6 +23,8 @@ import { server } from "../../../config.js";
 // genuinely wrong with the record.
 
 const NO_PROFILES = { column: null, steps: [], count: 0, truncated: false };
+// Only the loading screen reads `pending`; everything else sees no profiles.
+const PENDING_PROFILES = { ...NO_PROFILES, pending: true };
 
 // \u0000 cannot occur in either half, so no pair of ids can collide.
 const keyFor = (datasetId, recordId) =>
@@ -61,7 +63,12 @@ export default function usePreviewProfiles(datasetId, recordId) {
   }, [recordKey, datasetId, recordId]);
 
   return useMemo(
-    () => (loaded.key === recordKey ? loaded.profiles : NO_PROFILES),
+    () =>
+      loaded.key === recordKey
+        ? loaded.profiles
+        : recordKey
+          ? PENDING_PROFILES
+          : NO_PROFILES,
     [loaded, recordKey],
   );
 }

@@ -6,48 +6,78 @@
 // worth asserting on its own.
 
 import { COLUMNS } from "./previewFacetPlan.js";
-import { MAX_LABEL_LINES, MAX_TITLE_LINES } from "./previewLabelText.js";
-
-// Left of every vertical axis: room for its tick labels, then room for the
-// axis's own label, which runs along the axis and so needs only its line
-// height — two 18px lines here, automargin covers a third. Reserved by a
-// stack's margin and by a profile's pinned strip, both left of a vertical axis.
-export const TICK_ROOM_PX = 40;
-export const LABEL_GUTTER_PX = 48;
+import {
+  LABEL_FONT_PX,
+  MAX_LABEL_LINES,
+  MAX_TITLE_LINES,
+  SIDE_LABEL_LINES,
+  TITLE_FONT_PX,
+} from "./previewLabelText.js";
 
 // Above a profile's panels: their tick labels and the title standoff. The panel
 // titles' own lines are added per line, so they never reach the figure title.
-export const TOP_TICK_ROOM_PX = 28;
-// 18px at Plotly's LINE_SPACING of 1.3 is 23.4.
-export const LABEL_LINE_PX = 24;
+export const TOP_TICK_ROOM_PX = 32;
+// A label's line at Plotly's LINE_SPACING of 1.3: 15px is 19.5, so 20. Every
+// margin a label sits in is counted in these, so a phone's smaller labels
+// (MOBILE_LABEL_FONT_PX) buy back the room around them; each margin function
+// takes the `labelFont` the figure is drawn with.
+export const labelLineFor = (labelFont = LABEL_FONT_PX) =>
+  Math.ceil(labelFont * 1.3);
+export const LABEL_LINE_PX = labelLineFor();
+
+// A profile's pinned strip, left of its panels: room for the widest tick
+// labels, then every line its title may wrap to (axisLabelFor). Fixed, because
+// nothing inside the strip may push it.
+export const TICK_ROOM_PX = 48;
+const pinnedSideRoomFor = (labelFont) =>
+  TICK_ROOM_PX + SIDE_LABEL_LINES * labelLineFor(labelFont);
+
+// Left of a vertical axis the figure keeps: room for short tick labels and a
+// one-line title to start from, which Plotly's automargin grows to whatever the
+// drawn axis turns out to need. Reserving the worst case instead left a blank
+// band beside every short label.
+const SHORT_TICK_ROOM_PX = 28;
+const sideAxisRoomFor = (labelFont) =>
+  SHORT_TICK_ROOM_PX + labelLineFor(labelFont);
+
+// Right of every figure: Plotly's toolbar runs down that edge, its buttons 40px
+// wide on a touch screen (DatasetPreviewPlot/styles.css), and would sit on the
+// last panel without it.
+export const TOOLBAR_ROOM_PX = 40;
 
 // The shared axis is drawn in a strip of its own outside the scroller (see
 // previewPinnedAxis.js), so it stays in view however far the panels scroll: a
 // profile's on the left, a stack's at the bottom. The figure keeps only enough
-// of that edge not to clip the axis line. The title is capped at two lines,
-// because a strip sized from its title would feed back into the figure's size.
+// of that edge not to clip the axis line. A bottom strip's title is capped at
+// two lines, a left one's at one, because a strip sized from its title would
+// feed back into the figure's size.
 export const PINNED_AXIS_LINES = 2;
-const BOTTOM_TICK_ROOM_PX = 24;
+const BOTTOM_TICK_ROOM_PX = 28;
 export const PINNED_EDGE_PX = 4;
 
-export function pinnedAxisSizeFor(orientation) {
-  const tickRoom = orientation === COLUMNS ? TICK_ROOM_PX : BOTTOM_TICK_ROOM_PX;
-  return tickRoom + PINNED_AXIS_LINES * LABEL_LINE_PX;
+const bottomAxisRoomFor = (labelFont) =>
+  BOTTOM_TICK_ROOM_PX + PINNED_AXIS_LINES * labelLineFor(labelFont);
+
+export function pinnedAxisSizeFor(orientation, labelFont) {
+  return orientation === COLUMNS
+    ? pinnedSideRoomFor(labelFont)
+    : bottomAxisRoomFor(labelFont);
 }
 
 // Orientation-dependent because the two layouts spend their other edges
 // differently: a profile puts its panel titles on TOP and nothing at the
 // bottom, a stack labels each panel's own axis on the LEFT.
+// Each edge holds only what reaches it: half a tick label past the last
+// panel, and nothing below a profile, whose ticks and titles are all on top.
 const COLUMNS_MARGIN = {
   l: PINNED_EDGE_PX,
-  r: 26,
+  r: TOOLBAR_ROOM_PX,
   t: TOP_TICK_ROOM_PX,
-  b: 22,
+  b: PINNED_EDGE_PX,
 };
 const ROWS_MARGIN = {
-  l: TICK_ROOM_PX + LABEL_GUTTER_PX,
-  r: 26,
-  t: 30,
+  r: TOOLBAR_ROOM_PX,
+  t: 12,
   b: PINNED_EDGE_PX,
 };
 
@@ -55,9 +85,8 @@ const ROWS_MARGIN = {
 // its sideways title.
 export const COLORBAR_ROOM_PX = 96;
 
-// 14px at Plotly's LINE_SPACING of 1.3 is 18.2; 19 buys a pixel of clearance
-// rather than spending one.
-const TITLE_LINE_PX = 19;
+// TITLE_FONT_PX at Plotly's LINE_SPACING of 1.3, rounded up.
+const TITLE_LINE_PX = Math.ceil(TITLE_FONT_PX * 1.3);
 export const TITLE_PAD_PX = 10;
 
 // Nothing at all when there is no title — a record whose columns carry no
@@ -71,19 +100,31 @@ export function titleRoomFor(lineCount) {
  * for labels they cannot measure; buildFigure passes the counts it wrapped to.
  * `panelTitleLines` only counts for a profile, whose panel titles are on top.
  */
+const SHORT_BOTTOM_TICK_ROOM_PX = 22;
+
 export function marginFor(
   orientation,
   titleLines = MAX_TITLE_LINES,
   panelTitleLines = MAX_LABEL_LINES,
+  labelFont = LABEL_FONT_PX,
+  pinned = true,
 ) {
   if (orientation !== COLUMNS) {
-    return { ...ROWS_MARGIN, t: ROWS_MARGIN.t + titleRoomFor(titleLines) };
+    return {
+      ...ROWS_MARGIN,
+      l: sideAxisRoomFor(labelFont),
+      t: ROWS_MARGIN.t + titleRoomFor(titleLines),
+      ...(pinned
+        ? {}
+        : { b: SHORT_BOTTOM_TICK_ROOM_PX + labelLineFor(labelFont) }),
+    };
   }
   return {
     ...COLUMNS_MARGIN,
+    ...(pinned ? {} : { l: sideAxisRoomFor(labelFont) }),
     t:
       COLUMNS_MARGIN.t +
-      panelTitleLines * LABEL_LINE_PX +
+      panelTitleLines * labelLineFor(labelFont) +
       titleRoomFor(titleLines),
   };
 }
@@ -93,14 +134,16 @@ export function marginFor(
 // width on the eighteen gaps between them. A panel-relative gap keeps the same
 // proportions at any n.
 //
-// 0.22 is also what makes six 150px profile panels fit a ~1140px modal exactly.
-// Stacked panels need much less — every panel is labelled beside its own axis
-// and only the bottom one carries tick labels, so the gap is separation and
-// nothing else, and vertical space is the direction the modal scrolls.
-export const COLUMN_GAP = 0.22;
-export const ROW_GAP = 0.12;
+// Just enough to keep one panel's end tick label off the next one's first.
+// Stacked panels need less — every panel is labelled beside its own axis and
+// only the bottom one carries tick labels, so the gap is separation and
+// nothing else.
+export const COLUMN_GAP = 0.15;
+export const ROW_GAP = 0.08;
 
-// Below this a panel is not worth drawing; the container scrolls instead.
+// Below this a panel is not worth drawing; the container scrolls instead. Each
+// sizing function takes it as `minPanel`, which 0 turns into "fit the box": on
+// a touch screen a drag pans the data, so there is no scroll to fall back on.
 export const MIN_PANEL_PX = 150;
 export const MIN_PLOT_PX = 320;
 
@@ -109,6 +152,12 @@ export const MIN_PLOT_PX = 320;
 // minimum-size floors derive from it, so they cannot drift apart.
 export function panelPitch(n, gapRatio) {
   return n <= 0 ? 0 : n + (n - 1) * gapRatio;
+}
+
+// Rows top-down, in the order the variables were picked: Plotly counts a y
+// domain up from the bottom, so the first row takes the last domain.
+export function rowDomainsFor(n) {
+  return domainsFor(n, ROW_GAP).reverse();
 }
 
 // n evenly spaced [start, end] pairs over 0..1.
@@ -164,24 +213,118 @@ export function plotHeightFor(
   panelCount,
   availableHeight,
   titleLines = MAX_TITLE_LINES,
+  minPanel = MIN_PANEL_PX,
+  labelFont = LABEL_FONT_PX,
 ) {
   const available = Math.max(availableHeight || 0, MIN_PLOT_PX);
   if (orientation === COLUMNS) return available;
-  const margin = marginFor(orientation, titleLines);
+  const margin = marginFor(orientation, titleLines, undefined, labelFont);
   const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b;
+    minPanel * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b;
   // Whole pixels: a fractional height is a fractional scroll position.
   return Math.ceil(Math.max(available, needed));
 }
 
+// MIN_PLOT_PX stands in for a box not measured yet. A measured width is all
+// there is — a phone's is under it — and flooring it only adds a sideways
+// scroll; the panels' own minimum still applies.
+const widthBudgetFor = (availableWidth) =>
+  availableWidth > 0 ? availableWidth : MIN_PLOT_PX;
+
 // Profiles get narrow fast: six panels in a 1140px modal is ~170px each, which
 // still reads. The floor keeps a 14-column selection legible at the cost of a
 // horizontal scroll.
-export function plotWidthFor(orientation, panelCount, availableWidth) {
-  const available = Math.max(availableWidth || 0, MIN_PLOT_PX);
+export function plotWidthFor(
+  orientation,
+  panelCount,
+  availableWidth,
+  minPanel = MIN_PANEL_PX,
+  labelFont = LABEL_FONT_PX,
+) {
+  const available = widthBudgetFor(availableWidth);
   if (orientation !== COLUMNS) return available;
-  const margin = marginFor(orientation, MAX_TITLE_LINES);
+  const margin = marginFor(orientation, MAX_TITLE_LINES, undefined, labelFont);
   const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
+    minPanel * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
   return Math.ceil(Math.max(available, needed));
+}
+
+// A grid of panels (several variables on both axes): nothing is pinned, so the
+// figure keeps every edge's tick labels and titles itself — X titles under
+// each column, Y titles left of each row — and `header` adds room above the
+// columns naming what each one is coloured by, as many lines as an X title.
+export function gridMarginFor(
+  titleLines = MAX_TITLE_LINES,
+  { header = false, colorbars = false, labelFont = LABEL_FONT_PX } = {},
+) {
+  return {
+    l: sideAxisRoomFor(labelFont),
+    r: TOOLBAR_ROOM_PX + (colorbars ? COLORBAR_ROOM_PX : 0),
+    t:
+      12 +
+      (header ? PINNED_AXIS_LINES * labelLineFor(labelFont) : 0) +
+      titleRoomFor(titleLines),
+    b: bottomAxisRoomFor(labelFont),
+  };
+}
+
+// Every panel at least minPanel square; the scroller takes the rest.
+export function gridSizeFor({
+  columns,
+  rows,
+  availableWidth,
+  availableHeight,
+  margin,
+  minPanel = MIN_PANEL_PX,
+}) {
+  const needed = (count, gap) => minPanel * panelPitch(count, gap);
+  return {
+    width: Math.ceil(
+      Math.max(
+        widthBudgetFor(availableWidth),
+        needed(columns, COLUMN_GAP) + margin.l + margin.r,
+      ),
+    ),
+    height: Math.ceil(
+      Math.max(
+        Math.max(availableHeight || 0, MIN_PLOT_PX),
+        needed(rows, ROW_GAP) + margin.t + margin.b,
+      ),
+    ),
+  };
+}
+
+// One plot with every variable on an axis of its own (see buildOverlayFigure).
+// Nothing is pinned, so the figure keeps the shared axis's ticks and title. A
+// profile's value axes all run across the top, each past the first a
+// stackedAxisPxFor step further up; a stack's all run up the left, and Plotly's
+// autoshift places the extra ones from their measured labels. A step holds only
+// the lines the title below it wraps to, so one-line titles leave no blank band.
+export const MAX_STACKED_AXES = 4;
+export const stackedAxisPxFor = (
+  labelFont,
+  axisTitleLines = PINNED_AXIS_LINES,
+) => TOP_TICK_ROOM_PX + axisTitleLines * labelLineFor(labelFont);
+
+export function overlayMarginFor(
+  orientation,
+  titleLines = MAX_TITLE_LINES,
+  labelFont = LABEL_FONT_PX,
+  axisTitleLines = PINNED_AXIS_LINES,
+) {
+  const titleRoom = titleRoomFor(titleLines);
+  if (orientation === COLUMNS) {
+    return {
+      l: sideAxisRoomFor(labelFont),
+      r: TOOLBAR_ROOM_PX,
+      t: 10 + stackedAxisPxFor(labelFont, axisTitleLines) + titleRoom,
+      b: PINNED_EDGE_PX,
+    };
+  }
+  return {
+    l: sideAxisRoomFor(labelFont),
+    r: TOOLBAR_ROOM_PX,
+    t: 12 + titleRoom,
+    b: bottomAxisRoomFor(labelFont),
+  };
 }

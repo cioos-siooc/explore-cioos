@@ -10,6 +10,8 @@ import {
   byColumnName,
   isDownwardVertical,
   isTimeLike,
+  withDataPresence,
+  preferWithData,
 } from "./previewVariables.js";
 
 // The real /api/preview?dataset=mpoPmzaVikingCtdInsitu payload: a
@@ -352,11 +354,11 @@ test("label prefers long_name, then the column name", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(
     labelFor(index.get("TE90_01")),
-    "Temperature (1990 scale) ( degree_C )",
+    "Temperature (1990 scale) (degree_C)",
   );
 
   const noMeta = byColumnName(variablesFrom(VIKING_NO_META, VIKING_DATASET));
-  assert.equal(labelFor(noMeta.get("TE90_01")), "TE90_01 ( degree_C )");
+  assert.equal(labelFor(noMeta.get("TE90_01")), "TE90_01 (degree_C)");
 
   assert.equal(
     labelFor({
@@ -364,7 +366,7 @@ test("label prefers long_name, then the column name", () => {
       standardName: "sea_water_temperature",
       unit: "degree_C",
     }),
-    "x ( degree_C )",
+    "x (degree_C)",
   );
   assert.equal(labelFor({ columnName: "x" }), "x");
   assert.equal(labelFor(null), "");
@@ -387,7 +389,7 @@ test("columnUnits wins over the harvest, which may predate a units change", () =
     columnUnits: ["degree_C"],
     columnMeta: [{ name: "temperature", units: "K", long_name: "Temp" }],
   };
-  assert.equal(labelFor(variablesFrom(table, {})[0]), "Temp ( degree_C )");
+  assert.equal(labelFor(variablesFrom(table, {})[0]), "Temp (degree_C)");
 });
 
 test("colorBar min/max are parsed as numbers, absent ones stay undefined", () => {
@@ -530,3 +532,57 @@ test("a time column is recognised however ERDDAP spelled its units", () => {
 });
 
 export { VIKING, VIKING_NO_META, VIKING_DATASET };
+
+test("a column has data when any row holds a value, zero and text included", () => {
+  const variables = ["a", "b", "c", "d", "e"].map((columnName) => ({
+    columnName,
+  }));
+  const rows = [
+    { a: null, b: "", c: NaN, d: 0, e: null },
+    { a: undefined, b: null, c: null, d: null, e: "x" },
+  ];
+  assert.deepEqual(
+    withDataPresence(variables, rows).map((variable) => variable.hasData),
+    [false, false, false, true, true],
+  );
+});
+
+test("before any rows land nothing is marked empty", () => {
+  const variables = [{ columnName: "a" }];
+  assert.equal(withDataPresence(variables, []), variables);
+});
+
+test("preferWithData keeps every column when none has data", () => {
+  const empty = [
+    { columnName: "a", hasData: false },
+    { columnName: "b", hasData: false },
+  ];
+  assert.equal(preferWithData(empty), empty);
+});
+
+test("a column varies when its rows hold two distinct values", () => {
+  const variables = ["flat", "moving", "empty"].map((columnName) => ({
+    columnName,
+  }));
+  const rows = [
+    { flat: 4, moving: 1, empty: null },
+    { flat: 4, moving: null, empty: null },
+    { flat: 4, moving: 2, empty: null },
+  ];
+  assert.deepEqual(
+    withDataPresence(variables, rows).map((variable) => variable.varies),
+    [false, true, false],
+  );
+});
+
+test("a long_name published with its accents escaped reads with them", () => {
+  const table = {
+    columnNames: ["TEMP"],
+    columnTypes: ["float"],
+    columnUnits: ["degC"],
+    columnMeta: [{ name: "TEMP", long_name: "Temp\\u00e9rature" }],
+    rows: [],
+  };
+  const [variable] = variablesFrom(table, VIKING_DATASET);
+  assert.equal(variable.longName, "Température");
+});

@@ -6,23 +6,36 @@
 
 // Every label is drawn at this size explicitly, rather than at Plotly's default
 // for an axis title, which is what lets maxCharsFor predict how wide a label
-// will render. Twice the ticks, so a label reads as the heading of its numbers.
-export const LABEL_FONT_PX = 18;
-export const TICK_FONT_PX = 9;
-export const HOVER_FONT_PX = 12; // the hover box is read, not scanned: not tick-sized
-export const TITLE_FONT_PX = 14;
+// will render. A quarter again the ticks, so a label reads as the heading of
+// its numbers, and below the figure's title, which heads them all.
+export const LABEL_FONT_PX = 15;
+// On a phone the panels are narrow and the label's lines come out of the plot.
+export const MOBILE_LABEL_FONT_PX = 13;
+export const MOBILE_LABEL_LINES = 2;
+export const TICK_FONT_PX = 12;
+export const HOVER_FONT_PX = 13; // the hover box is read, not scanned: not tick-sized
+export const TITLE_FONT_PX = 18;
 export const MAX_TITLE_LINES = 2;
 
-// Average advance per character for Plotly's default stack ("Open Sans,
-// verdana, arial, sans-serif"), as a fraction of the font size. Deliberately
-// generous: overestimating wraps a label one word early, underestimating puts
-// two panel titles on top of each other.
-const CHAR_PX_PER_FONT_PX = 0.58;
-export const MAX_LABEL_LINES = 3;
+// The app's body face and ink (--cioos-font-body, --cioos-ink-80) rather than
+// Plotly's Open Sans in grey. Every font in a figure inherits from this one.
+export const PLOT_FONT = {
+  family: "Montserrat, system-ui, -apple-system, sans-serif",
+  color: "rgba(21,47,55,0.82)",
+};
 
-// labelFor writes "long_name ( unit )", and the unit group is both the tail of
+// Average advance per character for PLOT_FONT, as a fraction of the font size.
+// Deliberately generous: overestimating wraps a label one word early,
+// underestimating puts two panel titles on top of each other.
+const CHAR_PX_PER_FONT_PX = 0.62;
+export const MAX_LABEL_LINES = 3;
+// A label along a vertical axis: every line costs the margin a line's width,
+// so it gets two, and the name gives way before the unit does.
+export const SIDE_LABEL_LINES = 2;
+
+// labelFor writes "long_name (unit)", and the unit group is both the tail of
 // every label and the part that collides first, so it gets its own line.
-const UNIT_SUFFIX = /\s\(\s[^()]*\s\)$/;
+const UNIT_SUFFIX = /\s\([^()]*\)$/;
 
 // 0 means "unknown" — buildFigure is called before the plot area has been
 // measured, and every caller treats 0 as "do not wrap" rather than wrapping
@@ -84,6 +97,16 @@ export function wrapLabel(text, maxChars, maxLines = MAX_LABEL_LINES) {
     lines = kept;
   }
   return [...lines, ...(unit ? [unit] : [])].join("<br>");
+}
+
+// A title running along a vertical axis, held to the lines its margin keeps.
+export const sideLabel = (text, maxChars) =>
+  wrapLabel(text, maxChars, SIDE_LABEL_LINES);
+
+export function axisLabelFor(letter, text, maxChars, maxLines) {
+  return letter === "y"
+    ? sideLabel(text, maxChars)
+    : wrapLabel(text, maxChars, maxLines);
 }
 
 // The title wraps against the whole figure width, not a panel: it is centred on

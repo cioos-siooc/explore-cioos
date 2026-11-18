@@ -14,6 +14,15 @@ export const STEP_PARAM = "pstep";
 // window instead of the stepped one — see the /preview `allProfiles` parameter.
 export const LAYOUT_PARAM = "playout";
 export const COLOR_LAYOUT = "color";
+export const PANELS_LAYOUT = "panels";
+
+// How many rows /preview draws (see its `limit`), and the instant its window
+// ends at instead of the record's newest row (its `before`). Read by
+// SelectionProvider, because they change what is fetched.
+export const ROWS_PARAM = "prows";
+export const DEFAULT_ROW_LIMIT = 5000;
+export const ROW_LIMITS = [DEFAULT_ROW_LIMIT, 20000, 50000];
+export const BEFORE_PARAM = "pbefore";
 
 // `YYYY-MM-DD~YYYY-MM-DD` (inclusive UTC days), set when a trajectory pass is
 // plotted. Absent means the record's most recent data.
@@ -27,6 +36,12 @@ export const TAB_PARAM = "tab";
 // map; absent is the sidebar.
 export const WIDE_PARAM = "wide";
 
+// Anything else in the address reads as the default, not as a request for it.
+export function parseRowLimit(value) {
+  const limit = Number(value);
+  return ROW_LIMITS.includes(limit) ? limit : DEFAULT_ROW_LIMIT;
+}
+
 export function parsePeriod(value) {
   const [start, end] = (value || "").split("~");
   return start && end ? { start, end } : undefined;
@@ -38,26 +53,43 @@ export function parsePeriod(value) {
 //                                  cdm_data_type, table for Grid/unknown)
 //   pvars    the panel variables, comma-separated, one panel each
 //                                  (default: the dataset's first EOV column)
-//   paxis    the axis every panel shares
+//   paxis    the axis every panel shares, comma-separated; several make a
+//            grid with the panels on the other axis
 //                                  (default: depth / time / track, per type)
+//   porient  columns | rows        which way the panels run: across with a
+//                                  shared Y, or stacked with a shared X
+//                                  (default: columns for profiles, rows
+//                                  otherwise)
 //   pmode    markers | lines | markers+lines
 //   pcolors  per-variable colours, `column~rrggbb` comma-separated
 //                                  (default: the variable's own ERDDAP palette)
-//   pz       the column whose values shade EVERY panel — the third dimension
+//   pz       the columns whose values shade EVERY panel — the third
+//            dimension, comma-separated; several repeat each panel per column
 //                                  (default: none; colour then says which
 //                                  variable a panel draws, not what a third
 //                                  one was doing)
-//   pzscale  the colourscale that column is drawn in
+//   pzscale  retired single scale, read as the first `pz` column's
+//            `pzscales` entry until the next scale or colour write
+//   playout  panels | color        `panels`: one panel per variable against a
+//                                  shared axis; `color`: the same X and Y in
+//                                  every panel, one panel per `pvars`
+//                                  variable, each shaded by that variable
+//                                  (default: color for TimeSeriesProfile and
+//                                  TrajectoryProfile, panels otherwise)
+//   pcx      the colour plot's X, comma-separated; several make a grid
+//                                  (default: time, else the track)
+//   pcy      the colour plot's Y, comma-separated
+//                                  (default: depth, else a measurement)
+//   pzscales the scale per colour variable, in either layout,
+//            `column~Scale` comma-separated
 //                                  (default: its own colorBarPalette, else
 //                                  Viridis — and never a rainbow)
-//   playout  color                 (default: one panel per variable against a
-//                                  shared axis; `color` draws the same X and Y
-//                                  in every panel, one panel per `pvars`
-//                                  variable, each shaded by that variable)
-//   pcx      the colour plot's X   (default: time / track, per type)
-//   pcy      the colour plot's Y   (default: depth, else a measurement)
-//   pzscales the colour plot's scale per variable, `column~Scale` comma-
-//            separated             (default: as for pzscale)
+//   pzshare  1: every colour variable in the first one's scale
+//                                  (default: each in its own)
+//   pstack   1: the panel variables on ONE plot, each on its own axis in its
+//            line's colour     (default: one panel per variable; ignored by
+//                                  the colour plot, and drops `pz` and every
+//                                  shared axis but the first while set)
 //   pyflip   the columns whose Y axis is drawn opposite to its default,
 //            comma-separated       (default: none; a depth or pressure on Y
 //                                  is drawn downwards)
@@ -66,10 +98,15 @@ export function parsePeriod(value) {
 //                                  (default: none, meaning the window
 //                                  /preview returns on its own — every profile
 //                                  in the tail of the record at once)
+//   prows    how many rows are fetched, one of ROW_LIMITS
+//                                  (default: DEFAULT_ROW_LIMIT)
+//   pbefore  the instant the fetched window ends at, exclusive
+//                                  (default: none, the record's newest row)
 export const PLOT_PARAMS = [
   "vis",
   "pvars",
   "paxis",
+  "porient",
   "pmode",
   "pcolors",
   "pz",
@@ -78,8 +115,12 @@ export const PLOT_PARAMS = [
   "pcx",
   "pcy",
   "pzscales",
+  "pzshare",
+  "pstack",
   "pyflip",
   STEP_PARAM,
+  ROWS_PARAM,
+  BEFORE_PARAM,
 ];
 
 // Never read back; kept only so old links don't leave orphans in the address

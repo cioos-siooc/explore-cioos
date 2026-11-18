@@ -100,9 +100,9 @@ test("omits altitudeProxyColumn when the dataset declares no proxy", async () =>
   assert.equal("altitudeProxyColumn" in res.body.table, false);
 });
 
-test("truncates rows to 1000 even when ERDDAP returns more", async () => {
+test("truncates rows to 5000 even when ERDDAP returns more", async () => {
   db.queueRaw([FEATURE_ROW]);
-  const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);
+  const manyRows = Array.from({ length: 7500 }, (_, i) => [i]);
   axios.queueResponse({
     data: { table: { columnNames: ["i"], rows: manyRows } },
   });
@@ -112,7 +112,7 @@ test("truncates rows to 1000 even when ERDDAP returns more", async () => {
     .query({ dataset: "obs_270", profile: "1" });
 
   assert.equal(res.status, 200);
-  assert.equal(res.body.table.rows.length, 1000);
+  assert.equal(res.body.table.rows.length, 5000);
 });
 
 test("404s RECORD_NOT_FOUND when the feature query resolves nothing", async () => {
@@ -174,6 +174,32 @@ test("502s ERDDAP_UNAVAILABLE for a genuine upstream failure", async () => {
   assert.equal(res.status, 502);
   assert.equal(res.body.error, "ERDDAP_UNAVAILABLE");
   assert.equal(res.body.upstreamStatus, null);
+  // So the UI can link the request that failed.
+  assert.equal(res.body.erddapQuery, axios.calls[0].url);
+});
+
+test("/preview/query names the ERDDAP request /preview makes, without making it", async () => {
+  db.queueRaw([FEATURE_ROW]);
+  const planned = await agent
+    .get("/preview/query")
+    .query({ dataset: "obs_270", profile: "1" });
+  assert.equal(planned.status, 200);
+  assert.equal(axios.calls.length, 0);
+
+  resetCache();
+  db.queueRaw([FEATURE_ROW]);
+  axios.queueResponse({ data: { table: { columnNames: [], rows: [[1]] } } });
+  await agent.get("/preview").query({ dataset: "obs_270", profile: "1" });
+  assert.equal(planned.body.erddapQuery, axios.calls[0].url);
+});
+
+test("/preview/query refuses an unknown record the way /preview does", async () => {
+  db.queueRaw([]);
+  const res = await agent
+    .get("/preview/query")
+    .query({ dataset: "obs_270", profile: "nope" });
+  assert.equal(res.status, 404);
+  assert.equal(res.body.error, "RECORD_NOT_FOUND");
 });
 
 // NOTE: isLength() without .exists() does not reject an absent field in
@@ -190,8 +216,9 @@ test("escapes ERDDAP regex metacharacters in the profile id constraint", async (
 
   await agent.get("/preview").query({ dataset: "obs_270", profile: "a.b+c" });
 
-  // encodeURIComponent turns the escaped "\+" into "%5C%2B".
-  assert.match(axios.calls[0].url, /a%5C\.b%5C%2Bc/);
+  // Bracketed, not backslashed: a `%5C` gets the request 403'd by Cloudflare.
+  assert.match(axios.calls[0].url, /a%5B\.%5Db%5B%2B%5Dc/);
+  assert.ok(!axios.calls[0].url.includes("%5C"));
 });
 
 // --- stepping to one profile inside a record ---------------------------------
@@ -433,7 +460,11 @@ test("a tail window is a sample of the whole record", async () => {
     .get("/preview")
     .query({ dataset: "mpoPmzaVikingCtdBinned", profile: "AZMP-ESG" });
 
-  assert.deepEqual(res.body.sample, { rowCount: 2, totalRowCount: 26000 });
+  assert.deepEqual(res.body.sample, {
+    rowCount: 2,
+    totalRowCount: 26000,
+    startOfRecord: false,
+  });
 });
 
 test("a whole record is all of itself, even when the harvest counted fewer", async () => {
@@ -446,12 +477,16 @@ test("a whole record is all of itself, even when the harvest counted fewer", asy
     .get("/preview")
     .query({ dataset: "obs_270", profile: "1" });
 
-  assert.deepEqual(res.body.sample, { rowCount: 2, totalRowCount: 2 });
+  assert.deepEqual(res.body.sample, {
+    rowCount: 2,
+    totalRowCount: 2,
+    startOfRecord: true,
+  });
 });
 
 test("one cast cut at the row cap is counted from what ERDDAP sent", async () => {
   db.queueRaw([STEPPED_ROW]);
-  const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);
+  const manyRows = Array.from({ length: 7500 }, (_, i) => [i]);
   axios.queueResponse({
     data: { table: { columnNames: ["depth"], rows: manyRows } },
   });
@@ -462,7 +497,11 @@ test("one cast cut at the row cap is counted from what ERDDAP sent", async () =>
     at: "AZMP-ESG-21/05/20-23:01:41",
   });
 
-  assert.deepEqual(res.body.sample, { rowCount: 1000, totalRowCount: 1500 });
+  assert.deepEqual(res.body.sample, {
+    rowCount: 5000,
+    totalRowCount: 7500,
+    startOfRecord: false,
+  });
 });
 
 // --- /preview/profiles -------------------------------------------------------
@@ -715,4 +754,111 @@ test("`at` wins over a period: a single cast needs no time window", async () => 
   const { url } = axios.calls[0];
   assert.ok(url.includes("&profile=~"));
   assert.ok(!url.includes("time>") && !url.includes("time<"));
+});
+
+// --- paging back and drawing more -------------------------------------------
+
+const TAIL_ROW = {
+  ...FEATURE_ROW,
+  n_records: 90000,
+  use_whole_profile: false,
+  new_start_time: "2024-02-01T00:00:00Z",
+};
+
+test("`limit` sizes the window and the trim", async () => {
+  db.queueRaw([TAIL_ROW]);
+  const manyRows = Array.from({ length: 30000 }, (_, i) => [
+    new Date(Date.UTC(2024, 0, 1) + i * 60000).toISOString(),
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: manyRows } },
+  });
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", limit: "20000" });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.table.rows.length, 20000);
+  assert.equal(res.body.table.rows[0][0], manyRows[10000][0]);
+  assert.match(db.queries[0], /CEIL\(20000 \//);
+});
+
+test("rejects a limit past the cap", async () => {
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", limit: "50001" });
+  assert.equal(res.status, 400);
+  assert.equal(axios.calls.length, 0);
+});
+
+test("`before` ends the window there, exclusive, and anchors the SQL on it", async () => {
+  db.queueRaw([TAIL_ROW]);
+  axios.queueResponse({
+    data: {
+      table: { columnNames: ["time"], rows: [["2024-02-10T00:00:00Z"]] },
+    },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "obs_270",
+    profile: "1",
+    before: "2024-02-15T06:00:00Z",
+  });
+
+  assert.equal(res.status, 200);
+  assert.match(
+    axios.calls[0].url,
+    /&time>2024-02-01T00:00:00Z&time<2024-02-15T06:00:00\.000Z$/,
+  );
+  assert.match(db.queries[0], /CAST\('2024-02-15T06:00:00Z' AS timestamptz\)/);
+  assert.equal(res.body.sample.totalRowCount, 90000);
+  assert.equal(res.body.sample.startOfRecord, false);
+});
+
+test("`before` reaching the record's start says so", async () => {
+  db.queueRaw([{ ...TAIL_ROW, use_whole_profile: true }]);
+  axios.queueResponse({
+    data: {
+      table: { columnNames: ["time"], rows: [["2020-01-01T00:00:00Z"]] },
+    },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "obs_270",
+    profile: "1",
+    before: "2020-01-02T00:00:00Z",
+  });
+
+  assert.match(axios.calls[0].url, /&time<2020-01-02T00:00:00\.000Z$/);
+  assert.doesNotMatch(axios.calls[0].url, /time>/);
+  assert.deepEqual(res.body.sample, {
+    rowCount: 1,
+    totalRowCount: 90000,
+    startOfRecord: true,
+  });
+});
+
+test("a period wins over `before`", async () => {
+  db.queueRaw([TAIL_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2020-01-03"]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "obs_270",
+    profile: "1",
+    before: "2024-02-15T06:00:00Z",
+    timeMin: "2020-01-03T00:00:00Z",
+    timeMax: "2020-01-05T23:59:59Z",
+  });
+
+  assert.doesNotMatch(axios.calls[0].url, /time<2024/);
+});
+
+test("rejects a `before` that is not an ISO 8601 instant", async () => {
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", before: "last week" });
+  assert.equal(res.status, 400);
 });

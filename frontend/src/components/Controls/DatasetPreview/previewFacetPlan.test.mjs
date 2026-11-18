@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { variablesFrom } from "./previewVariables.js";
+import { variablesFrom, withDataPresence } from "./previewVariables.js";
 import {
   axisDirectionsFor,
   colorCandidatesFor,
@@ -14,6 +14,8 @@ import {
   resolvePanels,
   defaultVisFor,
   hasColorPlotFor,
+  defaultPlotLayoutFor,
+  plotLayoutFor,
   COLUMNS,
   ROWS,
 } from "./previewFacetPlan.js";
@@ -618,7 +620,7 @@ test("a profile's colour plot runs time across its depth", () => {
   }
 });
 
-test("a trajectory profile's colour plot runs its track across its depth", () => {
+test("a trajectory profile's colour plot runs time across its depth", () => {
   const dataset = { ...VIKING_DATASET, cdm_data_type: "TrajectoryProfile" };
   const variables = variablesFrom(VIKING, dataset);
   const data = [
@@ -632,8 +634,22 @@ test("a trajectory profile's colour plot runs its track across its depth", () =>
       [...variables, trackIndex.variable],
       data,
     ),
-    { x: POSITION_INDEX_COLUMN, y: "depth" },
+    { x: "time", y: "depth" },
   );
+});
+
+test("a record of many profiles opens on the colour plot, any link may ask for panels", () => {
+  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
+    const dataset = { cdm_data_type: type };
+    assert.equal(defaultPlotLayoutFor(dataset), "color", type);
+    assert.equal(plotLayoutFor(dataset, "panels"), "panels", type);
+    assert.equal(plotLayoutFor(dataset, "bogus"), "color", type);
+  }
+  for (const type of ["Profile", "TimeSeries", "Trajectory", "Point"]) {
+    const dataset = { cdm_data_type: type };
+    assert.equal(defaultPlotLayoutFor(dataset), "panels", type);
+    assert.equal(plotLayoutFor(dataset, "color"), "panels", type);
+  }
 });
 
 test("a timeseries' colour plot keeps time across and puts depth down", () => {
@@ -659,4 +675,177 @@ test("no plan means no colour plot axes", () => {
     x: null,
     y: null,
   });
+});
+
+// VIKING's rows with every value but the named columns' blanked out.
+const vikingWithDataIn = (dataset, columnNames) =>
+  withDataPresence(variablesFrom(VIKING, dataset), [
+    Object.fromEntries(
+      VIKING.columnNames.map((columnName) => [
+        columnName,
+        columnNames.includes(columnName) ? 1 : null,
+      ]),
+    ),
+  ]);
+
+test("an empty first_eov_column gives way to a measurement that has data", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const variables = vikingWithDataIn(dataset, ["depth", "PSAL_01"]);
+  assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["PSAL_01"]);
+});
+
+test("without a usable first_eov_column, a column mapped to an EOV opens first", () => {
+  const dataset = {
+    ...VIKING_DATASET,
+    cdm_data_type: "TimeSeriesProfile",
+    first_eov_column: null,
+  };
+  const table = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta && meta.name === "DOXY_01"
+        ? { ...meta, eovs: ["subsurfaceOxygen"] }
+        : meta,
+    ),
+  };
+  assert.deepEqual(
+    facetPlanFor(dataset, variablesFrom(table, dataset)).panelDefaults,
+    ["DOXY_01"],
+  );
+});
+
+test("a record with no data anywhere opens on the usual default", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const variables = vikingWithDataIn(dataset, []);
+  assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["TE90_01"]);
+});
+
+test("Point shares its first measurement that has data", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Point" };
+  const variables = vikingWithDataIn(dataset, ["CNDC_01", "PSAL_01"]);
+  const plan = facetPlanFor(dataset, variables);
+  assert.equal(plan.sharedAxis, "CNDC_01");
+  assert.deepEqual(plan.panelDefaults, ["PSAL_01"]);
+});
+
+// Four VIKING rows down a profile through time: depth and time step, the
+// `curved` columns bend (each offset, so none repeats another), the `linear` ones rise in step, the rest hold still.
+const vikingRows = ({ curved = [], linear = [] }) =>
+  [0, 1, 2, 3].map((step) =>
+    Object.fromEntries(
+      VIKING.columnNames.map((columnName) => [
+        columnName,
+        columnName === "time"
+          ? `2020-01-0${step + 1}T00:00:00Z`
+          : columnName === "depth"
+            ? step
+            : curved.includes(columnName)
+              ? step * step + curved.indexOf(columnName)
+              : linear.includes(columnName)
+                ? 2 * step + 1
+                : 7,
+      ]),
+    ),
+  );
+const defaultsFor = (cdm_data_type, columns) => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type };
+  const rows = vikingRows(columns);
+  const variables = withDataPresence(variablesFrom(VIKING, dataset), rows);
+  return facetPlanFor(dataset, variables, rows).panelDefaults;
+};
+
+test("profiles and timeseries open on up to three varying measurements, the EOV first", () => {
+  ["Profile", "TimeSeriesProfile", "TrajectoryProfile", "TimeSeries"].forEach(
+    (cdm_data_type) => {
+      assert.deepEqual(
+        defaultsFor(cdm_data_type, {
+          curved: ["CNDC_01", "PSAL_01", "DOXY_01", "TE90_01"],
+        }),
+        ["TE90_01", "CNDC_01", "PSAL_01"],
+        cdm_data_type,
+      );
+    },
+  );
+});
+
+test("a constant measurement is left out of the default panels", () => {
+  assert.deepEqual(
+    defaultsFor("TimeSeries", { curved: ["PSAL_01", "DOXY_01"] }),
+    ["PSAL_01", "DOXY_01"],
+  );
+});
+
+test("pressure and straight lines are left out of the default panels", () => {
+  assert.deepEqual(
+    defaultsFor("Profile", {
+      curved: ["PRES_01", "PSAL_01"],
+      linear: ["TE90_01", "CNDC_01"],
+    }),
+    ["PSAL_01"],
+  );
+});
+
+test("columns repeating another's values open once", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  const rows = vikingRows({ curved: ["TE90_01", "CNDC_01", "PSAL_01"] }).map(
+    (row) => ({ ...row, CNDC_01: row.TE90_01 }),
+  );
+  const variables = withDataPresence(variablesFrom(VIKING, dataset), rows);
+  assert.deepEqual(facetPlanFor(dataset, variables, rows).panelDefaults, [
+    "TE90_01",
+    "PSAL_01",
+  ]);
+});
+
+test("a second column of a picked standard_name is left out of the default panels", () => {
+  const table = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta.name === "CNDC_01"
+        ? { ...meta, standard_name: "sea_water_temperature" }
+        : meta,
+    ),
+  };
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  const rows = vikingRows({
+    curved: ["TE90_01", "CNDC_01", "PSAL_01", "DOXY_01"],
+  });
+  const variables = withDataPresence(variablesFrom(table, dataset), rows);
+  assert.deepEqual(facetPlanFor(dataset, variables, rows).panelDefaults, [
+    "TE90_01",
+    "PSAL_01",
+    "DOXY_01",
+  ]);
+});
+
+test("with no measurement varying, the usual single default stays", () => {
+  assert.deepEqual(defaultsFor("Profile", {}), ["TE90_01"]);
+});
+
+test("a trajectory still opens on a single panel", () => {
+  assert.equal(
+    defaultsFor("Trajectory", { curved: ["CNDC_01", "PSAL_01"] }).length,
+    1,
+  );
+});
+
+test("without an EOV, weather columns give way to the ocean ones", () => {
+  const dataset = {
+    ...VIKING_DATASET,
+    cdm_data_type: "TimeSeriesProfile",
+    first_eov_column: null,
+  };
+  const table = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta && meta.name === "TE90_01"
+        ? { ...meta, standard_name: "wind_speed", long_name: "Wind Spd Avg" }
+        : meta,
+    ),
+  };
+  const [first] = facetPlanFor(
+    dataset,
+    variablesFrom(table, dataset),
+  ).panelDefaults;
+  assert.notEqual(first, "TE90_01");
 });

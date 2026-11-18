@@ -2,6 +2,7 @@ import * as React from "react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useInRouterContext } from "react-router";
+import { useTranslation } from "react-i18next";
 
 import CloseButton from "./CloseButton.jsx";
 import useSheetDrag from "./useSheetDrag.js";
@@ -188,10 +189,13 @@ function BackDismiss({ open, onClose }) {
 
 function ModalHeader({ closeButton, className = "", children }) {
   const { onHide } = useContext(ModalContext);
+  const { t } = useTranslation();
   return (
     <div className={`modal-header ${className}`}>
       {children}
-      {closeButton && <CloseButton label="Close" onClick={onHide} />}
+      {closeButton && (
+        <CloseButton label={t("closeButtonText")} onClick={onHide} />
+      )}
     </div>
   );
 }
