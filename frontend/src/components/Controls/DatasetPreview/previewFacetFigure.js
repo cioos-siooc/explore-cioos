@@ -89,6 +89,29 @@ const axisTitle = (text, labelFont) => ({
   standoff: 6,
 });
 
+// A profile's depth axis hugs its data rather than Plotly's ~5% autorange
+// padding, except that an edge within that padding of 0 with no data between
+// stops at 0 — a cast from 0.5 m reads as starting at the surface.
+const ZERO_SNAP = 0.05; // of the data's span
+const EDGE_PAD = 0.01; // of the data's span: keeps the edge markers whole
+function depthRangeFor(data, columnName) {
+  let min = Infinity;
+  let max = -Infinity;
+  (data || []).forEach((row) => {
+    const value = row[columnName];
+    if (typeof value !== "number" || !Number.isFinite(value)) return;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  });
+  const span = max - min;
+  if (!(span > 0)) return {};
+  const clipmin =
+    min >= 0 && min <= ZERO_SNAP * span ? 0 : min - EDGE_PAD * span;
+  const clipmax =
+    max <= 0 && -max <= ZERO_SNAP * span ? 0 : max + EDGE_PAD * span;
+  return { autorangeoptions: { clipmin, clipmax } };
+}
+
 // The two arrangements, as closed alternatives rather than one boolean asked a
 // dozen times. Each owns the letters its axes take — which is what wires the
 // traces — the gap between panels, and how the hover is gathered.
@@ -597,6 +620,7 @@ export function buildFigure({
     ...(sharedLetter === "y" && reversedYAxes.has(sharedAxis)
       ? { autorange: "reversed" }
       : {}),
+    ...(sharedLetter === "y" ? depthRangeFor(data, sharedAxis) : {}),
     title: axisTitle(
       wrapAlong(sharedTitle, sharedLetter, [0, 1], PINNED_AXIS_LINES), // the pinned strip's fixed room
       labelFont,
@@ -838,6 +862,7 @@ export function buildOverlayFigure({
     ...(sharedLetter === "y" && reversedYAxes.has(sharedAxis)
       ? { autorange: "reversed" }
       : {}),
+    ...(sharedLetter === "y" ? depthRangeFor(data, sharedAxis) : {}),
     title: axisTitle(
       axisLabelFor(
         sharedLetter,

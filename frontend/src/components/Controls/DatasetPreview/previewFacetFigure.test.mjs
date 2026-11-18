@@ -124,6 +124,53 @@ test("the shared depth axis is reversed, and titled along itself", () => {
   assert.equal(layout.annotations, undefined);
 });
 
+const withDepths = (from, to) =>
+  DATA.map((row, i) => ({
+    ...row,
+    depth: from + ((to - from) * i) / (DATA.length - 1),
+  }));
+const depthRange = (data) =>
+  figure("TimeSeriesProfile", ALL_SIX, { data }).layout.yaxis.autorangeoptions;
+
+test("a profile starting near 0 stops its depth axis at 0", () => {
+  assert.deepEqual(depthRange(withDepths(2, 100)), {
+    clipmin: 0,
+    clipmax: 100.98,
+  });
+  assert.deepEqual(
+    overlayFrom("Profile", ["TE90_01", "PSAL_01"], { data: withDepths(2, 100) })
+      .layout.yaxis.autorangeoptions,
+    { clipmin: 0, clipmax: 100.98 },
+  );
+});
+
+test("a profile ending near 0 from below stops there too", () => {
+  assert.deepEqual(depthRange(withDepths(-100, -2)), {
+    clipmin: -100.98,
+    clipmax: 0,
+  });
+});
+
+test("a profile far from 0, or across it, hugs its data", () => {
+  assert.deepEqual(depthRange(withDepths(50, 150)), {
+    clipmin: 49,
+    clipmax: 151,
+  });
+  assert.deepEqual(depthRange(withDepths(-50, 50)), {
+    clipmin: -51,
+    clipmax: 51,
+  });
+});
+
+test("a profile at a single depth is left to Plotly", () => {
+  assert.equal(depthRange(withDepths(5, 5)), undefined);
+});
+
+test("a timeseries' shared time axis is left to Plotly", () => {
+  const { layout } = figure("TimeSeries", ["TE90_01"]);
+  assert.equal(layout.xaxis.autorangeoptions, undefined);
+});
+
 test("the user can draw the shared depth axis upwards", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
     reversedYAxes: new Set(),
