@@ -146,17 +146,35 @@ function Option(props) {
 }
 
 // The small filled caret the pane's other dropdowns and SelectPill draw, in
-// place of react-select's 20px chevron and its separator rule; a multi pick
-// shows a plus instead, since opening it adds another variable.
+// place of react-select's 20px chevron and its separator rule. A picker that
+// can still add shows its add pill (ValueContainer) instead.
 function DropdownIndicator(props) {
+  if (props.selectProps.canAdd) return null;
   return (
     <components.DropdownIndicator {...props}>
-      {props.isMulti ? (
-        <PlusLg size={11} aria-hidden="true" />
-      ) : (
-        <CaretDownFill size={9} aria-hidden="true" />
-      )}
+      <CaretDownFill size={9} aria-hidden="true" />
     </components.DropdownIndicator>
+  );
+}
+
+// Decorative: a click anywhere on the control already opens the menu. It
+// goes before the search input, which react-select renders last.
+function ValueContainer({ children, ...props }) {
+  const { t } = useTranslation();
+  const { canAdd, inputValue } = props.selectProps;
+  const parts = React.Children.toArray(children);
+  const input = parts.pop();
+  return (
+    <components.ValueContainer {...props}>
+      {parts}
+      {canAdd && !inputValue && (
+        <span className="variableSelectAdd" aria-hidden="true">
+          <PlusLg size={11} />
+          {t("datasetPreviewPlotAddVariable")}
+        </span>
+      )}
+      {input}
+    </components.ValueContainer>
   );
 }
 
@@ -211,9 +229,9 @@ function SortableMultiValue(props) {
 }
 
 /**
- * Variables for one axis, typed to filter: one pill each, or a single pick
- * when `isMulti` is off. Unless `required`, the last pick can be removed, and a
- * single pick then falls back to `placeholder`.
+ * Variables for one axis, typed to filter: one pill each. With `isMulti` off
+ * the axis holds one pill, and picking another swaps it. Unless `required`,
+ * the last pick can be removed, falling back to `placeholder`.
  */
 export default function VariablePicker({
   label,
@@ -292,19 +310,20 @@ export default function VariablePicker({
       }}
     >
       <SortableContext items={selected} strategy={rectSortingStrategy}>
+        {/* Always react-select's multi mode, so a lone pick is a pill too. */}
         <Select
-          isMulti={isMulti}
+          isMulti
+          canAdd={isMulti && !atCap}
           className="variableSelect"
           classNamePrefix="variableSelect"
           options={grouped}
-          value={isMulti ? options : (options[0] ?? null)}
+          value={options}
           onChange={(picked) =>
             onChange(
-              isMulti
-                ? picked.map(columnNameOf)
-                : picked
-                  ? [picked.columnName]
-                  : [],
+              (isMulti || picked.length <= selected.length
+                ? picked
+                : picked.slice(-1)
+              ).map(columnNameOf),
             )
           }
           getOptionValue={columnNameOf}
@@ -319,7 +338,7 @@ export default function VariablePicker({
           isOptionDisabled={() => atCap}
           closeMenuOnSelect={!isMulti}
           backspaceRemovesValue={!locked}
-          isClearable={!isMulti && !required}
+          isClearable={isMulti}
           placeholder={placeholder ?? t("datasetPreviewPlotSearchVariables")}
           aria-label={label}
           noOptionsMessage={({ inputValue }) =>
@@ -356,6 +375,7 @@ export default function VariablePicker({
             MenuList,
             Option,
             DropdownIndicator,
+            ValueContainer,
             MultiValue: SortableMultiValue,
             IndicatorSeparator: null,
             ...(locked && { MultiValueRemove: () => null }),
