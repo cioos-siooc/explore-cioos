@@ -91,7 +91,7 @@ export function LicenseCell({ metadata }) {
   const { t } = useTranslation();
   const license = metadata?.license;
   if (!license) return null;
-  const text = licenseLabel(license) ?? t("metadataLicenseCustomText");
+  const text = licenseLabel(license);
   const title = licenseText(license.title) || license.url;
   return (
     <div className="metaCell">

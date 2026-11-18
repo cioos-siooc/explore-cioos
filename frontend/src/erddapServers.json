@@ -58,5 +58,10 @@
     "url": "https://salishsea.eos.ubc.ca/erddap",
     "label_en": "SalishSeaCast (UBC)",
     "label_fr": "SalishSeaCast (UBC)"
+  },
+  {
+    "url": "https://erddap.oceantrack.org/erddap",
+    "label_en": "Ocean Tracking Network",
+    "label_fr": "Réseau de suivi des océans"
   }
 ]

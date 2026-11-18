@@ -366,6 +366,8 @@
   "metadataInfoUrlText": "More information",
   "metadataLicenseText": "License",
   "metadataLicenseCustomText": "Custom terms",
+  "metadataSourcesText": "Sources",
+  "metadataSourceLinkTitle": "Open the {{source}} record",
   "metadataResourceErddapName": "Data access form",
   "metadataResourceErddapDescription": "Subset and download the data in many formats from its ERDDAP server.",
   "metadataResourceAttributesName": "Variables and attributes",

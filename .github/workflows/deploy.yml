@@ -84,7 +84,11 @@ jobs:
             done
             test "$staged" = true || { echo "$sha has no successful staging deployment" >&2; exit 1; }
           fi
-          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            # A redeploy doesn't re-run the tests, but the SHA must have passed them.
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_test.yml/runs?event=release&head_sha=$sha&status=success&per_page=1" --jq '.total_count')
+            test "$passed" -gt 0 || { echo "$sha has no successful release Integration Tests run" >&2; exit 1; }
+          else
             for _ in $(seq 1 70); do
               conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_test.yml/runs?event=release&head_sha=$sha&per_page=100" \
                 | jq -r --arg published "$PUBLISHED_AT" '.workflow_runs | map(select(.created_at >= $published)) | sort_by(.created_at) | last | .conclusion // "pending"')
