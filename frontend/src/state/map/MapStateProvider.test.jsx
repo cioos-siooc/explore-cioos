@@ -201,11 +201,9 @@ describe("MapStateProvider", () => {
     expect(Object.values(latest.dataLayers).every(Boolean)).toBe(true);
   });
 
-  it("fetches /griddapCoverage only once the layer is switched on", async () => {
+  it("fetches /griddapCoverage with the layer off, for map clicks to list", async () => {
     await renderReady();
-    expect(latest.griddapCoverage).toBeUndefined();
-
-    act(() => latest.setGriddapCoverageVisible(true));
+    expect(latest.griddapCoverageVisible).toBe(false);
     await waitFor(() =>
       expect(latest.griddapCoverage).toEqual(griddapCoverageFixture),
     );

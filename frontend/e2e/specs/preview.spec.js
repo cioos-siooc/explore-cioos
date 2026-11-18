@@ -100,15 +100,19 @@ test.describe("record preview", () => {
   }) => {
     await openPreview(page, "&pmode=lines");
     await expect(plot(page).first()).toBeVisible();
+    const lineMode = page
+      .getByTestId("preview-mode-toggle")
+      .getByRole("button", { name: "Line", exact: true });
     await showSettings(page);
-    await expect(page.getByRole("button", { name: "Line" })).toBeVisible();
+    await expect(lineMode).toHaveAttribute("aria-pressed", "true");
 
     await page.getByRole("button", { name: "Table" }).click();
     await expect(plot(page)).toHaveCount(0);
     await page.getByRole("button", { name: "Plot" }).click();
 
     await expect(plot(page).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Line" })).toBeVisible();
+    await showSettings(page);
+    await expect(lineMode).toHaveAttribute("aria-pressed", "true");
   });
 
   test("closing clears the record and every plot param with it", async ({

@@ -241,7 +241,7 @@ async function downloadSelection(query) {
         ([key]) => !["format", "obisFormat"].includes(key),
       ),
     )}`,
-    job_id: randomUUID().slice(0, 6),
+    job_id: randomUUID(),
     // Installed by the package's reproduce.py.
     downloader_url: DOWNLOADER_URL,
   };

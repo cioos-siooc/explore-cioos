@@ -16,7 +16,7 @@ import useMediaQuery, { SHORT_QUERY } from "./useMediaQuery.js";
 
 const UIContext = createContext();
 
-// Above this the list sits beside the map by default; below it the map leads.
+// Below this a drawn shape does not reveal the list: it would cover the shape.
 const WIDE_SCREEN_QUERY = "(min-width: 1400px)";
 
 export function useUI() {
@@ -26,8 +26,8 @@ export function useUI() {
 // Adjust-during-render rather than an effect so the sidebar and what it is
 // raised for land in the same paint; an effect showed a frame of the closed
 // sidebar, which on a phone read as a dropped tap.
-function useRevealSidebar(value, isPresent, setSidebarOpenState) {
-  if (useChanged(value) && isPresent(value)) setSidebarOpenState(true);
+function useRevealSidebar(value, isPresent, setSidebarOpen) {
+  if (useChanged(value) && isPresent(value)) setSidebarOpen(true);
 }
 
 export default function UIProvider({ children }) {
@@ -35,19 +35,7 @@ export default function UIProvider({ children }) {
     useSelection();
 
   const wideScreen = useMediaQuery(WIDE_SCREEN_QUERY);
-  const [sidebarOpen, setSidebarOpenState] = useState(wideScreen);
-  // Once the user opens or closes the list, the screen-size default stops.
-  const sidebarChosenRef = useRef(false);
-  const setSidebarOpen = useCallback((next) => {
-    sidebarChosenRef.current = true;
-    setSidebarOpenState(next);
-  }, []);
-
-  // Follow the breakpoint until the user chooses, so a resize or rotation gets
-  // the default for its current size.
-  useEffect(() => {
-    if (!sidebarChosenRef.current) setSidebarOpenState(wideScreen);
-  }, [wideScreen]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showCoverageModal, setShowCoverageModal] = useState(false);
@@ -95,25 +83,24 @@ export default function UIProvider({ children }) {
   if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
 
   // Wide screens only: narrower, the list would cover the shape just drawn.
-  // These reveals don't count as the user's choice about the list.
   useRevealSidebar(
     polygon,
     (value) => wideScreen && !isEmpty(value),
-    setSidebarOpenState,
+    setSidebarOpen,
   );
 
   // Keyed on the pk: a results refresh hands the open dataset back as a new
   // object, which must not reopen a sidebar the user collapsed over it.
-  useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpenState);
+  useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpen);
 
-  useRevealSidebar(selectedTrajectory, Boolean, setSidebarOpenState);
+  useRevealSidebar(selectedTrajectory, Boolean, setSidebarOpen);
 
   // Only a growing selection reveals the list (so the basket visibly grows on
   // a phone); unticking must not reopen a list the user put away.
   const previousDownloadCount = useRef(0);
   useEffect(() => {
     const count = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
-    if (count > previousDownloadCount.current) setSidebarOpenState(true);
+    if (count > previousDownloadCount.current) setSidebarOpen(true);
     previousDownloadCount.current = count;
   }, [pointsToReview]);
 

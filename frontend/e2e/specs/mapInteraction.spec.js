@@ -33,13 +33,6 @@ const EMPTY = { lon: -105, lat: 60 };
 const openAt = async (page, { lon, lat }, extra = "", zoom = 2.75) => {
   await page.goto(`/?lat=${lat}&lon=${lon}&zoom=${zoom}&lang=en${extra}`);
   await waitForMapReady(page);
-  // The card stands aside while the datasets sidebar is open, and the sidebar
-  // starts open on a wide screen.
-  const sidebar = page.getByTestId("sidebar-datasets");
-  if ((await sidebar.getAttribute("data-expanded")) === "true") {
-    await page.getByTestId("topbar-datasets-button").click();
-    await expect(sidebar).toHaveAttribute("data-expanded", "false");
-  }
 };
 
 const canvasCentre = async (page) => {
@@ -78,12 +71,13 @@ const clickUntil = async (page, at, expectation) => {
 };
 
 const chip = (page) => page.locator(".mapChip");
+const chipLines = (page) => page.locator(".mapChip .mapChipLine");
 
 const openCard = (page) => page.locator('[data-testid="feature-card"].open');
 
 const expectHexCard = async (page) => {
   const card = openCard(page);
-  await expect(card).toContainText("18 day(s) of data");
+  await expect(card).toContainText("18 days of data");
   await expect(card).toContainText("Bulk and Size-Fractionated Chlorophyll");
   await expect(card).toContainText(
     "Water Property Measurements from Conductivity-Temperature-Depth",
@@ -98,7 +92,7 @@ test.describe("pointing at the map", () => {
     await expect(async () => {
       await page.mouse.move(x + 1, y);
       await page.mouse.move(x, y);
-      await expect(page.locator(".mapChip")).toHaveText("18 day(s) of data", {
+      await expect(page.locator(".mapChip")).toHaveText("18 days of data", {
         timeout: 1_000,
       });
     }).toPass({ timeout: 20_000 });
@@ -121,7 +115,7 @@ test.describe("pointing at the map", () => {
     await expect(async () => {
       await page.mouse.move(x + 1, y);
       await page.mouse.move(x, y);
-      await expect(page.locator(".mapChip")).toHaveText("18 day(s) of data", {
+      await expect(page.locator(".mapChip")).toHaveText("18 days of data", {
         timeout: 1_000,
       });
     }).toPass({ timeout: 20_000 });
@@ -211,7 +205,12 @@ test.describe("pointing at markers and tracks", () => {
   test("hovering a marker names its days of data", async ({ page }) => {
     await openScene(page);
     await hoverUntil(page, LONE_MARKER.at, () =>
-      expect(chip(page)).toHaveText("12 day(s) of data", { timeout: 1_000 }),
+      expect(chipLines(page)).toHaveText(
+        ["Surface vessel", "12 days of data"],
+        {
+          timeout: 1_000,
+        },
+      ),
     );
   });
 
@@ -248,7 +247,7 @@ test.describe("pointing at markers and tracks", () => {
       expect(openCard(page)).toBeVisible({ timeout: 1_000 }),
     );
     const card = openCard(page);
-    await expect(card).toContainText("40 day(s) of data");
+    await expect(card).toContainText("40 days of data");
     await expect(card.getByTestId("dataset-card")).toHaveCount(2);
     // A marker is a place, not a neighbourhood: no "nearby" qualifier.
     await expect(card).not.toContainText("nearby");
@@ -276,7 +275,9 @@ test.describe("pointing at markers and tracks", () => {
   }) => {
     await openScene(page);
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toHaveText("5 day(s) of data", { timeout: 1_000 }),
+      expect(chipLines(page)).toHaveText(["Surface vessel", "5 days of data"], {
+        timeout: 1_000,
+      }),
     );
   });
 
@@ -327,10 +328,16 @@ test.describe("pointing at gridded coverage", () => {
     );
   });
 
-  test("a marker keeps the hover over a grid", async ({ page }) => {
+  test("a marker keeps the hover over a grid and names the grids", async ({
+    page,
+  }) => {
+    // Only grid B reaches CROSSED_MARKER.
     await openScene(page, "&griddap=true");
     await hoverUntil(page, CROSSED_MARKER.at, () =>
-      expect(chip(page)).toHaveText("5 day(s) of data", { timeout: 1_000 }),
+      expect(chipLines(page)).toHaveText(
+        ["Surface vessel", "5 days of data", "Grid: Synthetic grid B"],
+        { timeout: 1_000 },
+      ),
     );
   });
 
@@ -432,6 +439,12 @@ test.describe("drawing a spatial filter", () => {
     // Only a shape the draw control holds has corners to drag: moving one
     // rewrites the bounds, and the rectangle mode drags its neighbours along
     // so it never turns into a free-form polygon.
+    // It rests as an outline: one click selects it, a second shows the corners.
+    const edge = await sceneAt(page, [-50, -60]);
+    for (let i = 0; i < 2; i += 1) {
+      await page.mouse.click(edge.x, edge.y);
+      await page.waitForTimeout(300);
+    }
     // One drag, not a retried one: the bounds land a debounce after mouseup,
     // and a second drag would start from where the corner used to be.
     const corner = await sceneAt(page, [100, -60]);

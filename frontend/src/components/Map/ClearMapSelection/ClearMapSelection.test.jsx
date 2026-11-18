@@ -8,12 +8,15 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import ClearMapSelection from "./ClearMapSelection.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 
 let latestMap;
 let latestSelection;
+let latestUI;
 function Probe() {
   latestMap = useMapState();
   latestSelection = useSelection();
+  latestUI = useUI();
   return null;
 }
 
@@ -37,6 +40,24 @@ describe("ClearMapSelection", () => {
 
     expect(latestMap.featureQuery).toBeNull();
     expect(screen.queryByTestId("clear-map-selection")).not.toBeInTheDocument();
+  });
+
+  it("leaves the clear to the open datasets list", async () => {
+    renderWithProviders(
+      <>
+        <ClearMapSelection />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    act(() => {
+      latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] });
+      latestUI.setSidebarOpen(true);
+    });
+    expect(screen.queryByTestId("clear-map-selection")).not.toBeInTheDocument();
+
+    act(() => latestUI.setSidebarOpen(false));
+    expect(screen.getByTestId("clear-map-selection")).toBeInTheDocument();
   });
 
   it("clears the dataset selection while one dataset is open", async () => {

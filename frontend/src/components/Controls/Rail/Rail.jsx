@@ -4,7 +4,7 @@ import useElementSize from "../../ui/useElementSize.js";
 import "./styles.css";
 
 // Unit-agnostic: only `axis` knows what the numbers mean.
-//   axis: { min, max, minText, maxText, toPos(value) -> 0..1, toValue(0..1) }
+//   axis: { min, max, toPos(value) -> 0..1, toValue(0..1) }
 // Position 0 is the axis minimum in both orientations (top when vertical).
 
 export default function Rail({
@@ -171,8 +171,8 @@ export default function Rail({
             style={at(handle.value)}
             aria-label={handle.label}
             aria-orientation={vertical ? "vertical" : undefined}
-            aria-valuemin={axis.minText ?? axis.min}
-            aria-valuemax={axis.maxText ?? axis.max}
+            aria-valuemin={axis.min}
+            aria-valuemax={axis.max}
             aria-valuenow={handle.value}
             aria-valuetext={handle.valueText ?? String(handle.value)}
             onPointerDown={beginDrag(handle.key)}

@@ -25,11 +25,6 @@
     "label_fr": "OGSL"
   },
   {
-    "url": "http://dap.onc.uvic.ca/erddap",
-    "label_en": "ONC",
-    "label_fr": "ONC"
-  },
-  {
     "url": "https://dap.oceannetworks.ca",
     "label_en": "ONC",
     "label_fr": "ONC"
@@ -63,5 +58,10 @@
     "url": "https://salishsea.eos.ubc.ca/erddap",
     "label_en": "SalishSeaCast (UBC)",
     "label_fr": "SalishSeaCast (UBC)"
+  },
+  {
+    "url": "https://erddap.oceantrack.org/erddap",
+    "label_en": "Ocean Tracking Network",
+    "label_fr": "Réseau de suivi des océans"
   }
 ]

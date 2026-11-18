@@ -3,6 +3,7 @@ const axios = require("axios");
 
 const router = express.Router();
 const db = require("../db");
+const cache = require("../utils/cache");
 const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
@@ -416,10 +417,31 @@ async function ckanLinkedRecords() {
   const sql = `
     SELECT ckan_id,
            bool_or(source_type IS DISTINCT FROM 'obis') AS erddap,
-           bool_or(source_type = 'obis') AS obis
+           bool_or(source_type = 'obis') AS obis,
+           COALESCE(
+             array_agg(DISTINCT erddap_url)
+               FILTER (WHERE source_type IS DISTINCT FROM 'obis'
+                         AND erddap_url IS NOT NULL),
+             '{}'
+           ) AS erddap_urls
     FROM cde.datasets
     WHERE ckan_id IS NOT NULL
     GROUP BY ckan_id
+  `;
+  const result = await db.raw(sql);
+  return result.rows;
+}
+
+// OBIS rows carry the https://obis.org sentinel erddap_url, so they group as
+// their own source.
+async function ckanMatchedBySource() {
+  const sql = `
+    SELECT erddap_url,
+           COUNT(*)::int       AS n_datasets,
+           COUNT(ckan_id)::int AS n_matched
+    FROM cde.datasets
+    GROUP BY erddap_url
+    ORDER BY n_datasets DESC, erddap_url
   `;
   const result = await db.raw(sql);
   return result.rows;
@@ -453,11 +475,26 @@ async function ckanRecordSources() {
   return sources;
 }
 
+// A record pointing to several servers counts once for each.
+function erddapServers(rows) {
+  const counts = new Map();
+  for (const r of rows)
+    for (const url of r.erddap_urls || [])
+      counts.set(url, (counts.get(url) || 0) + 1);
+  return [...counts]
+    .map(([erddap_url, n_records]) => ({ erddap_url, n_records }))
+    .sort(
+      (a, b) =>
+        b.n_records - a.n_records || a.erddap_url.localeCompare(b.erddap_url),
+    );
+}
+
 function tallyCkanCoverage(linkedRows, recordSources) {
   const tally = (rows) => ({
     n_linked: rows.length,
     n_erddap: rows.filter((r) => r.erddap).length,
     n_obis: rows.filter((r) => r.obis).length,
+    erddap_servers: erddapServers(rows),
   });
   if (!recordSources) {
     return {
@@ -490,15 +527,24 @@ function tallyCkanCoverage(linkedRows, recordSources) {
   };
 }
 
+// Kept until the harvest flushes redis, except a reply built during a CKAN
+// outage: cached, it would hide the catalogue totals for a whole day. The
+// toggle also gates serving a hit, before the handler runs, hence !== false.
 router.get(
   "/ckan-coverage",
-  ...pipeline({ filters: false, cacheFor: "10 minutes" }),
+  ...pipeline({
+    filters: false,
+    cacheToggle: (req, res) =>
+      cache.onlyOk(req, res) && res.locals.ckanReachable !== false,
+  }),
   async (req, res) => {
-    const [linkedRows, recordSources] = await Promise.all([
+    const [linkedRows, harvested, recordSources] = await Promise.all([
       ckanLinkedRecords(),
+      ckanMatchedBySource(),
       ckanRecordSources(),
     ]);
-    res.json(tallyCkanCoverage(linkedRows, recordSources));
+    res.locals.ckanReachable = recordSources !== null;
+    res.json({ ...tallyCkanCoverage(linkedRows, recordSources), harvested });
   },
 );
 

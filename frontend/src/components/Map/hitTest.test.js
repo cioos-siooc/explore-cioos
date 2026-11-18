@@ -1,19 +1,16 @@
 import { beforeAll, describe, it, expect, vi } from "vitest";
 
 import {
-  GRIDDAP_PRIORITY_ZOOM,
   POINT_HIT_GRACE_PX,
   buildFeatureQuery,
+  gridsCovering,
   datasetPksOf,
   dedupeGriddapByPk,
   featureHasDataset,
-  griddapCoveredIn,
   idsOutsideDataset,
-  griddapOutranksHexesIn,
   griddapTitle,
   isOnAPointIn,
   loadTurfUnion,
-  trackFeatureIn,
   trackItemsIn,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
@@ -24,57 +21,6 @@ import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 const hits = (...layerIds) => layerIds.map((id) => ({ layer: { id } }));
 
 const GRID = "griddap-coverage-fill";
-
-describe("the grid outranks the hexes only once it is zoomed in", () => {
-  it("stands aside below the threshold", () => {
-    expect(
-      griddapOutranksHexesIn(hits(GRID), GRIDDAP_PRIORITY_ZOOM - 0.01),
-    ).toBe(false);
-  });
-
-  it("takes precedence at the threshold itself", () => {
-    // The boundary is inclusive: griddapCoveredIn in Map.jsx tests the same
-    // scalar with the same >=, and the two halves of the rule must agree on it.
-    expect(griddapOutranksHexesIn(hits(GRID), GRIDDAP_PRIORITY_ZOOM)).toBe(
-      true,
-    );
-  });
-
-  it("takes precedence above it", () => {
-    expect(griddapOutranksHexesIn(hits(GRID), 12)).toBe(true);
-  });
-});
-
-describe("only a coverage rectangle can outrank them", () => {
-  it("is false with nothing under the cursor", () => {
-    expect(griddapOutranksHexesIn([], 12)).toBe(false);
-  });
-
-  it("is false for hexes and points alone, however far in", () => {
-    expect(griddapOutranksHexesIn(hits("hexes", "points"), 12)).toBe(false);
-  });
-
-  it("finds the rectangle among other hits, in any order", () => {
-    expect(griddapOutranksHexesIn(hits("hexes", GRID, "points"), 12)).toBe(
-      true,
-    );
-  });
-
-  it("counts a single-point grid's dot like a rectangle", () => {
-    expect(griddapOutranksHexesIn(hits("griddap-coverage-point"), 12)).toBe(
-      true,
-    );
-  });
-
-  it("ignores the coverage outline, which is a different layer", () => {
-    // The rectangles are drawn as a fill plus griddap-coverage-line on top of
-    // it, and only the fill is hit-tested — matching the outline too would
-    // count every rectangle twice.
-    expect(griddapOutranksHexesIn(hits("griddap-coverage-line"), 12)).toBe(
-      false,
-    );
-  });
-});
 
 // Characterisation tests: a tidy-up that changes a ranking fails here first.
 
@@ -136,36 +82,6 @@ describe("isOnAPointIn", () => {
   it("only measures the points layer", () => {
     const halo = feature("points-halo", { count: 1 }, pointAt(0, 0));
     expect(isOnAPointIn([halo], { x: 0, y: 0 }, identity)).toBe(false);
-  });
-});
-
-describe("trackFeatureIn", () => {
-  it("ranks an arrowhead over a line, whatever the render order", () => {
-    const line = feature("track-lines");
-    const head = feature("track-heads");
-    expect(trackFeatureIn([line, head])).toBe(head);
-    expect(trackFeatureIn([head, line])).toBe(head);
-  });
-
-  it("is undefined with no track under the cursor", () => {
-    expect(trackFeatureIn(hits("hexes", "points"))).toBeUndefined();
-  });
-});
-
-describe("griddapCoveredIn", () => {
-  it("lets hexes cover a grid below the priority zoom", () => {
-    expect(griddapCoveredIn(hits("hexes"), GRIDDAP_PRIORITY_ZOOM - 1)).toBe(
-      true,
-    );
-  });
-
-  it("stops hexes covering it at the priority zoom", () => {
-    expect(griddapCoveredIn(hits("hexes"), GRIDDAP_PRIORITY_ZOOM)).toBe(false);
-  });
-
-  it("always lets points and tracks cover it", () => {
-    expect(griddapCoveredIn(hits("points"), 12)).toBe(true);
-    expect(griddapCoveredIn(hits("track-heads-fixed"), 12)).toBe(true);
   });
 });
 
@@ -429,7 +345,7 @@ describe("buildFeatureQuery", () => {
     });
   });
 
-  it("lists stacked grids once each, outlined apart and filled as one", () => {
+  it("lists stacked grids once each, outlined apart and never filled", () => {
     const title = (en) => ({ en });
     const grids = [
       feature(
@@ -456,7 +372,6 @@ describe("buildFeatureQuery", () => {
     expect(query.highlight.features.map((f) => f.properties.role)).toEqual([
       "outline",
       "outline",
-      "fill",
     ]);
     expect(query.observationCount).toBe(0);
   });
@@ -468,10 +383,7 @@ describe("buildFeatureQuery", () => {
       [feature(GRID, { pk: 5 }, square(0, 0, 1, 1))],
       context({ gridGeometry: (pk) => (pk === 5 ? whole : undefined) }),
     );
-    expect(query.highlight.features.map((f) => f.geometry)).toEqual([
-      whole,
-      whole,
-    ]);
+    expect(query.highlight.features.map((f) => f.geometry)).toEqual([whole]);
   });
 
   it("lists a single-point grid and keeps its dot out of the area fill", () => {
@@ -501,8 +413,34 @@ describe("buildFeatureQuery", () => {
     ).toEqual([
       ["Point", "outline"],
       ["Polygon", "outline"],
-      ["Polygon", "fill"],
     ]);
+  });
+
+  it("lists the grids over a hex while their layer is off, without outlining them", () => {
+    const covering = feature(
+      GRID,
+      { pk: 9, title_translated: { en: "SST grid" } },
+      square(-70, 40, -60, 50),
+    );
+    const hex = feature(
+      "hexes",
+      { pk: 1, count: 4, datasets: "[2]" },
+      square(-64, 44, -63, 45),
+    );
+    const query = buildFeatureQuery(
+      lngLat,
+      [hex],
+      context({ gridsAt: () => [covering, covering] }),
+    );
+    expect(query.items.filter((item) => item.kind === "grid")).toEqual([
+      { kind: "grid", pk: 9, title: "SST grid" },
+    ]);
+    expect(query.datasetPks).toEqual([2, 9]);
+    expect(query.highlight.features).toHaveLength(1);
+
+    expect(
+      buildFeatureQuery(lngLat, [], context({ gridsAt: () => [covering] })),
+    ).toBeNull();
   });
 
   it("puts tracks first, then observations, then grids", () => {
@@ -529,6 +467,24 @@ describe("buildFeatureQuery", () => {
       "grid",
     ]);
     expect(query.datasetPks).toEqual([1, 2, 3]);
+  });
+});
+
+describe("gridsCovering", () => {
+  const coverage = {
+    features: [
+      feature(GRID, { pk: 1 }, square(-70, 40, -60, 50)),
+      feature(GRID, { pk: 2 }, square(0, 0, 10, 10)),
+      feature(GRID, { pk: 3 }, pointAt(-63.5, 44.6)),
+    ],
+  };
+  it("keeps the boxes holding the point, never a single-point grid", () => {
+    expect(
+      gridsCovering(coverage, { lng: -63.5, lat: 44.6 }).map(
+        (f) => f.properties.pk,
+      ),
+    ).toEqual([1]);
+    expect(gridsCovering(undefined, { lng: 0, lat: 0 })).toEqual([]);
   });
 });
 

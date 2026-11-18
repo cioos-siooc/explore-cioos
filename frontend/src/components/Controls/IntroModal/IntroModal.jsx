@@ -25,6 +25,7 @@ import useMediaQuery, {
 } from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
+import { Notice } from "../../AppShell/NoticeToast.jsx";
 import {
   findGridded,
   findTrajectory,
@@ -134,7 +135,7 @@ function Stat({ value, label, language }) {
   );
 }
 
-export default function IntroModal({ showModal, setShowModal }) {
+export default function IntroModal({ showModal, setShowModal, notices = [] }) {
   const { t, i18n } = useTranslation();
   const { setShowSelectionHelpModal, setShowPrivacyModal } = useUI();
   const { tipsEnabled, setTipsEnabled, startTour } = useTips();
@@ -187,6 +188,15 @@ export default function IntroModal({ showModal, setShowModal }) {
         </p>
       </Modal.Header>
       <Modal.Body>
+        {notices.length > 0 && (
+          <ul className="introNotices">
+            {notices.map((notice) => (
+              <li key={notice.id}>
+                <Notice notice={notice} />
+              </li>
+            ))}
+          </ul>
+        )}
         <section className="introHero">
           <svg
             className="introHeroWaves"

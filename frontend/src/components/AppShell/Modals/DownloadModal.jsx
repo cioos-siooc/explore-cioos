@@ -33,9 +33,9 @@ export default function DownloadModal() {
           </span>
           <span className="downloadModalTitleText">
             <span className="downloadModalTitleRow">
-              <span className="downloadModalTitleHeading">
+              <h2 className="downloadModalTitleHeading">
                 {t("downloadModalTitleText")}
-              </span>
+              </h2>
               {selectedCount > 0 && (
                 <span
                   className="downloadModalTitleCounter"

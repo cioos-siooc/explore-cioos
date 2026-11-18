@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
-from sentry_sdk.crons import monitor
 
 from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.core.day_sets import ranges_to_csv_cell
@@ -356,7 +355,6 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     return written_files
 
 
-@monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
          obis_discovery=None, source=None, triggered_by=None, skip_unchanged=False):
@@ -497,7 +495,15 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         os.makedirs(folder)
 
     # Unchanged datasets (erddap_verified) still need verified_at bumped.
-    if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
+    # A single source exposing only empty datasets is an upstream state (each
+    # dataset's attempt says why); its incremental load records the attempts
+    # and keeps what was loaded before.
+    nothing_harvested = (
+        erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty
+    )
+    if nothing_harvested and triggered_source:
+        logger.warning("No datasets harvested from %s", triggered_source)
+    elif nothing_harvested:
         logger.info("No datasets harvested from any source")
         _write_run_audit_csvs(
             folder=folder,

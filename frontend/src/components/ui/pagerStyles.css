@@ -9,7 +9,7 @@
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .pagerRange {
@@ -91,7 +91,7 @@
   font: inherit;
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   cursor: pointer;
 }
 

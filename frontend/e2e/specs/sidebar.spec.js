@@ -2,33 +2,18 @@ import { expect, test } from "../support/test.js";
 import { openApp } from "../support/appPage.js";
 import { VIEWPORTS } from "../support/constants.js";
 
-// The datasets list is open by default only above (min-width: 1400px), so what
-// this spec expects depends on which project is running it.
-function startsOpen(viewportWidth) {
-  return viewportWidth >= 1400;
-}
-
 test.describe("the datasets sidebar", () => {
-  test("opens by default only where there is map to spare", async ({
-    page,
-  }, testInfo) => {
+  test("starts closed on every screen size", async ({ page }) => {
     await openApp(page);
-    const expanded = startsOpen(testInfo.project.use.viewport.width);
     await expect(page.getByTestId("sidebar-datasets")).toHaveAttribute(
       "data-expanded",
-      String(expanded),
+      "false",
     );
   });
 
-  test("opens and closes again", async ({ page }, testInfo) => {
+  test("opens and closes again", async ({ page }) => {
     await openApp(page);
     const panel = page.getByTestId("sidebar-datasets");
-    const wasOpen = startsOpen(testInfo.project.use.viewport.width);
-
-    if (wasOpen) {
-      await page.getByTestId("topbar-datasets-button").click();
-      await expect(panel).toHaveAttribute("data-expanded", "false");
-    }
 
     await page.getByTestId("topbar-datasets-button").click();
     await expect(panel).toHaveAttribute("data-expanded", "true");
@@ -88,18 +73,16 @@ test.describe("the datasets sidebar", () => {
   });
 
   test("a user override outlives a resize", async ({ page }) => {
-    // Once the user has chosen, the screen-size default no longer applies.
     await page.setViewportSize(VIEWPORTS.desktop);
     await openApp(page);
     const panel = page.getByTestId("sidebar-datasets");
-    await expect(panel).toHaveAttribute("data-expanded", "true");
 
     await page.getByTestId("topbar-datasets-button").click();
-    await expect(panel).toHaveAttribute("data-expanded", "false");
+    await expect(panel).toHaveAttribute("data-expanded", "true");
 
     await page.setViewportSize(VIEWPORTS.tablet);
     await page.setViewportSize(VIEWPORTS.desktop);
-    await expect(panel).toHaveAttribute("data-expanded", "false");
+    await expect(panel).toHaveAttribute("data-expanded", "true");
   });
 
   test("widens a dataset page over the map, and Escape returns it to the sidebar", async ({

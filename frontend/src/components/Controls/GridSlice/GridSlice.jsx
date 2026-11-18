@@ -109,8 +109,6 @@ function TimeSlice({ nodes, time, onChange }) {
     () => ({
       min: nodes.min,
       max: nodes.max,
-      minText: new Date(nodes.min).toISOString(),
-      maxText: new Date(nodes.max).toISOString(),
       toPos: (ms) => (ms - nodes.min) / (nodes.max - nodes.min),
       toValue: (pos) => nodes.min + pos * (nodes.max - nodes.min),
     }),

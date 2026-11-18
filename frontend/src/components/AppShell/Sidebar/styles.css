@@ -175,12 +175,13 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* The last thing to give up room: the mode label shrinks first. */
+/* Pushes the window buttons to the far end. */
 .datasetsBackButton {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   flex: 0 0 auto;
+  margin-right: auto;
   padding: 5px 12px 5px 8px;
   border: 1px solid var(--cioos-primary);
   border-radius: var(--cioos-radius-pill);
@@ -188,7 +189,7 @@
   font: inherit;
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -198,7 +199,7 @@
 
 .datasetsBackButton:hover {
   background-color: var(--cioos-white);
-  border-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-800);
 }
 
 .datasetsBackButtonIcon {
@@ -221,25 +222,6 @@
 .datasetsBackButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
-}
-
-/* Shrinks before the back button and clips rather than pushing the chevron
-   off the end. */
-.datasetsBannerMode {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  flex: 0 1 auto;
-  margin-left: auto;
-  overflow: hidden;
-  font-family: var(--cioos-font-display);
-  font-size: var(--cioos-font-size-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  color: var(--cioos-primary-700);
 }
 
 .sidebarBody {
@@ -271,7 +253,7 @@
   margin: 0;
   font-size: var(--cioos-font-size-xs);
   line-height: 1.4;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 /* The same glyph the dataset cards are ticked with. */
@@ -282,6 +264,28 @@
   color: var(--cioos-primary);
 }
 
+.sidebarFooterAddAll {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cioos-primary-800);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sidebarFooterAddAll:hover {
+  color: var(--cioos-navy);
+}
+
+.sidebarFooterAddAll:focus-visible {
+  outline: 2px solid var(--cioos-primary-800);
+  outline-offset: 2px;
+  border-radius: var(--cioos-radius-sm);
+}
+
 .sidebarFooterHintMore {
   display: inline-flex;
   vertical-align: -2px;
@@ -289,7 +293,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
@@ -308,7 +312,7 @@
   gap: 8px;
   flex-shrink: 0;
   padding: 6px 14px;
-  border: 1px solid var(--cioos-primary-700);
+  border: 1px solid var(--cioos-primary-800);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-primary);
   font: inherit;
@@ -319,7 +323,7 @@
 }
 
 .sidebarDownloadButton:hover:not(:disabled) {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 /* A washed-out fill instead of a faded one: the teal at 45% left its white
@@ -457,11 +461,6 @@
   .datasetsHeader,
   .datasetsBanner {
     padding: var(--cioos-space-lg) var(--cioos-space-lg) var(--cioos-space-md);
-  }
-
-  /* Dropped rather than clipped: the dataset title below says it in full. */
-  .datasetsBannerMode {
-    display: none;
   }
 
   .sidebarFooter {

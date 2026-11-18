@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import pathlib
+import shutil
 import time
 import traceback
 
@@ -480,6 +481,22 @@ def delete_expired_downloads():
         sentry_sdk.capture_exception()
     if deleted:
         logger.info("Deleted {} expired downloads", deleted)
+
+
+def delete_abandoned_job_folders():
+    """Remove the working folders of downloads whose process was killed; never
+    raises. Call it between jobs only: a running job's folder looks the same."""
+    removed = 0
+    try:
+        for path in pathlib.Path().glob(downloader_wrapper.JOB_FOLDER_PREFIX + "*"):
+            if path.is_dir():
+                shutil.rmtree(path)
+                removed += 1
+    except OSError:
+        logger.exception("Could not delete abandoned download folders")
+        sentry_sdk.capture_exception()
+    if removed:
+        logger.info("Deleted {} abandoned download folders", removed)
 
 
 def update_download_jobs(pk, row, session=None):

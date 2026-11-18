@@ -64,3 +64,19 @@ def test_email_states_the_link_lifetime_in_both_languages(monkeypatch):
     body = sent[0][1]
     assert f"for {ds.DOWNLOAD_RETENTION_DAYS} days" in body
     assert f"pendant {ds.DOWNLOAD_RETENTION_DAYS} jours" in body
+
+
+def test_abandoned_job_folders_are_deleted(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    abandoned = tmp_path / "cde_download_killed"
+    (abandoned / "data").mkdir(parents=True)
+    (abandoned / "data" / "part.csv").write_text("a,b\n")
+    other = tmp_path / "keep_me"
+    other.mkdir()
+    a_zip = _zip(tmp_path, "cde_download_done.zip", 0)
+
+    ds.delete_abandoned_job_folders()
+
+    assert not abandoned.exists()
+    assert other.exists()
+    assert a_zip.exists()

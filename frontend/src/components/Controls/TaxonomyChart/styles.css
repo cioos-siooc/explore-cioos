@@ -10,7 +10,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   transform: translate(-50%, -50%);
 }
 
