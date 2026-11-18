@@ -1542,6 +1542,27 @@ test("a stacked profile runs every x axis across the top, stacking the extras up
   assert.equal(layout.hovermode, "y unified");
 });
 
+test("a stacked profile leaves each axis only the room its own title wraps to", () => {
+  const { layout } = overlayFrom("Profile", ["TE90_01", "PSAL_01", "DOXY_01"], {
+    size: { width: 400, height: 600 },
+    labels: {
+      TE90_01: "A much longer temperature label that has to wrap",
+      PSAL_01: "Salinity",
+    },
+  });
+  const top = layout.yaxis.domain[1];
+  const [above, aboveThat] = [layout.xaxis2, layout.xaxis3].map(
+    (axis) => axis.position,
+  );
+  assert.ok(above - top > aboveThat - above);
+});
+
+test("stacked axes past the first pick their own round ticks", () => {
+  const { layout } = overlayFrom("TimeSeries", ["TE90_01", "PSAL_01"]);
+  assert.equal(layout.yaxis2.tickmode, "auto");
+  assert.equal(layout.yaxis.tickmode, undefined);
+});
+
 test("a single stacked variable keeps the full plot height", () => {
   const { layout } = overlayFrom("Profile", ["TE90_01"]);
   assert.deepEqual(layout.yaxis.domain, [0, 1]);

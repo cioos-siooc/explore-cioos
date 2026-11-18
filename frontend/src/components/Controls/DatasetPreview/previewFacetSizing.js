@@ -298,22 +298,26 @@ export function gridSizeFor({
 // Nothing is pinned, so the figure keeps the shared axis's ticks and title. A
 // profile's value axes all run across the top, each past the first a
 // stackedAxisPxFor step further up; a stack's all run up the left, and Plotly's
-// autoshift places the extra ones from their measured labels.
+// autoshift places the extra ones from their measured labels. A step holds only
+// the lines the title below it wraps to, so one-line titles leave no blank band.
 export const MAX_STACKED_AXES = 4;
-export const stackedAxisPxFor = (labelFont) =>
-  TOP_TICK_ROOM_PX + PINNED_AXIS_LINES * labelLineFor(labelFont);
+export const stackedAxisPxFor = (
+  labelFont,
+  axisTitleLines = PINNED_AXIS_LINES,
+) => TOP_TICK_ROOM_PX + axisTitleLines * labelLineFor(labelFont);
 
 export function overlayMarginFor(
   orientation,
   titleLines = MAX_TITLE_LINES,
   labelFont = LABEL_FONT_PX,
+  axisTitleLines = PINNED_AXIS_LINES,
 ) {
   const titleRoom = titleRoomFor(titleLines);
   if (orientation === COLUMNS) {
     return {
       l: sideAxisRoomFor(labelFont),
       r: TOOLBAR_ROOM_PX,
-      t: 10 + stackedAxisPxFor(labelFont) + titleRoom,
+      t: 10 + stackedAxisPxFor(labelFont, axisTitleLines) + titleRoom,
       b: PINNED_EDGE_PX,
     };
   }

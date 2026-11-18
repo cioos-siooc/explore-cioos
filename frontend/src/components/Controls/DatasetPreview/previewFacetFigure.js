@@ -769,21 +769,42 @@ export function buildOverlayFigure({
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
-  const margin = overlayMarginFor(plan.orientation, titleLines, labelFont);
-  const plottingWidth = size.width
-    ? Math.max(size.width - margin.l - margin.r, 0)
-    : 0;
+  const { l, r } = overlayMarginFor(plan.orientation, titleLines, labelFont);
+  const plottingWidth = size.width ? Math.max(size.width - l - r, 0) : 0;
+  const valueLabelFor = (columnName, plottingHeight) =>
+    axisLabelFor(
+      valueLetter,
+      titleFor(columnName),
+      maxCharsFor(
+        valueLetter === "y" ? plottingHeight : plottingWidth,
+        labelFont,
+      ),
+      PINNED_AXIS_LINES,
+    );
+  // A profile's value axes are stacked upward, each above the one below's
+  // ticks and title, which only fits inside the paper if the plot shrinks.
+  const axisTitleLines =
+    valueLetter === "x"
+      ? panels.map((name) => valueLabelFor(name).split("<br>").length)
+      : [];
+  const offsetsPx = axisTitleLines.map((_, index) =>
+    axisTitleLines
+      .slice(0, index)
+      .reduce((sum, lines) => sum + stackedAxisPxFor(labelFont, lines), 0),
+  );
+  const margin = overlayMarginFor(
+    plan.orientation,
+    titleLines,
+    labelFont,
+    axisTitleLines.at(-1),
+  );
   const plottingHeight = Math.max(
     (size.height || MIN_PLOT_PX) - margin.t - margin.b,
     1,
   );
-
-  // A profile's value axes past the first are stacked upward, which only fits
-  // inside the paper if the plot shrinks to make room.
-  const step = stackedAxisPxFor(labelFont) / plottingHeight;
   const plotDomain =
     valueLetter === "x"
-      ? [0, round6(1 - Math.max(panels.length - 1, 0) * step)]
+      ? [0, round6(1 - (offsetsPx.at(-1) || 0) / plottingHeight)]
       : [0, 1];
 
   const layout = {
@@ -843,7 +864,9 @@ export function buildOverlayFigure({
           ? { anchor: "free", autoshift: true }
           : {
               anchor: "free",
-              position: round6(plotDomain[1] + index * step),
+              position: round6(
+                plotDomain[1] + offsetsPx[index] / plottingHeight,
+              ),
             };
     layout[axisKey(valueLetter, index)] = {
       ...AXIS_LINE,
@@ -855,22 +878,14 @@ export function buildOverlayFigure({
       zeroline: false,
       ...(index === 0
         ? { domain: [0, 1], gridcolor: OVERLAY_GRID_COLOR }
-        : { overlaying: valueLetter, showgrid: false }),
+        : // Plotly syncs an overlaying axis's ticks to its base's gridlines,
+          // which lands them on values like 3.628; without a grid there is
+          // nothing to line up with.
+          { overlaying: valueLetter, showgrid: false, tickmode: "auto" }),
       ...(valueLetter === "y" && reversedYAxes.has(columnName)
         ? { autorange: "reversed" }
         : {}),
-      title: axisTitle(
-        axisLabelFor(
-          valueLetter,
-          titleFor(columnName),
-          maxCharsFor(
-            valueLetter === "y" ? plottingHeight : plottingWidth,
-            labelFont,
-          ),
-          PINNED_AXIS_LINES,
-        ),
-        labelFont,
-      ),
+      title: axisTitle(valueLabelFor(columnName, plottingHeight), labelFont),
     };
     return {
       type: "scatter",
