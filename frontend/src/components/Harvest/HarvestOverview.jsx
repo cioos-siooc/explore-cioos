@@ -60,7 +60,7 @@ function ServerCard({ server, shades, t }) {
 function SectionLoading({ titleKey, descKey, t }) {
   return (
     <div>
-      <h2 className="harvest-section-title">{t(titleKey)}</h2>
+      <h3 className="harvest-section-title">{t(titleKey)}</h3>
       <p className="harvest-section-desc">{t(descKey)}</p>
       <div className="harvest-section-loading" role="status">
         <Spinner size="md" role="presentation" />
@@ -70,56 +70,139 @@ function SectionLoading({ titleKey, descKey, t }) {
   );
 }
 
+// ERDDAP servers are steps of one blue (ordinal, darkest = most records) so a
+// shade never implies the same server across rows; OBIS keeps its own hue.
+const SERVER_SHADES = ["#104281", "#256abf", "#5598e7", "#86b6ef"];
+const OBIS_COLOR = "#eb6834";
+const NONE_COLOR = "var(--harvest-input-border)";
+
+// A record linked from both sources sits in its server's segment; the overlap
+// is what n_erddap and n_obis together overshoot n_linked by. Records
+// pointing to several servers (none today) would be counted once per server.
+function linkSegments(s, total, t) {
+  const servers = s.erddap_servers || [];
+  const named =
+    servers.length > SERVER_SHADES.length
+      ? servers.slice(0, SERVER_SHADES.length - 1)
+      : servers;
+  const folded = servers.slice(named.length);
+  const both = Math.max(0, s.n_erddap + s.n_obis - s.n_linked);
+  return [
+    ...named.map((srv, i) => ({
+      key: srv.erddap_url,
+      label: hostname(srv.erddap_url),
+      n: srv.n_records,
+      color: SERVER_SHADES[i],
+      to: `/harvest/server/${slugify(srv.erddap_url)}`,
+    })),
+    ...(folded.length
+      ? [
+          {
+            key: "other",
+            label: t("harvest.ckanCoverage.otherServers", {
+              count: folded.length,
+            }),
+            n: folded.reduce((sum, srv) => sum + srv.n_records, 0),
+            color: SERVER_SHADES[SERVER_SHADES.length - 1],
+            members: folded
+              .map((srv) => `${hostname(srv.erddap_url)}: ${srv.n_records}`)
+              .join("\n"),
+          },
+        ]
+      : []),
+    {
+      key: "obis",
+      label: t("harvest.ckanCoverage.link.obis"),
+      n: s.n_obis - both,
+      color: OBIS_COLOR,
+    },
+    {
+      key: "none",
+      label: t("harvest.ckanCoverage.link.none"),
+      n: total == null ? 0 : total - s.n_linked,
+      color: NONE_COLOR,
+    },
+  ].filter((seg) => seg.n > 0);
+}
+
+const describe = (segments) =>
+  segments.map((seg) => `${seg.label}: ${seg.n}`).join(", ");
+
+function LinkBar({ segments, label }) {
+  return (
+    <div className="harvest-stack-bar" role="img" aria-label={label}>
+      {segments.map((seg) => (
+        <span
+          key={seg.key}
+          style={{ flexGrow: seg.n, background: seg.color }}
+          title={`${seg.label}: ${seg.n}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+// The bar's legend: each server links to its page; OBIS has none.
+function SegmentLegend({ segments, label }) {
+  if (!segments.length) return null;
+  return (
+    <ul className="harvest-pie-legend harvest-link-legend" aria-label={label}>
+      {segments.map((seg) => (
+        <li key={seg.key} title={seg.members}>
+          <span
+            className="harvest-pie-swatch"
+            style={{ background: seg.color }}
+            aria-hidden="true"
+          />
+          <span className="harvest-pie-name">
+            {seg.to ? (
+              <Link to={seg.to} className="harvest-link">
+                {seg.label}
+              </Link>
+            ) : (
+              seg.label
+            )}
+          </span>
+          <span className="harvest-pie-value">{seg.n}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function CkanCoverage({ coverage, t }) {
   const total = coverage.n_ckan_records;
   const pct = total ? Math.round((100 * coverage.n_linked) / total) : null;
+  const ratio =
+    pct !== null
+      ? t("harvest.ckanCoverage.ratio", { linked: coverage.n_linked, total })
+      : t("harvest.ckanCoverage.unavailable", { linked: coverage.n_linked });
+  const overall = linkSegments(coverage, total, t);
   return (
     <div>
-      <h2 className="harvest-section-title">
+      <h3 className="harvest-section-title">
         {t("harvest.ckanCoverage.title")}
-      </h2>
+      </h3>
       <p className="harvest-section-desc">
         {t("harvest.ckanCoverage.caption")}
       </p>
-      {pct !== null && (
-        <>
-          <div className="harvest-ckan-pct">{pct}%</div>
-          <div
-            className="harvest-ckan-meter"
-            role="img"
-            aria-label={t("harvest.ckanCoverage.ratio", {
-              linked: coverage.n_linked,
-              total,
-            })}
-          >
-            <span style={{ width: `${pct}%` }} />
-          </div>
-        </>
-      )}
-      <p className="harvest-card-meta">
-        {pct !== null
-          ? t("harvest.ckanCoverage.ratio", {
-              linked: coverage.n_linked,
-              total,
-            })
-          : t("harvest.ckanCoverage.unavailable", {
-              linked: coverage.n_linked,
-            })}
-      </p>
-      {coverage.sources ? (
+      {pct !== null && <div className="harvest-ckan-pct">{pct}%</div>}
+      <LinkBar segments={overall} label={ratio} />
+      <p className="harvest-card-meta">{ratio}</p>
+      <SegmentLegend
+        segments={overall}
+        label={t("harvest.ckanCoverage.dataFrom")}
+      />
+      {coverage.sources && (
         <ul className="harvest-ckan-sources">
           {coverage.sources.map((s) => {
             const sourcePct = s.n_records
               ? Math.round((100 * s.n_linked) / s.n_records)
               : 0;
+            const segments = linkSegments(s, s.n_records, t);
+            const linked = segments.filter((seg) => seg.key !== "none");
             return (
-              <li
-                key={s.source ?? ""}
-                title={t("harvest.ckanCoverage.split", {
-                  erddap: s.n_erddap,
-                  obis: s.n_obis,
-                })}
-              >
+              <li key={s.source ?? ""}>
                 <span className="harvest-pie-name">
                   {s.source ?? t("harvest.ckanCoverage.unknownSource")}
                 </span>
@@ -130,23 +213,14 @@ function CkanCoverage({ coverage, t }) {
                     pct: sourcePct,
                   })}
                 </span>
-                <div className="harvest-ckan-meter" aria-hidden="true">
-                  <span style={{ width: `${sourcePct}%` }} />
-                </div>
+                <LinkBar segments={segments} label={describe(segments)} />
+                <SegmentLegend
+                  segments={linked}
+                  label={t("harvest.ckanCoverage.dataFrom")}
+                />
               </li>
             );
           })}
-        </ul>
-      ) : (
-        <ul className="harvest-pie-legend">
-          <li>
-            <span className="harvest-pie-name">ERDDAP</span>
-            <span className="harvest-pie-value">{coverage.n_erddap}</span>
-          </li>
-          <li>
-            <span className="harvest-pie-name">OBIS</span>
-            <span className="harvest-pie-value">{coverage.n_obis}</span>
-          </li>
         </ul>
       )}
       {coverage.n_linked_stale > 0 && (
@@ -242,9 +316,9 @@ function HarvestedInCkan({ harvested, t }) {
   const ratio = t("harvest.ckanCoverage.harvestedRatio", { matched, total });
   return (
     <div>
-      <h2 className="harvest-section-title">
+      <h3 className="harvest-section-title">
         {t("harvest.ckanCoverage.harvestedTitle")}
-      </h2>
+      </h3>
       <p className="harvest-section-desc">
         {t("harvest.ckanCoverage.harvestedDesc")}
       </p>
@@ -260,12 +334,7 @@ function HarvestedInCkan({ harvested, t }) {
             ? Math.round((100 * s.n_matched) / s.n_datasets)
             : 0;
           return (
-            <li
-              key={s.erddap_url}
-              title={t("harvest.ckanCoverage.unmatched", {
-                count: s.n_datasets - s.n_matched,
-              })}
-            >
+            <li key={s.erddap_url}>
               <span className="harvest-pie-name">{hostname(s.erddap_url)}</span>
               <span className="harvest-pie-value">
                 {t("harvest.ckanCoverage.sourceRatio", {
@@ -274,6 +343,13 @@ function HarvestedInCkan({ harvested, t }) {
                   pct: matchedPct,
                 })}
               </span>
+              {s.n_datasets > s.n_matched && (
+                <span className="harvest-muted">
+                  {t("harvest.ckanCoverage.unmatched", {
+                    count: s.n_datasets - s.n_matched,
+                  })}
+                </span>
+              )}
               <div className="harvest-ckan-meter" aria-hidden="true">
                 <span style={{ width: `${matchedPct}%` }} />
               </div>
@@ -310,6 +386,43 @@ export default function HarvestOverview() {
           : ""}
       </p>
 
+      <div className="harvest-columns">
+        <section aria-labelledby="harvest-col-metadata">
+          <h2 id="harvest-col-metadata" className="harvest-column-title">
+            {t("harvest.columns.metadata")}
+          </h2>
+          <p className="harvest-section-desc">
+            {t("harvest.columns.metadataDesc")}
+          </p>
+          {loadingCkan && (
+            <SectionLoading
+              titleKey="harvest.ckanCoverage.title"
+              descKey="harvest.ckanCoverage.caption"
+              t={t}
+            />
+          )}
+          {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
+        </section>
+        <section aria-labelledby="harvest-col-data">
+          <h2 id="harvest-col-data" className="harvest-column-title">
+            {t("harvest.columns.data")}
+          </h2>
+          <p className="harvest-section-desc">
+            {t("harvest.columns.dataDesc")}
+          </p>
+          {loadingCkan && (
+            <SectionLoading
+              titleKey="harvest.ckanCoverage.harvestedTitle"
+              descKey="harvest.ckanCoverage.harvestedDesc"
+              t={t}
+            />
+          )}
+          {ckanCoverage?.harvested?.length > 0 && (
+            <HarvestedInCkan harvested={ckanCoverage.harvested} t={t} />
+          )}
+        </section>
+      </div>
+
       {servers && servers.length > 0 && (
         <section className="harvest-catalogue">
           <div>
@@ -324,7 +437,7 @@ export default function HarvestOverview() {
                 harvested={allHarvested}
                 failures={allFailures}
                 shades={shades}
-                size={160}
+                bar
               />
             </div>
           </div>
@@ -338,24 +451,6 @@ export default function HarvestOverview() {
               </p>
               <HarvestReasonBars failures={allFailures} />
             </div>
-          )}
-          {loadingCkan && (
-            <>
-              <SectionLoading
-                titleKey="harvest.ckanCoverage.title"
-                descKey="harvest.ckanCoverage.caption"
-                t={t}
-              />
-              <SectionLoading
-                titleKey="harvest.ckanCoverage.harvestedTitle"
-                descKey="harvest.ckanCoverage.harvestedDesc"
-                t={t}
-              />
-            </>
-          )}
-          {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
-          {ckanCoverage?.harvested?.length > 0 && (
-            <HarvestedInCkan harvested={ckanCoverage.harvested} t={t} />
           )}
         </section>
       )}

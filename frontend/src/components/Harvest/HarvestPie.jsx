@@ -142,12 +142,14 @@ function arcPath(start, end) {
 const pct = (n, total) => `${Math.round((100 * n) / total)}%`;
 
 // onSelect({status, reason}) makes slices and legend rows filter controls;
-// `selected` is the slice key currently filtered on.
+// `selected` is the slice key currently filtered on. `bar` draws the same
+// slices as one stacked bar.
 export default function HarvestPie({
   harvested,
   failures,
   shades,
   size = 64,
+  bar = false,
   onSelect,
   selected,
 }) {
@@ -161,47 +163,68 @@ export default function HarvestPie({
   const dimmed = (s) => selected && s.key !== selected;
   const tip = (s) => `${s.label}: ${s.n} (${pct(s.n, total)})`;
 
+  const label = t("harvest.pie.label", { harvested, total });
   let start = 0;
   return (
-    <div className="harvest-pie">
-      <svg
-        viewBox="0 0 64 64"
-        width={size}
-        height={size}
-        role="img"
-        aria-label={t("harvest.pie.label", { harvested, total })}
-      >
-        {slices.length === 1 ? (
-          <circle
-            cx={C}
-            cy={C}
-            r={R}
-            fill={slices[0].color}
-            className={selectable(slices[0]) ? "harvest-clickable" : undefined}
-            onClick={() => select(slices[0])}
-          >
-            <title>{tip(slices[0])}</title>
-          </circle>
-        ) : (
-          slices.map((s) => {
-            const end = start + s.n / total;
-            const d = arcPath(start, end);
-            start = end;
-            return (
-              <path
-                key={s.key}
-                d={d}
-                fill={s.color}
-                opacity={dimmed(s) ? 0.35 : 1}
-                className={`harvest-pie-slice${selectable(s) ? " harvest-clickable" : ""}`}
-                onClick={() => select(s)}
-              >
-                <title>{tip(s)}</title>
-              </path>
-            );
-          })
-        )}
-      </svg>
+    <div className={`harvest-pie${bar ? " harvest-pie-bar" : ""}`}>
+      {bar ? (
+        <div className="harvest-stack-bar" role="img" aria-label={label}>
+          {slices.map((s) => (
+            <span
+              key={s.key}
+              style={{
+                flexGrow: s.n,
+                background: s.color,
+                opacity: dimmed(s) ? 0.35 : 1,
+              }}
+              className={selectable(s) ? "harvest-clickable" : undefined}
+              title={tip(s)}
+              onClick={() => select(s)}
+            />
+          ))}
+        </div>
+      ) : (
+        <svg
+          viewBox="0 0 64 64"
+          width={size}
+          height={size}
+          role="img"
+          aria-label={label}
+        >
+          {slices.length === 1 ? (
+            <circle
+              cx={C}
+              cy={C}
+              r={R}
+              fill={slices[0].color}
+              className={
+                selectable(slices[0]) ? "harvest-clickable" : undefined
+              }
+              onClick={() => select(slices[0])}
+            >
+              <title>{tip(slices[0])}</title>
+            </circle>
+          ) : (
+            slices.map((s) => {
+              const end = start + s.n / total;
+              const d = arcPath(start, end);
+              start = end;
+              return (
+                <path
+                  key={s.key}
+                  d={d}
+                  fill={s.color}
+                  opacity={dimmed(s) ? 0.35 : 1}
+                  className={`harvest-pie-slice${selectable(s) ? " harvest-clickable" : ""}`}
+                  onClick={() => select(s)}
+                >
+                  <title>{tip(s)}</title>
+                </path>
+              );
+            })
+          )}
+        </svg>
+      )}
       <ul className="harvest-pie-legend">
         {slices.map((s) => {
           const row = (
