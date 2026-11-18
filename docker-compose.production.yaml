@@ -28,10 +28,6 @@ services:
     environment:
       # Base hardcodes `db`; production may target a DB across the VPN.
       DB_HOST_EXTERNAL: ${DB_HOST_EXTERNAL:-db}
-      HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
-    volumes:
-      # Host-editable. A changed server list needs `restart prefect_worker`.
-      - ${HARVEST_CONFIG_HOST_FILE:-./harvest_config.yaml}:/app/harvester/harvest_config.yaml:ro
 
   redis:
     # Bound the cache (see redis-config/redis.conf) so it can't compete with Postgres.

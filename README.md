@@ -111,9 +111,8 @@ the start of every flow run, from the first of:
    only for an instance that must harvest an uncommitted list.
 2. `HARVEST_CONFIG_FILE` — a baked file, e.g.
    `/app/harvester/harvest_config.sample.yaml`, or a mounted one. Defaults to
-   `/app/harvester/harvest_config.production.yaml`; the override sample and
-   `docker-compose.production.yaml` point it at their mounted
-   `/app/harvester/harvest_config.yaml`.
+   `/app/harvester/harvest_config.production.yaml`; the override sample points
+   it at its mounted `/app/harvester/harvest_config.yaml`.
 
 A `HARVEST_CONFIG_B64` that fails to decode stops the worker rather than
 falling back to another config.
@@ -361,8 +360,8 @@ build full copies of the stack.
 ### Self-hosted production
 
 `docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,
-holding only what production adds: host ports (nginx, Prefect, Postgres), the host-editable `harvest_config.yaml`
-bind mount, a capped redis config, and an overridable `DB_HOST_EXTERNAL`.
+holding only what production adds: host ports (nginx, Prefect, Postgres), a
+capped redis config, and an overridable `DB_HOST_EXTERNAL`.
 Everything else is inherited.
 
 1. Create `.env` — CI does this for you. By hand, start from `.env.production`
@@ -380,9 +379,9 @@ Everything else is inherited.
    `DB_HOST_EXTERNAL` and `DB_BIND_ADDRESS` to the VPN address; otherwise the DB
    port stays bound to `127.0.0.1`.
 
-2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
-   [Harvest configuration](#harvest-configuration)).
-3. Start: `sudo docker compose up -d --build`.
+2. Start: `sudo docker compose up -d --build`. The worker harvests the baked
+   `harvest_config.production.yaml` (see
+   [Harvest configuration](#harvest-configuration) to pick another).
 
 ### Monitoring
 
