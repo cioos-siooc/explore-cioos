@@ -482,6 +482,14 @@ describe("DatasetPreviewPlot", () => {
   it("lets only one axis hold several variables", async () => {
     const user = open("/?pvars=temperature,salinity");
     await waitFor(() => expect(traceCount()).toBe(2));
+    const pills = (caption) =>
+      rowCaptioned(caption).querySelectorAll(".variableSelect__multi-value");
+    const offersAdd = (caption) =>
+      within(rowCaptioned(caption)).queryByText("Add variable") !== null;
+    expect(pills("Y axis")).toHaveLength(1);
+    expect(offersAdd("X axis")).toBe(true);
+    expect(offersAdd("Y axis")).toBe(false);
+    expect(offersAdd("Color by")).toBe(false);
 
     // X holds two, so picking on Y replaces its one variable.
     await user.click(variableSearch("Y axis"));

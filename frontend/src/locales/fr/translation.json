@@ -542,6 +542,7 @@
   "datasetPreviewPlotSettings": "Réglages du graphique",
   "datasetPreviewPlotSelectAll": "Tout sélectionner",
   "datasetPreviewPlotSelectNone": "Tout désélectionner",
+  "datasetPreviewPlotAddVariable": "Ajouter une variable",
   "datasetPreviewPlotSearchVariables": "Rechercher des variables",
   "datasetPreviewPlotNoMatchingVariables": "Aucune variable correspondante",
   "datasetPreviewPlotAllVariablesSelected": "Toutes les variables sont tracées",

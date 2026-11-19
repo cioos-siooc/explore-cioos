@@ -541,6 +541,7 @@
   "datasetPreviewPlotSettings": "Plot settings",
   "datasetPreviewPlotSelectAll": "Select all",
   "datasetPreviewPlotSelectNone": "Clear all",
+  "datasetPreviewPlotAddVariable": "Add variable",
   "datasetPreviewPlotSearchVariables": "Search variables",
   "datasetPreviewPlotNoMatchingVariables": "No matching variables",
   "datasetPreviewPlotAllVariablesSelected": "Every variable is plotted",
