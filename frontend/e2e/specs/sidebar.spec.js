@@ -117,6 +117,24 @@ test.describe("the datasets sidebar", () => {
     await expect(page.getByTestId("sidebar-scrim")).toHaveCount(0);
   });
 
+  test("shows only the selected tab's panel on a dataset page", async ({
+    page,
+  }) => {
+    await openApp(page, "dataset=HakaiBIOOSBuoy1hour");
+    const panel = page.getByTestId("sidebar-datasets");
+    if ((await panel.getAttribute("data-expanded")) !== "true") {
+      await page.getByTestId("topbar-datasets-button").click();
+    }
+    const metadata = page.locator(".datasetPanel-metadata");
+    const data = page.locator(".datasetPanel-data");
+    await expect(metadata).toBeVisible();
+    await expect(data).toBeHidden();
+
+    await page.getByRole("tab", { name: "Data", exact: true }).click();
+    await expect(data).toBeVisible();
+    await expect(metadata).toBeHidden();
+  });
+
   test("widens the datasets list into a grid of cards", async ({
     page,
   }, testInfo) => {

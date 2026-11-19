@@ -11,8 +11,9 @@
   display: contents;
 }
 
-/* Kept mounted (shouldForceMount), so a view left behind holds its state. */
-.datasetTabsRoot [role="tabpanel"][data-inert] {
+/* Kept mounted (shouldForceMount), so a view left behind holds its state.
+   Not keyed on role: react-aria drops role="tabpanel" from the unselected one. */
+.datasetInspectorBody > [data-inert] {
   display: none;
 }
 
