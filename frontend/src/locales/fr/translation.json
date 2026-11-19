@@ -694,6 +694,7 @@
   "harvest.reason.MISSING_REQUIRED_VARS": "Variables requises manquantes",
   "harvest.reason.NO_SUPPORTED_VARIABLES": "Aucune variable prise en charge",
   "harvest.reason.INGEST_FLAG_FALSE": "Ingestion désactivée",
+  "harvest.reason.FILE_LISTING": "Liste de fichiers",
   "harvest.reason.DEPTH_AND_ALTITUDE": "Profondeur et altitude",
   "harvest.reason.UNKNOWN_ERROR": "Erreur inconnue",
   "harvest.col.duration": "Durée",

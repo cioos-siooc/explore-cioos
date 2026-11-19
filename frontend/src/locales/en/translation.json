@@ -693,6 +693,7 @@
   "harvest.reason.MISSING_REQUIRED_VARS": "Missing required variables",
   "harvest.reason.NO_SUPPORTED_VARIABLES": "No supported variables",
   "harvest.reason.INGEST_FLAG_FALSE": "Ingest disabled",
+  "harvest.reason.FILE_LISTING": "File listing",
   "harvest.reason.DEPTH_AND_ALTITUDE": "Depth and altitude",
   "harvest.reason.UNKNOWN_ERROR": "Unknown error",
   "harvest.col.duration": "Duration",
