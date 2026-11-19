@@ -139,7 +139,7 @@
 
 .legendBadge.error {
   background-color: var(--cioos-error-bg);
-  color: var(--cioos-error);
+  color: var(--cioos-error-700);
 }
 
 .datasetsCardList {

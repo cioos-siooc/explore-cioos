@@ -340,7 +340,7 @@
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0.01em;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   transition: opacity var(--cioos-transition-fast);
