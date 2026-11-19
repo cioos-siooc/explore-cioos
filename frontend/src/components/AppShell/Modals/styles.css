@@ -75,16 +75,24 @@
   white-space: nowrap;
 }
 
-.filtersModal .filtersModalTitleCounter {
+.filtersModal .filtersModalTitleCounter,
+.downloadModalTitleCounter {
   display: inline-flex;
   align-items: center;
-  padding: 1px 8px;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 1.8em;
+  height: 1.8em;
+  padding: 0 0.55em;
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-navy);
   color: var(--cioos-white);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
-  line-height: 1.6;
+  line-height: 1;
+
+  /* Digits have no descenders; without the trim they sit above centre. */
+  text-box: trim-both cap alphabetic;
   white-space: nowrap;
 }
 
@@ -175,19 +183,6 @@
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
-}
-
-.downloadModalTitleCounter {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 8px;
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-navy);
-  color: var(--cioos-white);
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
-  line-height: 1.6;
-  white-space: nowrap;
 }
 
 .downloadModalTitleSubtitle {
