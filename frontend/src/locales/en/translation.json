@@ -230,6 +230,7 @@
   "timeSelectorQuickSelect10Years": "1 decade",
   "timeSelectorStartDate": "Start Date",
   "timeSelectorEndDate": "End Date",
+  "datePickerOpenCalendar": "Open calendar",
   "datasetsTableHeaderSelectAllTitle": "Select all",
   "datasetsTableHeaderTitleTitle": "Sort by dataset title",
   "datasetsTableHeaderTitleText": "Title",

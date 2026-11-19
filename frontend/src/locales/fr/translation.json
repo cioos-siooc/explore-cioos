@@ -230,6 +230,7 @@
   "timeSelectorQuickSelect10Years": "1 décennie",
   "timeSelectorStartDate": "Date de début",
   "timeSelectorEndDate": "Date de fin",
+  "datePickerOpenCalendar": "Ouvrir le calendrier",
   "datasetsTableHeaderSelectAllTitle": "Tout sélectionner",
   "datasetsTableHeaderTitleTitle": "Trier par titre de jeu de données",
   "datasetsTableHeaderTitleText": "Titre",

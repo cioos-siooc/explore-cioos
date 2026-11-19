@@ -52,7 +52,7 @@ function TimeBarSurface() {
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-time-bar-space", measureBarSpace);
 
-  const { axis, maxIso } = useTimeAxis({
+  const { axis, maxIso, domainStart } = useTimeAxis({
     timeExtent,
     timeFilterActive,
     startDate,
@@ -108,6 +108,7 @@ function TimeBarSurface() {
           value={startDate}
           min={defaultStartDate}
           max={endDate}
+          yearMin={domainStart}
           onCommit={(value) => setFieldValue("start", value)}
         />
         <span className="railFieldSep">–</span>
@@ -116,6 +117,7 @@ function TimeBarSurface() {
           value={endDate}
           min={startDate}
           max={maxIso}
+          yearMin={domainStart}
           onCommit={(value) => setFieldValue("end", value)}
         />
         <IntervalSelect

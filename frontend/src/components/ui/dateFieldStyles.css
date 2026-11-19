@@ -1,5 +1,5 @@
-/* The caller's class draws the box (DateInput); this keeps its segments on
-   one line and marks the one being typed in. */
+/* The caller's class draws the box (the Group around segments and button);
+   this keeps it on one line and marks the segment being typed in. */
 .cioosDateField {
   display: contents;
 }
@@ -7,8 +7,15 @@
 .cioosDateInput {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   white-space: nowrap;
   cursor: text;
+}
+
+.cioosDateSegments {
+  display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .cioosDateSegment {
@@ -33,4 +40,227 @@
 
 .cioosDateInput[data-invalid] {
   border-color: var(--cioos-error);
+}
+
+.cioosDateButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: none;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.cioosDateButton[data-hovered],
+.cioosDateButton[data-pressed] {
+  color: var(--cioos-primary);
+}
+
+.cioosDateButton[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.cioosDatePopover {
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-shadow-md);
+}
+
+.cioosDateDialog {
+  padding: 10px;
+  outline: none;
+}
+
+/* Same size whatever the month: as wide as the grid, as tall as six weeks
+   (the most a month spans), so the pickers and arrows stay put. */
+.cioosCalendar {
+  --cell: 32px;
+  --header: 32px;
+
+  width: calc(7 * var(--cell));
+  min-height: calc(var(--header) + 6px + 24px + 6 * var(--cell));
+}
+
+.cioosCalendarHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--header);
+  margin-bottom: 6px;
+}
+
+.cioosCalendarPicker {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.cioosCalendarSelect .react-aria-SelectValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cioosCalendarSelect {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.cioosCalendarSelect svg {
+  flex: none;
+  font-size: 10px;
+  color: var(--cioos-ink-60);
+}
+
+.cioosCalendarSelect:hover {
+  border-color: var(--cioos-primary);
+}
+
+.cioosCalendarSelect:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.cioosPickerPopover {
+  min-width: var(--trigger-width);
+}
+
+.cioosPickerList {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px 0;
+  outline: none;
+}
+
+.cioosPickerOption {
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  outline: none;
+}
+
+.cioosPickerOption[data-focused],
+.cioosPickerOption[data-hovered] {
+  background-color: var(--cioos-surface-2);
+}
+
+.cioosPickerOption[data-selected] {
+  background-color: var(--cioos-teal-light);
+  font-weight: 600;
+}
+
+.cioosCalendarNav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: none;
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.cioosCalendarNav[data-hovered] {
+  background-color: var(--cioos-surface-2);
+}
+
+.cioosCalendarNav[data-disabled] {
+  color: var(--cioos-ink-40);
+  cursor: default;
+}
+
+.cioosCalendarGrid {
+  border-collapse: collapse;
+  font-size: var(--cioos-font-size-xs);
+}
+
+.cioosCalendarGrid th {
+  height: 24px;
+  padding: 0 0 4px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+}
+
+.cioosCalendarCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: var(--cioos-radius-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  outline: none;
+}
+
+.cioosCalendarCell[data-outside-month] {
+  display: none;
+}
+
+.cioosCalendarCell[data-hovered] {
+  background-color: var(--cioos-surface-2);
+}
+
+.cioosCalendarCell[data-selected] {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.cioosCalendarCell[data-disabled],
+.cioosCalendarCell[data-unavailable] {
+  color: var(--cioos-ink-40);
+  cursor: default;
+}
+
+.cioosCalendarCell[data-focus-visible] {
+  box-shadow: var(--cioos-focus);
+}
+
+/* Phones: 44px touch targets. */
+@media (max-width: 700px), (max-height: 500px) {
+  .cioosDateButton {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .cioosCalendarSelect {
+    min-height: 44px;
+
+    /* iOS Safari zooms into a focused field under 16px. */
+    font-size: 16px;
+  }
+
+  .cioosCalendar {
+    --cell: 40px;
+    --header: 44px;
+  }
+
+  .cioosCalendarNav {
+    width: 40px;
+    height: 40px;
+  }
 }
