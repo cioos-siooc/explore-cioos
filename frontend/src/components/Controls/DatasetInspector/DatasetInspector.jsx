@@ -726,30 +726,30 @@ export default function DatasetInspector({
         selectedKey={tab}
         onSelectionChange={setTab}
       >
-        {/* Widened, both views sit side by side and need no tabs. */}
-        {!wide && (
-          <TabList
-            className="datasetTabs"
-            aria-label={t("datasetInspectorTabsLabel")}
-          >
-            {[
-              ["metadata", "datasetInspectorMetadataTab", InfoCircle],
-              ["data", "datasetInspectorDataTab", Table],
-            ].map(([key, label, Icon]) => (
-              <Tab
-                key={key}
-                id={key}
-                className="datasetTab"
-                data-tip-highlight={
-                  key === "data" ? tipHighlight("showData") : undefined
-                }
-              >
-                <Icon size={14} aria-hidden="true" />
-                {t(label)}
-              </Tab>
-            ))}
-          </TabList>
-        )}
+        {/* Widened, both views sit side by side and need no tabs; the list
+            stays mounted (hidden) because the panels take their ids from it. */}
+        <TabList
+          hidden={wide}
+          className="datasetTabs"
+          aria-label={t("datasetInspectorTabsLabel")}
+        >
+          {[
+            ["metadata", "datasetInspectorMetadataTab", InfoCircle],
+            ["data", "datasetInspectorDataTab", Table],
+          ].map(([key, label, Icon]) => (
+            <Tab
+              key={key}
+              id={key}
+              className="datasetTab"
+              data-tip-highlight={
+                key === "data" ? tipHighlight("showData") : undefined
+              }
+            >
+              <Icon size={14} aria-hidden="true" />
+              {t(label)}
+            </Tab>
+          ))}
+        </TabList>
         <div className="datasetInspectorBody" ref={bodyRef}>
           <TabPanel {...viewProps("metadata")}>
             {viewHeading("metadata", "datasetInspectorMetadataTab", InfoCircle)}

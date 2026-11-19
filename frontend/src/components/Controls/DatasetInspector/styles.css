@@ -25,6 +25,10 @@
   background-color: var(--cioos-white);
 }
 
+.datasetTabs[hidden] {
+  display: none;
+}
+
 .datasetTab {
   flex: 1 1 0;
   display: inline-flex;
