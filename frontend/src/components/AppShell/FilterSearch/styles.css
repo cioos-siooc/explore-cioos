@@ -216,6 +216,11 @@
   cursor: pointer;
 }
 
+/* Applied rows would otherwise merge into one block. */
+.filterSearchOption + .filterSearchOption {
+  margin-top: 4px;
+}
+
 .filterSearchOption[data-state="include"] {
   background-color: var(--cioos-teal-light);
 }
@@ -438,7 +443,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 5px;
-  padding-top: 8px;
+  padding: 10px 0 12px;
   border-top: 1px solid var(--cioos-hairline);
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
