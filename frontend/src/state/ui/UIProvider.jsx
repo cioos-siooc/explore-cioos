@@ -81,6 +81,14 @@ export default function UIProvider({ children }) {
     [openFilters],
   );
   if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
+  // Opened from the Datasets button, the list takes focus on its first card
+  // once it has one (DatasetsTable clears this).
+  const [listFocusPending, setListFocusPending] = useState(false);
+  if (!sidebarOpen && listFocusPending) setListFocusPending(false);
+  const openDatasetList = useCallback(() => {
+    setListFocusPending(true);
+    setSidebarOpen(true);
+  }, []);
 
   // Wide screens only: narrower, the list would cover the shape just drawn.
   useRevealSidebar(
@@ -109,6 +117,9 @@ export default function UIProvider({ children }) {
     setListDensity,
     sidebarOpen,
     setSidebarOpen,
+    openDatasetList,
+    listFocusPending,
+    setListFocusPending,
     showFiltersModal,
     setShowFiltersModal,
     showDownloadModal,

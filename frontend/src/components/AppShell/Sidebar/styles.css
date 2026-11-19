@@ -78,18 +78,20 @@
   box-shadow: var(--cioos-shadow-3d);
 
   /* A transition on the resting position rather than keyframes, so either
-     control travels the card. `visibility` makes the parked card inert; being
-     discrete it flips at the end of the transition, never mid-flight. */
+     control travels the card. `visibility` makes the parked card inert: it
+     flips once the card has left, but at once on the way in, so the Datasets
+     button can focus the first card in the same frame. */
   transform: translateX(calc(-100% - 16px)) var(--cioos-perspective);
   visibility: hidden;
   transition:
     transform 0.32s cubic-bezier(0.22, 0.8, 0.3, 1),
-    visibility 0.32s;
+    visibility 0s 0.32s;
 }
 
 .sidebarDatasets.expanded {
   transform: translateX(0) var(--cioos-perspective);
   visibility: visible;
+  transition-delay: 0s;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -438,7 +440,8 @@
     /* Down here the sheet is the screen, so it rises from the bottom edge, at
        the other sheets' pace (modalStyles.css). */
     transform: translateY(100%);
-    transition-duration: 0.5s;
+    transition-duration: 0.5s, 0s;
+    transition-delay: 0s, 0.5s;
   }
 
   .sidebarDatasets.expanded {

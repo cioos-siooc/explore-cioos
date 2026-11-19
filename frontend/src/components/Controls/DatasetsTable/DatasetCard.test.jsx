@@ -198,6 +198,26 @@ describe("DatasetCard", () => {
     expect(onHoverEnd).toHaveBeenCalled();
   });
 
+  it("calls onHover/onHoverEnd as keyboard focus enters and leaves it", async () => {
+    const user = userEvent.setup();
+    const onHover = vi.fn();
+    const onHoverEnd = vi.fn();
+    render(
+      <DatasetCard
+        row={ROW}
+        t={t}
+        i18n={i18n}
+        onInspect={() => {}}
+        onHover={onHover}
+        onHoverEnd={onHoverEnd}
+      />,
+    );
+    screen.getByRole("button", { name: ROW.title }).focus();
+    expect(onHover).toHaveBeenCalledWith(ROW);
+    await user.tab();
+    expect(onHoverEnd).toHaveBeenCalled();
+  });
+
   describe("download modal variant", () => {
     it("shows a spinner while estimates are loading", () => {
       render(

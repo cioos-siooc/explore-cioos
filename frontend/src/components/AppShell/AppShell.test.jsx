@@ -153,6 +153,28 @@ describe("AppShell (composition)", () => {
     );
   });
 
+  it("the Datasets button opens the list with focus on its first card", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("cde.introSeen", "true");
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await user.click(await screen.findByTestId("topbar-datasets-button"));
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getAllByTestId("dataset-card")[0]
+            .querySelector("button.datasetCardTitle"),
+        ).toHaveFocus(),
+      { timeout: 3000 },
+    );
+    await user.keyboard("{ArrowDown}");
+    expect(
+      screen
+        .getAllByTestId("dataset-card")[1]
+        .querySelector("button.datasetCardTitle"),
+    ).toHaveFocus();
+  });
+
   it("comes back from a dataset page to the same page of the list", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem("cde.introSeen", "true");

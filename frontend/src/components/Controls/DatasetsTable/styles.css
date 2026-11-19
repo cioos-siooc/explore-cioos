@@ -152,6 +152,11 @@
   padding: 10px;
 }
 
+/* Focused only by a pointer (tabindex -1); its entries draw their own ring. */
+.datasetsCardList:focus {
+  outline: none;
+}
+
 /* Widened over the map (useWideView), the cards flow into a grid under
    full-width group headers. Only the sidebar's list: the Download modal's is
    the same table. */

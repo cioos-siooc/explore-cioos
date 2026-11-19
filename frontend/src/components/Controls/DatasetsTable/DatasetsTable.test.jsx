@@ -319,6 +319,108 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     );
   });
 
+  it("↑/↓ move between the list's entries, which are one Tab stop", async () => {
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    const gridToggle = document.querySelector(".datasetsCardGroupToggle");
+    const alpha = screen.getByRole("button", { name: "Alpha station" });
+    const beta = screen.getByRole("button", { name: "Beta station" });
+
+    gridToggle.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(alpha).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(beta).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(beta).toHaveFocus();
+    await user.keyboard("{ArrowUp}{ArrowUp}");
+    expect(gridToggle).toHaveFocus();
+
+    // Tab leaves the list from the current entry; Shift+Tab comes back to it.
+    await user.keyboard("{ArrowDown}");
+    await user.tab();
+    expect(document.activeElement.closest(".datasetsCardList")).toBeNull();
+    await user.tab({ shift: true });
+    expect(alpha.closest("[data-testid=dataset-card]")).toContainElement(
+      document.activeElement,
+    );
+  });
+
+  it("starts on the first card, past the grid group's header, and again on new results", async () => {
+    const { user, rerender } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    const firstCard = () => screen.getAllByTestId("dataset-card")[0];
+    expect(firstCard()).toHaveTextContent("Alpha station");
+
+    expect(
+      screen.getByRole("button", { name: "Alpha station" }),
+    ).not.toHaveAttribute("tabindex");
+    expect(document.querySelector(".datasetsCardGroupToggle")).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+
+    // Focus on the list itself, as after a click between cards, goes on to
+    // the first card.
+    act(() => document.querySelector(".datasetsCardList").focus());
+    expect(screen.getByRole("button", { name: "Alpha station" })).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("button", { name: "Beta station" })).toHaveFocus();
+
+    rerender(
+      <DatasetsTable
+        datasets={ROWS.slice(0, 2)}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Alpha station" }),
+      ).not.toHaveAttribute("tabindex"),
+    );
+    expect(
+      screen.getByRole("button", { name: "Beta station" }),
+    ).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("↓ after a click on a card's blank space moves to the next card", async () => {
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS.slice(0, 2)}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    const [alphaCard] = await screen.findAllByTestId("dataset-card");
+    await user.click(alphaCard.querySelector(".datasetCardMeta"));
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("button", { name: "Beta station" })).toHaveFocus();
+  });
+
   it("paginates: only PAGE_SIZES[0] rows render per page", async () => {
     const many = Array.from({ length: 30 }, (_, i) =>
       makeRow({ pk: i + 1, title: `Station ${String(i).padStart(2, "0")}` }),
@@ -335,6 +437,34 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     const cards = await screen.findAllByTestId("dataset-card");
     expect(cards.length).toBeLessThan(many.length);
     expect(document.querySelector(".pager")).toBeInTheDocument();
+  });
+
+  it("a pager page opens on its first card, with focus there", async () => {
+    const many = Array.from({ length: 30 }, (_, i) =>
+      makeRow({ pk: i + 1, title: `Station ${String(i).padStart(2, "0")}` }),
+    );
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={many}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByTestId("dataset-card")[0]
+          .querySelector("button.datasetCardTitle"),
+      ).toHaveFocus(),
+    );
+    expect(screen.getAllByTestId("dataset-card")[0]).not.toHaveTextContent(
+      "Station 00",
+    );
   });
 
   it("grouping by platform renders group headers with counts", async () => {
@@ -748,6 +878,35 @@ describe("DatasetsTable (download modal)", () => {
 
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
     expect(handleSelectDataset).not.toHaveBeenCalled();
+  });
+
+  it("↑/↓ move between cards' checkboxes, or the remove button when a card can't be ticked", async () => {
+    const rows = [
+      makeRow({ pk: 1, title: "Alpha station", internalDownload: true }),
+      makeRow({ pk: 2, title: "Beta station", internalDownload: false }),
+    ];
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        isDownloadModal
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    screen.getByRole("checkbox", { name: /Alpha station/ }).focus();
+    await user.keyboard("{ArrowDown}");
+    expect(
+      screen.getByRole("button", {
+        name: "Remove from the download selection: Beta station",
+      }),
+    ).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(
+      screen.getByRole("checkbox", { name: /Alpha station/ }),
+    ).toHaveFocus();
   });
 
   it("offers no density toggle and ignores a stored compact preference", async () => {

@@ -52,6 +52,7 @@ export default function TopControls() {
     setShowCoverageModal,
     sidebarOpen,
     setSidebarOpen,
+    openDatasetList,
     quickFiltersCollapsed,
     setQuickFiltersCollapsed,
   } = useUI();
@@ -80,7 +81,13 @@ export default function TopControls() {
             className={classNames("topBarButton", { active: sidebarOpen })}
             data-testid="topbar-datasets-button"
             // A minimized dataset page comes back as it was left.
-            onChange={() => setSidebarOpen(!sidebarOpen)}
+            onChange={() =>
+              sidebarOpen
+                ? setSidebarOpen(false)
+                : inspectDataset
+                  ? setSidebarOpen(true)
+                  : openDatasetList()
+            }
             isSelected={sidebarOpen}
             title={
               sidebarOpen

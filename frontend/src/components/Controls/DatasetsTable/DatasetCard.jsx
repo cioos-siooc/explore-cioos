@@ -95,6 +95,8 @@ export default function DatasetCard({
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
+      onFocus={() => onHover(row)}
+      onBlur={() => onHoverEnd()}
     >
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
