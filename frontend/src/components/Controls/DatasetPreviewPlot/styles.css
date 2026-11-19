@@ -870,6 +870,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Names the control: the readout alone ("Latest 6 of 202 profiles", a cast's
+   date) does not say it is something to pick with. */
+.previewProfileSliceCaption {
+  margin-right: 6px;
+  color: var(--cioos-ink-60);
+}
+
 /* Which one of how many — the reading the label alone cannot give, and the one
    that says whether there is a profile on either side. */
 .previewProfileSliceCount {

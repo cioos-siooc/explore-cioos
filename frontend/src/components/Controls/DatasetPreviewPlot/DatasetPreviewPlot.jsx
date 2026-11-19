@@ -143,6 +143,7 @@ export default function DatasetPreviewPlot() {
     plotCustomized,
     resetPlot,
     profiles,
+    drawnProfileCount,
     step,
     setStep,
     previewWindow,
@@ -915,7 +916,12 @@ export default function DatasetPreviewPlot() {
               </h5>
             )}
             {showSlice && (
-              <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
+              <ProfileSlice
+                profiles={profiles}
+                drawnCount={drawnProfileCount}
+                step={step}
+                setStep={setStep}
+              />
             )}
           </div>
         )}

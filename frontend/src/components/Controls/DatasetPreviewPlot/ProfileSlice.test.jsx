@@ -21,11 +21,16 @@ const profilesOf = (count, extra = {}) => ({
 
 // Cleans up first, so a test may show the control at more than one selection
 // without two sliders answering getByRole.
-const show = (profiles, step = null) => {
+const show = (profiles, step = null, drawnCount = null) => {
   cleanup();
   const setStep = vi.fn();
   renderWithProviders(
-    <ProfileSlice profiles={profiles} step={step} setStep={setStep} />,
+    <ProfileSlice
+      profiles={profiles}
+      drawnCount={drawnCount}
+      step={step}
+      setStep={setStep}
+    />,
     { providers: "none" },
   );
   return setStep;
@@ -44,8 +49,7 @@ describe("ProfileSlice", () => {
 
   it("opens on every profile at once, which is what the plot drew before", () => {
     show(profilesOf(335));
-    expect(screen.getByText("All in this window")).toBeInTheDocument();
-    expect(screen.getByText("0 / 335")).toBeInTheDocument();
+    expect(screen.getByText("All recent profiles")).toBeInTheDocument();
     // There is nothing before the window, and there is a profile after it.
     expect(screen.getByTitle("Previous profile")).toBeDisabled();
     expect(screen.getByTitle("Next profile")).not.toBeDisabled();
@@ -91,6 +95,24 @@ describe("ProfileSlice", () => {
     const setStep = show(profilesOf(335), "AZMP-ESG-cast-0");
     fireEvent.click(screen.getByTitle("Previous profile"));
     expect(setStep).toHaveBeenCalledWith(null);
+  });
+
+  it("finds a numeric profile id the URL handed back as a string", () => {
+    // Glider TrajectoryProfiles: ERDDAP sends the ids as numbers.
+    const numeric = {
+      column: "profile_id",
+      count: 3,
+      truncated: false,
+      steps: [1, 2, 3].map((value) => ({ value, time: null })),
+    };
+    const setStep = show(numeric, "2");
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle("Previous profile"));
+    expect(setStep).toHaveBeenCalledWith(1);
+
+    const toAll = show(numeric, "1");
+    fireEvent.click(screen.getByTitle("Previous profile"));
+    expect(toAll).toHaveBeenCalledWith(null);
   });
 
   it("stops at the last profile", () => {
@@ -144,8 +166,7 @@ describe("ProfileSlice", () => {
 
   it("falls back to the window when a link names a profile this record lacks", () => {
     show(profilesOf(335), "a-cast-from-another-station");
-    expect(screen.getByText("All in this window")).toBeInTheDocument();
-    expect(screen.getByText("0 / 335")).toBeInTheDocument();
+    expect(screen.getByText("All recent profiles")).toBeInTheDocument();
   });
 
   it("says the stops are a sample when the record holds more than it sent", () => {
@@ -165,7 +186,7 @@ describe("ProfileSlice", () => {
     // A TimeSeriesProfile harvested per cast: /preview draws that cast.
     show(profilesOf(10, { current: "AZMP-ESG-cast-0" }));
     expect(screen.getByText("1 / 10")).toBeInTheDocument();
-    expect(screen.queryByText("All in this window")).toBeNull();
+    expect(screen.queryByText("All recent profiles")).toBeNull();
     expect(screen.getByTitle("Previous profile")).toBeDisabled();
   });
 
@@ -181,9 +202,24 @@ describe("ProfileSlice", () => {
 
   it("calls the All stop a window, not the whole record", () => {
     show(profilesOf(335));
-    expect(screen.getByText("0 / 335")).toHaveAttribute(
+    expect(screen.getByText("All recent profiles")).toHaveAttribute(
       "title",
       "Every profile in the most recent rows of this record, drawn at once",
     );
+  });
+
+  it("says how many profiles the All stop draws out of the record's", () => {
+    // jklymak_mvp surveyA.nc: the 1000-row tail holds casts 197-202 of 202.
+    show(profilesOf(202), null, 6);
+    expect(screen.getByText("Latest 6 of 202 profiles")).toBeInTheDocument();
+    expect(screen.queryByText(/\/ 202/)).toBeNull();
+  });
+
+  it("names itself as the profile selector", () => {
+    show(profilesOf(3));
+    expect(screen.getByText("Profile selector")).toBeInTheDocument();
+    expect(
+      screen.getByRole("slider", { name: "Profile selector" }),
+    ).toBeInTheDocument();
   });
 });
