@@ -133,6 +133,7 @@ function SourceGroup({
           label={label}
           isSelected={allSelected}
           isExcluded={allExcluded}
+          isIndeterminate={!allSelected && someSet && !allExcluded}
           onInclude={() =>
             setAll({ isSelected: !allSelected, isExcluded: false })
           }

@@ -9,6 +9,7 @@ import FeedbackButton from "../../Controls/FeedbackButton/FeedbackButton.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 // The top bar passes the Datasets/Filters control in as children, welded in as
 // a second row of this card.
@@ -58,18 +59,17 @@ export default function BrandSearch({ children }) {
               className="brandMinorItem brandFeedback"
               size={20}
             />
-            <button
-              type="button"
+            <ToggleButton
               className={classNames("brandMinorItem", {
                 active: showIntroModal,
               })}
-              onClick={() => setShowIntroModal(true)}
-              aria-pressed={showIntroModal}
+              onChange={() => setShowIntroModal(true)}
+              isSelected={showIntroModal}
               title={t("dockIntroButtonTitle")}
               aria-label={t("dockIntroButtonTitle")}
             >
               <InfoCircle size={20} aria-hidden="true" />
-            </button>
+            </ToggleButton>
             <button
               type="button"
               className="brandMinorItem"

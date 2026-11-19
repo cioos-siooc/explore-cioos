@@ -25,6 +25,7 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 // Half the shell's usual 12px inset: on narrow viewports it comes straight off
 // the left column, whose height is already spoken for.
@@ -75,13 +76,12 @@ export default function TopControls() {
           <DatasetCounts />
         </div>
         <div className="topBarActions" data-testid="top-bar-actions">
-          <button
-            type="button"
+          <ToggleButton
             className={classNames("topBarButton", { active: sidebarOpen })}
             data-testid="topbar-datasets-button"
             // A minimized dataset page comes back as it was left.
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-pressed={sidebarOpen}
+            onChange={() => setSidebarOpen(!sidebarOpen)}
+            isSelected={sidebarOpen}
             title={
               sidebarOpen
                 ? t("sidebarCollapseTitle")
@@ -94,16 +94,15 @@ export default function TopControls() {
             <span className="topBarButtonLabel">
               {t("topBarDatasetsLabel")}
             </span>
-          </button>
-          <button
-            type="button"
+          </ToggleButton>
+          <ToggleButton
             className={classNames("topBarButton", {
               active: showCoverageModal,
             })}
             data-testid="topbar-coverage-button"
             data-tip-highlight={tipHighlight("timeCoverage")}
-            onClick={() => setShowCoverageModal(true)}
-            aria-pressed={showCoverageModal}
+            onChange={() => setShowCoverageModal(true)}
+            isSelected={showCoverageModal}
             // "Time coverage", because "Time" already names the time filter's
             // chip, which can be on screen at the same moment.
             title={t("coverageButtonTitle")}
@@ -112,7 +111,7 @@ export default function TopControls() {
             <span className="topBarButtonLabel">
               {t("topBarCoverageLabel")}
             </span>
-          </button>
+          </ToggleButton>
           <div
             className={classNames("topBarButton topBarFiltersSegment", {
               // Once closed, applied filters keep the lighter "applied" wash.
@@ -120,12 +119,11 @@ export default function TopControls() {
               applied: !showFiltersModal && activeFilterCount > 0,
             })}
           >
-            <button
-              type="button"
+            <ToggleButton
               className="topBarFiltersOpen"
               data-testid="topbar-filters-button"
-              onClick={openFilters}
-              aria-pressed={showFiltersModal}
+              onChange={() => openFilters()}
+              isSelected={showFiltersModal}
               title={t("dockFiltersCountTitle", { count: activeFilterCount })}
             >
               <Filter size={18} aria-hidden="true" />
@@ -137,7 +135,7 @@ export default function TopControls() {
                   {activeFilterCount}
                 </span>
               )}
-            </button>
+            </ToggleButton>
             <button
               type="button"
               className="topBarFiltersToggle"

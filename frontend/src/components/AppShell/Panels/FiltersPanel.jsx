@@ -255,7 +255,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
       tipTarget={tipTarget}
       label={t("filterMatchAllLabel")}
       checked={checked}
-      onChange={(e) => setChecked(e.target.checked)}
+      onChange={setChecked}
     />
   );
 
@@ -334,10 +334,10 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                   data-testid="text-search-all"
                   label={t("textSearchAllSwitch")}
                   checked={searchIn === SEARCH_ALL}
-                  onChange={(e) =>
+                  onChange={(all) =>
                     setSearch(
                       appliedSearchText,
-                      e.target.checked ? SEARCH_ALL : SEARCH_TITLES,
+                      all ? SEARCH_ALL : SEARCH_TITLES,
                     )
                   }
                 />

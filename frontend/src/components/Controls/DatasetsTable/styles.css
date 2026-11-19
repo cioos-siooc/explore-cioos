@@ -216,18 +216,18 @@
 }
 
 @media (hover: hover) {
-  .datasetCardSelect:not(:disabled):hover {
+  .datasetCardSelect:not([data-disabled]):hover {
     color: var(--cioos-navy);
   }
 }
 
-.datasetCardSelect:focus-visible {
+.datasetCardSelect[data-focus-visible] {
   outline: 2px solid var(--cioos-primary-800);
   outline-offset: 2px;
   border-radius: 50%;
 }
 
-.datasetCardSelect:disabled {
+.datasetCardSelect[data-disabled] {
   color: var(--cioos-hairline);
   cursor: not-allowed;
 }

@@ -358,7 +358,7 @@
   height: calc(var(--legend-switch) - 4px);
 }
 
-.mapLegend .form-switch .form-check-input:checked::before {
+.mapLegend .form-switch[data-selected] .form-check-input::before {
   transform: translateX(12px);
 }
 

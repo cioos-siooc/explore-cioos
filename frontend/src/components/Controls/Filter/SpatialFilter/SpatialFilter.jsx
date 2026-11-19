@@ -29,6 +29,7 @@ import {
   useGoToRegion,
   useRegionMatches,
 } from "../../../../state/useRegionSearch.js";
+import Button from "../../../ui/Button.jsx";
 import Spinner from "../../../ui/Spinner.jsx";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
@@ -357,20 +358,20 @@ export default function SpatialFilter() {
         </h3>
         <p className="spatialFilterSectionHint">{t("spatialFilterDrawHint")}</p>
         <div className="multiCheckboxFilter">
-          <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
+          <Button
             className={`optionButton ${activeMode === "box" ? "selected" : ""}`}
-            onClick={() => startDraw("box")}
+            onPress={() => startDraw("box")}
           >
-            <BoundingBox />
+            <BoundingBox aria-hidden="true" />
             <span className="optionName">{t("drawBoundingBoxOption")}</span>
-          </div>
-          <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
+          </Button>
+          <Button
             className={`optionButton ${activeMode === "polygon" ? "selected" : ""}`}
-            onClick={() => startDraw("polygon")}
+            onPress={() => startDraw("polygon")}
           >
-            <Pentagon />
+            <Pentagon aria-hidden="true" />
             <span className="optionName">{t("drawPolygonOption")}</span>
-          </div>
+          </Button>
         </div>
       </section>
       <PlaceSearch>

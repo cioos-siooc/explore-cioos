@@ -48,6 +48,7 @@ import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 // Up to billions: a full-catalogue maximum runs into the millions.
 const COUNT_UNITS = [
@@ -578,35 +579,33 @@ export default function Legend({
   const trackKeys = renderTrackKeys();
   const bathymetryBar = renderBathymetryBar();
   const depthToolButton = depthTool && (
-    <button
-      type="button"
+    <ToggleButton
       className={classNames("legendToolButton", { active: depthTool.active })}
-      onClick={() => {
+      onChange={() => {
         depthTool.onChange(!depthTool.active);
         // The dialog covers the map the tool is about to be used on.
         if (!depthTool.active) setDetailOpen(false);
       }}
-      disabled={controls.bathymetry ? !controls.bathymetry.checked : false}
-      aria-pressed={depthTool.active}
+      isDisabled={controls.bathymetry ? !controls.bathymetry.checked : false}
+      isSelected={depthTool.active}
       title={t(depthTool.active ? "legendDepthToolExit" : "legendDepthTool")}
       aria-label={t("legendDepthTool")}
     >
       <Crosshair size={11} aria-hidden="true" />
-    </button>
+    </ToggleButton>
   );
   // Two palettes, so one button: pressed is CHS's, and the bar shows which.
   const chsColours = controls.bathymetry?.palette === "chs";
   const paletteButton = controls.bathymetry?.onPaletteChange && (
-    <button
-      type="button"
+    <ToggleButton
       className={classNames("legendToolButton", { active: chsColours })}
-      onClick={() =>
+      onChange={() =>
         controls.bathymetry.onPaletteChange(
           chsColours ? defaultBathymetryPalette : "chs",
         )
       }
-      disabled={!controls.bathymetry.checked}
-      aria-pressed={chsColours}
+      isDisabled={!controls.bathymetry.checked}
+      isSelected={chsColours}
       title={t(
         chsColours
           ? "legendBathymetryPaletteToDeep"
@@ -615,7 +614,7 @@ export default function Legend({
       aria-label={t("legendBathymetryPaletteChs")}
     >
       <Palette size={11} aria-hidden="true" />
-    </button>
+    </ToggleButton>
   );
   const layerSwitches = renderLayerSwitches();
 

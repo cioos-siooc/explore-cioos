@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import reasonLabel from "./reasonLabel.js";
+import { ToggleButton } from "../ui/Button.jsx";
 
 // The status pills' colours (--cioos-success / --cioos-error / --cioos-warn),
 // each reason a shade of its status. Shade order and the slice order below
@@ -170,7 +171,7 @@ export default function HarvestPie({
       {bar ? (
         <div className="harvest-stack-bar" role="img" aria-label={label}>
           {slices.map((s) => (
-            <span // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
+            <span // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a mouse shortcut inside an image; the legend's buttons are the way in by keyboard
               key={s.key}
               style={{
                 flexGrow: s.n,
@@ -253,14 +254,13 @@ export default function HarvestPie({
                 .join(" ")}
             >
               {selectable(s) ? (
-                <button
-                  type="button"
+                <ToggleButton
                   className="harvest-pie-item"
-                  aria-pressed={s.key === selected}
-                  onClick={() => select(s)}
+                  isSelected={s.key === selected}
+                  onChange={() => select(s)}
                 >
                   {row}
-                </button>
+                </ToggleButton>
               ) : (
                 row
               )}

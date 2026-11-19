@@ -234,6 +234,21 @@ barely change.
    has left it. A later map click updates the open card without taking focus
    again.
 6. `Button`, `ToggleButton`, `Switch`, `Checkbox`, `SearchField`
+   **Done:** `ui/Button.jsx` (Button, ToggleButton, ToggleButtonGroup),
+   `ui/Checkbox.jsx`, and `ui/Switch.jsx` and `ui/TableFilter.jsx` on RAC
+   `Switch`/`SearchField`. RAC passes no `title` through, so `ui/withTitle.js`
+   adds it back with RAC's `render` prop. Every `aria-pressed` button is a
+   `ToggleButton`; one-of choices (`SegmentedToggle`, the coverage and taxonomy
+   views) are a single-selection `ToggleButtonGroup`, so radios walked with the
+   arrow keys. Filter rows are a `Checkbox` (the label is the whole row, the
+   group rows `isIndeterminate`), and Space ticks them rather than Enter. A row
+   that explains itself takes a `tooltip` prop: focus is on the hidden input but
+   the pointer on the label, so a ui/Tooltip around it can't serve both. The
+   language toggle and the draw options are Buttons. Two mouse shortcuts keep a
+   justified lint disable, since a keyboard path already exists beside them:
+   the dataset card's click (its title button) and the harvest bar's segments
+   (the legend's buttons). `aria-pressed`/`aria-checked` outside `ui/` are now
+   lint errors. Initial JS: +8.0 kB gz.
 7. Collapsibles → `Disclosure`; Tabs
 8. FilterSearch → `ComboBox`/`Autocomplete`; chips → `TagGroup`
 9. Rail → `Slider`; TimeRail date → `DateField`

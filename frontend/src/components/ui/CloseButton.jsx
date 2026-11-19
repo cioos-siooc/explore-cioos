@@ -1,6 +1,8 @@
 import * as React from "react";
 import { X } from "react-bootstrap-icons";
 
+import Button from "./Button.jsx";
+
 import "./closeButtonStyles.css";
 
 // The one way out of anything dismissable, so "this closes" is learned once.
@@ -12,15 +14,14 @@ export default function CloseButton({
   testId,
 }) {
   return (
-    <button
-      type="button"
+    <Button
       className="closeButton"
       data-testid={testId}
-      onClick={onClick}
+      onPress={onClick}
       title={label}
       aria-label={label}
     >
       <Icon aria-hidden="true" />
-    </button>
+    </Button>
   );
 }

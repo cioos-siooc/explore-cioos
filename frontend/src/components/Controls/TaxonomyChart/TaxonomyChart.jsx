@@ -6,6 +6,7 @@ import Spinner from "../../ui/Spinner.jsx";
 import { buildTaxonomyTree, fetchChecklist } from "./taxonomy.js";
 import TaxonomyTree from "./TaxonomyTree.jsx";
 import "./styles.css";
+import { ToggleButton, ToggleButtonGroup } from "../../ui/Button.jsx";
 
 const TaxonomySunburst = lazy(() => import("./TaxonomySunburst.jsx"));
 
@@ -92,22 +93,20 @@ export default function TaxonomyChart({ datasetId }) {
         </div>
         <div className="taxonomyControls">
           <div className="taxonomyActions" ref={setActionsEl} />
-          <div
+          <ToggleButtonGroup
             className="viewToggle"
-            role="group"
             aria-label={t("taxonomyViewLabel")}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[view]}
+            onSelectionChange={(keys) => setView([...keys][0])}
           >
             {VIEWS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={view === option}
-                onClick={() => setView(option)}
-              >
+              <ToggleButton key={option} id={option}>
                 {t(`taxonomyView_${option}`)}
-              </button>
+              </ToggleButton>
             ))}
-          </div>
+          </ToggleButtonGroup>
         </div>
       </div>
       {body}

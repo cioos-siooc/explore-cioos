@@ -18,11 +18,11 @@
   transition: background-color var(--cioos-transition-fast);
 }
 
-.sortSelectDirection:hover {
+.sortSelectDirection[data-hovered] {
   background-color: var(--cioos-surface-2);
 }
 
-.sortSelectDirection:focus-visible {
+.sortSelectDirection[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }

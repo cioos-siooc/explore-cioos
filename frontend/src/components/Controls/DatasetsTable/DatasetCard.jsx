@@ -30,6 +30,7 @@ import {
 } from "../../../downloadLinks.js";
 import erddapServersJSONfile from "../../../erddapServers.json";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
+import Checkbox from "../../ui/Checkbox.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip, { TooltipTarget } from "../../ui/Tooltip.jsx";
 
@@ -72,12 +73,6 @@ export default function DatasetCard({
   // Failed estimates will never arrive: say so instead of spinning.
   const estimatesFailed = !estimatesLoading && !estimatesReady;
 
-  const handleSelect = (e) => {
-    // The card itself opens the dataset page; this control must not.
-    e.stopPropagation();
-    if (!selectDisabled) onSelect(row);
-  };
-
   const clickable = typeof onInspect === "function";
   const handleCardClick = clickable ? () => onInspect(row) : undefined;
 
@@ -86,7 +81,7 @@ export default function DatasetCard({
     : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
 
   return (
-    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Checkbox
+    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a mouse shortcut; the title button is the way in by keyboard
       data-testid="dataset-card"
       data-dataset-pk={row.pk}
       data-selected={Boolean(selected)}
@@ -103,16 +98,12 @@ export default function DatasetCard({
     >
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
-          {/* A button with role=checkbox: it carries an icon a native input
-              cannot. */}
-          <button
-            type="button"
-            role="checkbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Checkbox
-            aria-checked={Boolean(selected)}
+          <Checkbox
             className={classNames("datasetCardSelect", { checked: selected })}
+            isSelected={Boolean(selected)}
+            isDisabled={selectDisabled}
+            onChange={() => onSelect(row)}
             title={selectTitle}
-            onClick={handleSelect}
-            disabled={selectDisabled}
             aria-label={`${t("datasetsCardSelectForDownloadText")}: ${row.title}`}
             data-tip-highlight={tipHighlight}
           >
@@ -121,7 +112,7 @@ export default function DatasetCard({
             ) : (
               <PlusCircle size={16} aria-hidden="true" />
             )}
-          </button>
+          </Checkbox>
 
           {/* The wrapper is the height of the title's first line, so the dot
               stays centered on that line however the title wraps. */}

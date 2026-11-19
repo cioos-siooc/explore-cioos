@@ -514,7 +514,7 @@ export default function FilterSearch({
                           type="button"
                           className="filterSearchGroupOpen"
                           data-testid={`filter-search-region-${s.id}`}
-                          aria-pressed={s.pressed}
+                          aria-pressed={s.pressed} // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={s.choose}
                         >

@@ -7,7 +7,7 @@ import {
   XSquare,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
-import Tooltip from "../../../ui/Tooltip.jsx";
+import Checkbox from "../../../ui/Checkbox.jsx";
 import {
   filterOptionLabel,
   toggleOptionExcluded,
@@ -113,9 +113,7 @@ export default function MultiCheckboxFilter({
             <Square />
           )
         }
-        aria-checked={
-          !allSelected && someSet && !allExcluded ? "mixed" : allSelected
-        }
+        isIndeterminate={!allSelected && someSet && !allExcluded}
         data-testid="filter-option-group"
       >
         <span className="optionName">{label}</span>
@@ -130,35 +128,28 @@ export default function MultiCheckboxFilter({
     const hoverText = option[`hover_${i18n.language}`] || title;
 
     return (
-      <Tooltip
+      <FilterOption
         key={option.pk}
-        placement="bottom"
-        delay={150}
-        content={hoverText}
+        label={title}
+        isSelected={option.isSelected}
+        isExcluded={option.isExcluded}
+        onInclude={() => updateOption(option, toggleOptionIncluded)}
+        onExclude={() => updateOption(option, toggleOptionExcluded)}
+        excludeTipHighlight={tipHighlight(isFirst && "exclude")}
+        tooltip={hoverText}
+        data-testid="filter-option"
+        data-option-pk={option.pk}
+        data-excluded={Boolean(option.isExcluded)}
       >
-        <FilterOption
-          label={title}
-          isSelected={option.isSelected}
-          isExcluded={option.isExcluded}
-          onInclude={() => updateOption(option, toggleOptionIncluded)}
-          onExclude={() => updateOption(option, toggleOptionExcluded)}
-          excludeTipHighlight={tipHighlight(isFirst && "exclude")}
-          title={hoverText ? "" : t(title)}
-          data-testid="filter-option"
-          data-option-pk={option.pk}
-          data-selected={isChecked(option)}
-          data-excluded={Boolean(option.isExcluded)}
-        >
-          <span className="optionName">{title}</span>
-          {colored && (
-            <CircleFill
-              className="optionColorCircle"
-              fill={swatchColor}
-              size="15"
-            />
-          )}
-        </FilterOption>
-      </Tooltip>
+        <span className="optionName">{title}</span>
+        {colored && (
+          <CircleFill
+            className="optionColorCircle"
+            fill={swatchColor}
+            size="15"
+          />
+        )}
+      </FilterOption>
     );
   }
 
@@ -167,25 +158,17 @@ export default function MultiCheckboxFilter({
       {optionsSelected.length > 0 &&
         optionsSelected.length !== allOptions.length && (
           <>
-            <div
+            <Checkbox
               className="searchResultsButton"
-              role="checkbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Checkbox
-              aria-checked={optionsSelected.every(isChecked)}
-              tabIndex={0}
+              isSelected={optionsSelected.every(isChecked)}
               data-testid="filter-select-all-results"
-              onClick={() => selectAllSearchResultsToggle()}
-              onKeyDown={(event) => {
-                if (event.key === " " || event.key === "Enter") {
-                  event.preventDefault();
-                  selectAllSearchResultsToggle();
-                }
-              }}
+              onChange={() => selectAllSearchResultsToggle()}
             >
               {optionsSelected.every(isChecked) ? <CheckSquare /> : <Square />}
               {t("multiCheckboxFilterSelectSearchResults")}{" "}
               {`(${optionsSelected.length})`}
-              <hr />
-            </div>
+            </Checkbox>
+            <hr />
           </>
         )}
       {optionsSelected.length === 0 ? (

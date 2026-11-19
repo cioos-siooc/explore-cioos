@@ -287,3 +287,18 @@
   color: var(--cioos-ink-60);
   cursor: default;
 }
+
+/* The draw options are buttons wearing the filter rows' look. */
+.spatialFilterOptions .optionButton {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.spatialFilterOptions .optionButton[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}

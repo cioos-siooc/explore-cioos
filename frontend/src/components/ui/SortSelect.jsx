@@ -2,6 +2,7 @@ import React from "react";
 import { CaretDownFill, CaretUpFill } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
+import { ToggleButton } from "./Button.jsx";
 import SelectPill from "./SelectPill.jsx";
 import "./sortSelectStyles.css";
 
@@ -22,11 +23,11 @@ export default function SortSelect({ fields, sort, onChange, label }) {
       // Changing field keeps the direction.
       onChange={(field) => onChange({ field, dir: sort.dir })}
     >
-      <button
-        type="button"
+      <ToggleButton
         className="sortSelectDirection"
-        onClick={() =>
-          onChange({ field: sort.field, dir: ascending ? "desc" : "asc" })
+        isSelected={ascending}
+        onChange={(asc) =>
+          onChange({ field: sort.field, dir: asc ? "asc" : "desc" })
         }
         title={directionTitle}
         aria-label={directionTitle}
@@ -36,7 +37,7 @@ export default function SortSelect({ fields, sort, onChange, label }) {
         ) : (
           <CaretDownFill size={9} aria-hidden="true" />
         )}
-      </button>
+      </ToggleButton>
     </SelectPill>
   );
 }

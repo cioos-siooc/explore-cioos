@@ -67,7 +67,7 @@ test.describe("filters", () => {
     );
 
     await groups.click();
-    await expect(groups).toHaveAttribute("aria-checked", "true");
+    await expect(groups.getByRole("checkbox")).toBeChecked();
     await expect(page).toHaveURL(/eovs=[^&]*seaSurfaceHeight/);
   });
 

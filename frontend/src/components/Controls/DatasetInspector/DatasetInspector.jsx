@@ -75,6 +75,7 @@ import ZoomToDataset, {
   useZoomToDataset,
 } from "../../AppShell/ZoomToDataset/ZoomToDataset.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 function GridNodeCount({ dimensions }) {
   const factors = gridNodeFactors(dimensions);
@@ -191,12 +192,11 @@ function DatasetActions({
     localizedCkanUrl(dataset.ckan_url, i18n.language);
   return (
     <div className="datasetTitleActions">
-      <button
-        type="button"
+      <ToggleButton
         className={classNames("datasetAction", { active: inSelection })}
-        onClick={onAdd}
-        disabled={isGrid}
-        aria-pressed={inSelection}
+        onChange={() => onAdd()}
+        isDisabled={isGrid}
+        isSelected={inSelection}
         title={
           isGrid
             ? t("griddapNotDownloadableTooltip")
@@ -211,7 +211,7 @@ function DatasetActions({
           <PlusCircle size={14} aria-hidden="true" />
         )}
         {t(inSelection ? "datasetExitAddedText" : "datasetExitAddText")}
-      </button>
+      </ToggleButton>
       {source && (
         <a
           className="datasetAction"
@@ -1042,10 +1042,9 @@ export default function DatasetInspector({
                               </button>
                             )}
                             {(isTrajectoryDataset || row.profile_id) && (
-                              <button
-                                type="button"
+                              <ToggleButton
                                 className="listCardButton"
-                                aria-pressed={onMap}
+                                isSelected={onMap}
                                 title={t(
                                   onMap
                                     ? "datasetInspectorHideFromMapTitle"
@@ -1053,7 +1052,7 @@ export default function DatasetInspector({
                                       ? "trajectoryTrackShowTitle"
                                       : "datasetInspectorShowOnMapTitle",
                                 )}
-                                onClick={() => toggleOnMap(row.profile_id)}
+                                onChange={() => toggleOnMap(row.profile_id)}
                               >
                                 {onMap ? (
                                   <PinMapFill size={13} aria-hidden="true" />
@@ -1061,7 +1060,7 @@ export default function DatasetInspector({
                                   <PinMap size={13} aria-hidden="true" />
                                 )}
                                 {t("datasetInspectorShowOnMapText")}
-                              </button>
+                              </ToggleButton>
                             )}
                           </>
                         }

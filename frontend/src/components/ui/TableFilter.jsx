@@ -1,5 +1,8 @@
 import * as React from "react";
-import { Search } from "react-bootstrap-icons";
+import { Search, X } from "react-bootstrap-icons";
+import { Input, SearchField } from "react-aria-components";
+
+import Button from "./Button.jsx";
 
 import "./tableFilterStyles.css";
 
@@ -16,18 +19,20 @@ export function filterRows(rows, filterText) {
   );
 }
 
+// Escape clears it, as does the X once there is text to clear.
 export default function TableFilter({ value, onChange, placeholder }) {
   return (
-    <label className="tableFilterWrap">
+    <SearchField
+      className="tableFilterWrap"
+      value={value}
+      onChange={onChange}
+      aria-label={placeholder}
+    >
       <Search size={13} aria-hidden="true" />
-      <input
-        className="tableFilterInput"
-        type="search"
-        value={value}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
+      <Input className="tableFilterInput" placeholder={placeholder} />
+      <Button className="tableFilterClear">
+        <X size={14} aria-hidden="true" />
+      </Button>
+    </SearchField>
   );
 }

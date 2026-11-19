@@ -1,11 +1,13 @@
-.form-check.form-switch {
+/* react-aria Switch: a label holding a visually hidden input, so the track is
+   drawn on a span and styled from the label's data-* state. */
+:where(.form-switch) {
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
 .form-switch .form-check-input {
-  appearance: none;
   width: 36px;
   height: 20px;
   margin: 0;
@@ -14,7 +16,6 @@
   border: 1px solid var(--cioos-hairline, #dce8e5);
   border-radius: 999px;
   position: relative;
-  cursor: pointer;
   transition: background-color 0.15s ease-in-out;
 }
 
@@ -31,21 +32,24 @@
   transition: transform 0.15s ease-in-out;
 }
 
-.form-switch .form-check-input:checked {
+.form-switch[data-selected] .form-check-input {
   background-color: var(--cioos-primary, #52a79b);
   border-color: var(--cioos-primary, #52a79b);
 }
 
-.form-switch .form-check-input:checked::before {
+.form-switch[data-selected] .form-check-input::before {
   transform: translateX(16px);
 }
 
-.form-switch .form-check-input:disabled {
+.form-switch[data-focus-visible] .form-check-input {
+  box-shadow: var(--cioos-focus);
+}
+
+.form-switch[data-disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .form-switch .form-check-label {
   font-size: var(--cioos-font-size-sm);
-  cursor: pointer;
 }

@@ -22,10 +22,23 @@ export default function Tooltip({
   return (
     <TooltipTrigger delay={delay} closeDelay={0}>
       <Focusable>{children}</Focusable>
-      <AriaTooltip placement={placement} offset={6} className="cioosTooltip">
-        <div className="tooltip-inner">{content}</div>
-      </AriaTooltip>
+      <TooltipBubble placement={placement}>{content}</TooltipBubble>
     </TooltipTrigger>
+  );
+}
+
+// Rendered inside a TooltipTrigger; `triggerRef` positions it against an
+// element other than the trigger (see ui/Checkbox).
+export function TooltipBubble({ placement = "bottom", triggerRef, children }) {
+  return (
+    <AriaTooltip
+      placement={placement}
+      offset={6}
+      className="cioosTooltip"
+      triggerRef={triggerRef}
+    >
+      <div className="tooltip-inner">{children}</div>
+    </AriaTooltip>
   );
 }
 

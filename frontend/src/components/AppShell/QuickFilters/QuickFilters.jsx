@@ -31,6 +31,7 @@ import {
   MenuTrigger,
 } from "../../ui/Dropdown.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 // drawRequest is a *last* request, not a current one (see MapStateProvider),
 // so the lit menu item comes from the drawn shape, or failing one from the tool
@@ -232,13 +233,12 @@ export default function QuickFilters() {
           </span>
         </button>
       )}
-      <button
-        type="button"
+      <ToggleButton
         className={classNames("quickFilterButton", { applied: onlyInView })}
         data-testid="quick-filter-in-view"
         data-tip-highlight={tipHighlight("inView")}
-        onClick={() => setOnlyInView(!onlyInView)}
-        aria-pressed={onlyInView}
+        onChange={() => setOnlyInView(!onlyInView)}
+        isSelected={onlyInView}
         title={t("quickFilterInViewTitle")}
         aria-label={countedLabel(
           onlyInView,
@@ -259,14 +259,13 @@ export default function QuickFilters() {
         <span className="quickFilterCaption" aria-hidden="true">
           {t("quickFilterCaptionInView")}
         </span>
-      </button>
-      <button
-        type="button"
+      </ToggleButton>
+      <ToggleButton
         className={classNames("quickFilterButton", { applied: realtimeOnly })}
         data-testid="quick-filter-realtime"
         data-tip-highlight={tipHighlight("realtime")}
-        onClick={() => setRealtimeOnly(!realtimeOnly)}
-        aria-pressed={realtimeOnly}
+        onChange={() => setRealtimeOnly(!realtimeOnly)}
+        isSelected={realtimeOnly}
         title={t("quickFilterRealtimeTitle")}
         aria-label={countedLabel(
           realtimeOnly,
@@ -287,7 +286,7 @@ export default function QuickFilters() {
         <span className="quickFilterCaption" aria-hidden="true">
           {t("quickFilterCaptionRealtime")}
         </span>
-      </button>
+      </ToggleButton>
       <button
         type="button"
         className="quickFilterButton quickFilterReset"

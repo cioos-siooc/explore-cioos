@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../../test/renderWithProviders.jsx";
@@ -25,7 +25,7 @@ describe("MultiCheckboxFilter", () => {
     expect(screen.getAllByTestId("filter-option")).toHaveLength(2);
   });
 
-  it("reflects isSelected via aria-checked", () => {
+  it("reflects isSelected on its checkbox", () => {
     render(
       <MultiCheckboxFilter
         optionsSelected={OPTIONS}
@@ -36,7 +36,7 @@ describe("MultiCheckboxFilter", () => {
     const checked = screen
       .getAllByTestId("filter-option")
       .find((el) => el.dataset.optionPk === "2");
-    expect(checked).toHaveAttribute("aria-checked", "true");
+    expect(within(checked).getByRole("checkbox")).toBeChecked();
   });
 
   it("shows the 'no filter options' message when there are none", () => {
@@ -79,7 +79,7 @@ describe("MultiCheckboxFilter", () => {
     expect(OPTIONS).toEqual(original);
   });
 
-  it("is keyboard-operable: Enter toggles the focused option", async () => {
+  it("is keyboard-operable: Space toggles the focused option", async () => {
     const user = userEvent.setup();
     const setOptionsSelected = vi.fn();
     render(
@@ -92,8 +92,8 @@ describe("MultiCheckboxFilter", () => {
     const option = screen
       .getAllByTestId("filter-option")
       .find((el) => el.dataset.optionPk === "1");
-    option.focus();
-    await user.keyboard("{Enter}");
+    within(option).getByRole("checkbox").focus();
+    await user.keyboard(" ");
     expect(setOptionsSelected).toHaveBeenCalled();
   });
 
@@ -168,17 +168,18 @@ describe("MultiCheckboxFilter", () => {
     }
     render(<Harness />);
     const option = () => screen.getByTestId("filter-option");
+    const box = () => screen.getByRole("checkbox", { name: /Glider/ });
     const exclude = () => screen.getByRole("button", { name: /: Glider$/ });
 
     await user.click(option());
-    expect(option()).toHaveAttribute("aria-checked", "true");
+    expect(box()).toBeChecked();
     expect(option()).toHaveAttribute("data-excluded", "false");
 
     await user.click(exclude());
-    expect(option()).toHaveAttribute("aria-checked", "false");
+    expect(box()).not.toBeChecked();
     expect(option()).toHaveAttribute("data-excluded", "true");
     expect(exclude()).toHaveAttribute("aria-pressed", "true");
-    // aria-checked cannot say "excluded", so it is announced as text.
+    // A checkbox cannot say "excluded", so it is announced as text.
     expect(option()).toHaveTextContent("(excluded)");
 
     await user.click(exclude());
@@ -186,7 +187,7 @@ describe("MultiCheckboxFilter", () => {
 
     await user.click(option());
     await user.click(option());
-    expect(option()).toHaveAttribute("aria-checked", "false");
+    expect(box()).not.toBeChecked();
     expect(option()).toHaveAttribute("data-excluded", "false");
   });
 
@@ -242,8 +243,10 @@ describe("MultiCheckboxFilter", () => {
         screen.getByRole("group", { name: "Biogeochemical" }),
       ).toContainElement(screen.getAllByTestId("filter-option")[0]);
       expect(screen.getAllByTestId("filter-option-group")).toHaveLength(2);
-      expect(group("Biogeochemical")).toHaveAttribute("aria-checked", "mixed");
-      expect(group("Physical")).toHaveAttribute("aria-checked", "false");
+      expect(
+        within(group("Biogeochemical")).getByRole("checkbox"),
+      ).toBePartiallyChecked();
+      expect(within(group("Physical")).getByRole("checkbox")).not.toBeChecked();
     });
 
     it("the category row includes every option in it, the rest untouched", async () => {

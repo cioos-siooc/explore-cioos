@@ -54,6 +54,7 @@ import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
 import "../../Map/ClearMapSelection/styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -491,15 +492,14 @@ export default function DatasetsTable({
         </>
       ) : (
         <div className="datasetsCardToolbar">
-          <button
-            type="button"
+          <ToggleButton
             className={classNames("datasetsCardFilters", {
               active: showFiltersModal,
               applied: !showFiltersModal && activeFilterCount > 0,
             })}
             data-testid="datasets-filters-button"
-            onClick={openFilters}
-            aria-pressed={showFiltersModal}
+            onChange={() => openFilters()}
+            isSelected={showFiltersModal}
             title={t("dockFiltersCountTitle", { count: activeFilterCount })}
           >
             <Filter size={13} aria-hidden="true" />
@@ -509,7 +509,7 @@ export default function DatasetsTable({
                 {activeFilterCount}
               </span>
             )}
-          </button>
+          </ToggleButton>
           {sortControl}
           <SelectPill
             label={t("datasetsCardGroupByLabel")}
@@ -517,12 +517,11 @@ export default function DatasetsTable({
             options={groupByOptions}
             onChange={setGroupBy}
           />
-          <button
-            type="button"
+          <ToggleButton
             className="datasetsCardDensity"
             data-testid="datasets-density-toggle"
-            onClick={() => setListDensity(compact ? "full" : "compact")}
-            aria-pressed={compact}
+            onChange={() => setListDensity(compact ? "full" : "compact")}
+            isSelected={compact}
             aria-label={t("datasetsCardDensityCompactTitle")}
             title={t(
               compact
@@ -535,7 +534,7 @@ export default function DatasetsTable({
             ) : (
               <ViewStacked size={14} aria-hidden="true" />
             )}
-          </button>
+          </ToggleButton>
         </div>
       )}
 
@@ -692,11 +691,10 @@ export default function DatasetsTable({
                 </button>
                 {filter && (
                   <>
-                    <button
-                      type="button"
+                    <ToggleButton
                       className="datasetsCardGroupFilter"
-                      onClick={() => filter.toggle("include")}
-                      aria-pressed={filter.state === "include"}
+                      onChange={() => filter.toggle("include")}
+                      isSelected={filter.state === "include"}
                       aria-label={`${t("datasetsCardGroupIncludeAction")}: ${label}`}
                       title={t(
                         filter.state === "include"
@@ -709,12 +707,11 @@ export default function DatasetsTable({
                       ) : (
                         <Square size={13} aria-hidden="true" />
                       )}
-                    </button>
-                    <button
-                      type="button"
+                    </ToggleButton>
+                    <ToggleButton
                       className="datasetsCardGroupFilter exclude"
-                      onClick={() => filter.toggle("exclude")}
-                      aria-pressed={filter.state === "exclude"}
+                      onChange={() => filter.toggle("exclude")}
+                      isSelected={filter.state === "exclude"}
                       aria-label={`${t("filterOptionExcludeAction")}: ${label}`}
                       title={t(
                         filter.state === "exclude"
@@ -723,7 +720,7 @@ export default function DatasetsTable({
                       )}
                     >
                       <SlashCircle size={13} aria-hidden="true" />
-                    </button>
+                    </ToggleButton>
                   </>
                 )}
               </div>

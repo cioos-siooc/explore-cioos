@@ -514,11 +514,11 @@
   cursor: pointer;
 }
 
-.viewToggle button:hover {
+.viewToggle button[data-hovered] {
   background-color: var(--cioos-surface-2);
 }
 
-.viewToggle button[aria-pressed="true"] {
+.viewToggle button[data-selected] {
   background-color: var(--cioos-primary-800);
   color: var(--cioos-on-primary);
 }

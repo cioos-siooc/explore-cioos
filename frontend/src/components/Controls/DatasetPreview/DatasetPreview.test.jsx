@@ -111,7 +111,7 @@ describe("DatasetPreview", () => {
         expect(screen.getByTestId("preview-plot")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByRole("button", { name: "Table" }));
+      await user.click(screen.getByRole("radio", { name: "Table" }));
 
       expect(screen.queryByTestId("preview-plot")).not.toBeInTheDocument();
       expect(screen.getByText("Test dataset:")).toBeInTheDocument();
@@ -139,7 +139,7 @@ describe("DatasetPreview", () => {
       expect(link).toHaveAttribute("target", "_blank");
       // The Table/Plot toggle is withheld too until there is something to show.
       expect(
-        screen.queryByRole("button", { name: "Table" }),
+        screen.queryByRole("radio", { name: "Table" }),
       ).not.toBeInTheDocument();
     });
 
@@ -179,7 +179,7 @@ describe("DatasetPreview", () => {
       expect(alert).toHaveTextContent(/figure could not be drawn/i);
       expect(alert).toHaveTextContent("bad trace");
       // The Table view stays reachable.
-      expect(screen.getByRole("button", { name: "Table" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Table" })).toBeInTheDocument();
     });
 
     it("offers a retry when the data server did not answer", async () => {
@@ -228,8 +228,8 @@ describe("DatasetPreview", () => {
 
     it("puts the Plot button before the Table button", () => {
       open();
-      const plot = screen.getByRole("button", { name: "Plot" });
-      const table = screen.getByRole("button", { name: "Table" });
+      const plot = screen.getByRole("radio", { name: "Plot" });
+      const table = screen.getByRole("radio", { name: "Table" });
       expect(
         plot.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();

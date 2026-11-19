@@ -53,10 +53,7 @@ describe("TaxonomyChart", () => {
       providers: "app",
     });
     expect(await screen.findByTestId("sunburst")).toHaveTextContent("7");
-    expect(screen.getByRole("button", { name: "Sunburst" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(screen.getByRole("radio", { name: "Sunburst" })).toBeChecked();
   });
 
   it("switches to the tree, and records the choice in the link", async () => {
@@ -65,7 +62,7 @@ describe("TaxonomyChart", () => {
     });
     await screen.findByTestId("sunburst");
 
-    await user.click(screen.getByRole("button", { name: "Tree" }));
+    await user.click(screen.getByRole("radio", { name: "Tree" }));
 
     expect(screen.queryByTestId("sunburst")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Animalia" })).toHaveAttribute(

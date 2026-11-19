@@ -1,8 +1,11 @@
 import * as React from "react";
+import classNames from "classnames";
 
+import { ToggleButton, ToggleButtonGroup } from "./Button.jsx";
 import "./segmentedToggleStyles.css";
 
-// A handful of mutually exclusive choices, all visible, one click each.
+// A handful of mutually exclusive choices, all visible, one press each: a
+// radio group, walked with the arrow keys.
 export default function SegmentedToggle({
   options,
   value,
@@ -12,26 +15,27 @@ export default function SegmentedToggle({
   "data-testid": testId,
 }) {
   return (
-    <div
-      className={className ? `segmentedToggle ${className}` : "segmentedToggle"}
-      role="group"
+    <ToggleButtonGroup
+      className={classNames("segmentedToggle", className)}
       aria-label={label}
       data-testid={testId}
+      selectionMode="single"
+      disallowEmptySelection
+      selectedKeys={[value]}
+      onSelectionChange={(keys) => onChange([...keys][0])}
     >
       {options.map(({ value: optionValue, label: optionLabel, icon: Icon }) => (
-        <button
+        <ToggleButton
           key={optionValue}
-          type="button"
-          className={
-            value === optionValue ? "toggleButton selected" : "toggleButton"
-          }
-          aria-pressed={value === optionValue}
-          onClick={() => onChange(optionValue)}
+          id={optionValue}
+          className={classNames("toggleButton", {
+            selected: value === optionValue,
+          })}
         >
           {Icon && <Icon size={15} aria-hidden="true" />}
           <span className="toggleLabel">{optionLabel}</span>
-        </button>
+        </ToggleButton>
       ))}
-    </div>
+    </ToggleButtonGroup>
   );
 }

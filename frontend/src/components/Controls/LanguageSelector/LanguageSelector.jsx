@@ -1,7 +1,9 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import "./styles.css";
 import { useNavigate, useParams, useSearchParams } from "react-router";
+
+import Button from "../../ui/Button.jsx";
+import "./styles.css";
 
 export default function LanguageSelector({ className }) {
   const { t, i18n } = useTranslation();
@@ -12,16 +14,16 @@ export default function LanguageSelector({ className }) {
   const otherLanguage = i18n.languages.filter((l) => l !== lang).pop();
 
   return (
-    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
+    <Button
       className={className + " languageSelector"}
       title={t("languageSelectorTitle")}
-      onClick={() => {
+      onPress={() => {
         const params = searchParams;
         params.set("lang", otherLanguage);
         navigate("?" + params.toString());
       }}
     >
       {`${otherLanguage}`.toUpperCase()}
-    </div>
+    </Button>
   );
 }

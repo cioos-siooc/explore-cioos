@@ -33,7 +33,7 @@ import {
   showNonna,
   showTrajectory,
 } from "../../../state/tips/scenes.js";
-import "../../ui/switchStyles.css";
+import Switch from "../../ui/Switch.jsx";
 import "./styles.css";
 
 function TrajectoryIcon({ size }) {
@@ -300,10 +300,13 @@ export default function IntroModal({ showModal, setShowModal, notices = [] }) {
 
         <footer className="introFooter">
           <div className="introFooterCards">
-            <label
+            <Switch
               className="introFooterCard"
-              htmlFor="introTipsToggle"
               data-testid="intro-tips"
+              aria-labelledby="introTipsHeading"
+              aria-describedby="introTipsText"
+              checked={tipsEnabled}
+              onChange={setTipsEnabled}
             >
               <Lightbulb size={20} aria-hidden="true" />
               <span className="introFooterText">
@@ -326,19 +329,7 @@ export default function IntroModal({ showModal, setShowModal, notices = [] }) {
                   />
                 </span>
               </span>
-              <span className="form-switch">
-                <input
-                  id="introTipsToggle"
-                  className="form-check-input"
-                  type="checkbox"
-                  role="switch" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Switch
-                  aria-labelledby="introTipsHeading"
-                  aria-describedby="introTipsText"
-                  checked={tipsEnabled}
-                  onChange={() => setTipsEnabled(!tipsEnabled)}
-                />
-              </span>
-            </label>
+            </Switch>
             <FeedbackButton
               className="introFooterCard"
               size={20}

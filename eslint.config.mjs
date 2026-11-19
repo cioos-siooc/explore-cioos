@@ -20,6 +20,11 @@ const handBuiltControls = [
       "Hand-built widget role: use (or add) a react-aria-components wrapper in src/components/ui/.",
   },
   {
+    selector: "JSXAttribute[name.name=/^aria-(pressed|checked)$/]",
+    message:
+      "Hand-built toggle or checkbox: use ToggleButton, Checkbox or Switch from src/components/ui/.",
+  },
+  {
     selector:
       "CallExpression[callee.property.name='addEventListener'][callee.object.name=/^(document|window)$/][arguments.0.value=/^(keydown|mousedown|pointerdown)$/]",
     message:
