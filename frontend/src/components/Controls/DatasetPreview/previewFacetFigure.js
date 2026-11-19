@@ -321,45 +321,33 @@ function levelXTicks(layout, plottingWidth) {
     });
 }
 
-// Plotly draws the shared axis's line once, beside the panel it is anchored
-// to — a profile's first, a stack's last — and every other panel gets the same
-// edge as a shape.
-const sharedAxisEdgesFor = (panelLetter, panelCount) =>
-  Array.from({ length: panelCount - 1 }, (_, i) => {
-    const panel = `${axisRef(panelLetter, panelLetter === "x" ? i + 1 : i)} domain`;
-    return {
-      type: "line",
-      layer: "below",
-      line: { color: AXIS_LINE_COLOR, width: 1 },
-      ...(panelLetter === "x"
-        ? { xref: panel, x0: 0, x1: 0, yref: "y domain", y0: 0, y1: 1 }
-        : { yref: panel, y0: 0, y1: 0, xref: "x domain", x0: 0, x1: 1 }),
-    };
-  });
-
-// A grid draws each axis line once, on the bottom (last) row and the left column;
-// every other panel gets the same two edges as shapes.
-const edgeLine = {
-  type: "line",
+// Plotly draws each axis line once, on one side of one panel; a box per panel
+// frames every panel on all four sides.
+const panelBox = (xAxis, yAxis) => ({
+  type: "rect",
   layer: "below",
+  xref: `${xAxis} domain`,
+  yref: `${yAxis} domain`,
+  x0: 0,
+  x1: 1,
+  y0: 0,
+  y1: 1,
   line: { color: AXIS_LINE_COLOR, width: 1 },
-};
-function gridEdgesFor(columns, rows) {
-  const edges = [];
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const xref = `${axisRef("x", column)} domain`;
-      const yref = `${axisRef("y", row)} domain`;
-      if (row < rows - 1) {
-        edges.push({ ...edgeLine, xref, x0: 0, x1: 1, yref, y0: 0, y1: 0 });
-      }
-      if (column > 0) {
-        edges.push({ ...edgeLine, xref, x0: 0, x1: 0, yref, y0: 0, y1: 1 });
-      }
-    }
-  }
-  return edges;
-}
+});
+
+const facetBoxesFor = (panelLetter, panelCount) =>
+  Array.from({ length: panelCount }, (_, i) =>
+    panelLetter === "x"
+      ? panelBox(axisRef("x", i), axisRef("y", 0))
+      : panelBox(axisRef("x", 0), axisRef("y", i)),
+  );
+
+const gridBoxesFor = (columns, rows) =>
+  Array.from({ length: rows }, (_, row) =>
+    Array.from({ length: columns }, (_, column) =>
+      panelBox(axisRef("x", column), axisRef("y", row)),
+    ),
+  ).flat();
 
 export const COLORBAR_THICKNESS_PX = 12;
 export const COLORBAR_PAD_PX = 10;
@@ -814,7 +802,7 @@ export function buildFigure({
         ticks: legendTicksFor(colorDimension),
       }
     : null;
-  layout.shapes = sharedAxisEdgesFor(panelLetter, panels.length);
+  layout.shapes = facetBoxesFor(panelLetter, panels.length);
   // First, so every panel's markers draw over its line.
   levelXTicks(layout, plottingWidth);
   return {
@@ -1304,7 +1292,7 @@ export function buildGridFigure({
     });
   });
 
-  layout.shapes = gridEdgesFor(columnCount, rowCount);
+  layout.shapes = gridBoxesFor(columnCount, rowCount);
   if (header) {
     layout.annotations = columns.map(({ shade }, column) =>
       columnHeaderFor(

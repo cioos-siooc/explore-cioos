@@ -134,12 +134,11 @@ export function marginFor(
 // width on the eighteen gaps between them. A panel-relative gap keeps the same
 // proportions at any n.
 //
-// Just enough to keep one panel's end tick label off the next one's first.
-// Stacked panels need less — every panel is labelled beside its own axis and
-// only the bottom one carries tick labels, so the gap is separation and
-// nothing else.
-export const COLUMN_GAP = 0.15;
-export const ROW_GAP = 0.08;
+// Each panel is boxed, so the gap only has to keep one panel's end tick label
+// off the next one's first. Stacked panels need less — every panel is labelled
+// beside its own axis and only the bottom one carries tick labels.
+export const COLUMN_GAP = 0.1;
+export const ROW_GAP = 0.04;
 
 // Below this a panel is not worth drawing; the container scrolls instead. Each
 // sizing function takes it as `minPanel`, which 0 turns into "fit the box": on

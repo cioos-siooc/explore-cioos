@@ -114,6 +114,23 @@ test("a profile gets one shared y axis and one x axis per panel", () => {
   assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 6);
 });
 
+test("every panel of a profile and of a stack is boxed against the shared axis", () => {
+  const boxes = (type) =>
+    figure(type, ["TE90_01", "PSAL_01"]).layout.shapes.map((shape) => [
+      shape.type,
+      shape.xref,
+      shape.yref,
+    ]);
+  assert.deepEqual(boxes("Profile"), [
+    ["rect", "x domain", "y domain"],
+    ["rect", "x2 domain", "y domain"],
+  ]);
+  assert.deepEqual(boxes("TimeSeries"), [
+    ["rect", "x domain", "y domain"],
+    ["rect", "x domain", "y2 domain"],
+  ]);
+});
+
 test("the shared depth axis is reversed, and titled along itself", () => {
   const { layout } = figure("Profile", ALL_SIX);
   assert.equal(layout.yaxis.autorange, "reversed");
@@ -1158,10 +1175,17 @@ test("a grid draws one panel per X and Y pair, X across and Y down", () => {
   assert.ok(layout.yaxis.domain[0] > layout.yaxis2.domain[1]);
 });
 
-test("a grid draws its panels' missing edges, and only those", () => {
+test("a grid frames every panel in a box of its own", () => {
   const { layout } = gridFigure();
-  // 2 x 2: three panels lack a bottom or a left line, one lacks both.
-  assert.equal(layout.shapes.length, 4);
+  assert.deepEqual(
+    layout.shapes.map((shape) => [shape.type, shape.xref, shape.yref]),
+    [
+      ["rect", "x domain", "y domain"],
+      ["rect", "x2 domain", "y domain"],
+      ["rect", "x domain", "y2 domain"],
+      ["rect", "x2 domain", "y2 domain"],
+    ],
+  );
 });
 
 test("a grid keeps each panel variable's own colour", () => {
