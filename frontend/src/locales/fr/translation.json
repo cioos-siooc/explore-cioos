@@ -1161,7 +1161,7 @@
   "directLinksTitle": "Interroger les sources moi-même",
   "datasetInspectorTracksText": "Trajectoires",
   "datasetInspectorCatalogueValueText": "selon la fiche du catalogue",
-  "datasetInspectorSingleSeriesText": "Ce jeu de données est une seule série sans nom : il n'y a pas d'enregistrement à prévisualiser ici. Ouvrez-le à sa source pour voir les données.",
+  "datasetInspectorSingleSeriesText": "Ce jeu de données est une seule série sans nom; « Afficher les données » en prévisualise les données.",
   "datasetCardTracks_one": "{{count, number}} trajectoire",
   "datasetCardTracks_other": "{{count, number}} trajectoires",
   "datasetExitAddText": "Ajouter au téléchargement",

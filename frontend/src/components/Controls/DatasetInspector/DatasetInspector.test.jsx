@@ -708,16 +708,16 @@ describe("DatasetInspector facts sheet", () => {
     expect(metadata).toHaveFocus();
   });
 
-  it("explains a single unnamed series instead of promising record actions", async () => {
+  it("previews a single unnamed series under the empty record id", async () => {
     stubRecordsResponse({ profiles: [{ profile_id: null }] });
-    await renderReady();
+    const setInspectRecordID = vi.fn();
+    const { user } = await renderReady({ setInspectRecordID });
     await openData();
     expect(
       await screen.findByText(/a single unnamed series/),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/"Show data" previews a record's data/),
-    ).not.toBeInTheDocument();
     expect(document.querySelector(".recordIdCaption")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Show data/ }));
+    expect(setInspectRecordID).toHaveBeenCalledWith("");
   });
 });

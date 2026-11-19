@@ -172,7 +172,7 @@ export default function SelectionProvider({ children }) {
   // Seeded from the URL because a shared link arrives with the record open,
   // and true until the payload lands so the modal shows a spinner, not "no data".
   const [recordLoading, setRecordLoading] = useState(() =>
-    Boolean(initialParams.get(RECORD_PARAM)),
+    initialParams.has(RECORD_PARAM),
   );
   const [datasetPreview, setDatasetPreview] = useState();
   // Why the last /preview came back with nothing, or undefined when it did not.
@@ -386,7 +386,8 @@ export default function SelectionProvider({ children }) {
     [setSearchParams],
   );
 
-  const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined;
+  // "" is a record too: a dataset's one unnamed series.
+  const inspectRecordID = searchParams.get(RECORD_PARAM) ?? undefined;
   const periodParam = searchParams.get(PERIOD_PARAM) || undefined;
   const inspectRecordPeriod = useMemo(
     () => parsePeriod(periodParam),
@@ -400,10 +401,10 @@ export default function SelectionProvider({ children }) {
     (recordId, { replace = false, period } = {}) => {
       // Set before navigating so the modal never renders "no data" in the
       // frame before the fetch starts.
-      if (recordId) setRecordLoading(true);
+      if (recordId != null) setRecordLoading(true);
       setSearchParams(
         (previous) => {
-          if (!recordId) return withoutPreviewParams(previous);
+          if (recordId == null) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
           // A profile id belongs to the record it came from: carrying one to
@@ -717,7 +718,7 @@ export default function SelectionProvider({ children }) {
       : searchParams.get(BEFORE_PARAM) || undefined;
 
   useEffect(() => {
-    if (!inspectDatasetId || !inspectRecordID) return;
+    if (!inspectDatasetId || inspectRecordID === undefined) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setRecordLoading(true);
     const previewUrl =
@@ -827,7 +828,7 @@ export default function SelectionProvider({ children }) {
     // Both halves deliberately: recordLoading is seeded true by a shared link,
     // so ORing it would leave an empty modal open forever if the link's
     // dataset never resolves.
-    showPreviewModal: Boolean(inspectDataset && inspectRecordID),
+    showPreviewModal: Boolean(inspectDataset) && inspectRecordID !== undefined,
     previewError,
     previewQuery,
     retryPreview,

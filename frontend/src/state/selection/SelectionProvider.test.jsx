@@ -373,6 +373,17 @@ describe("SelectionProvider", () => {
       .map(([input]) => (typeof input === "string" ? input : input.url))
       .filter((url) => url.includes("/preview?"));
 
+  it("an empty ?preview= opens the dataset's unnamed series", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}&preview=` });
+    await waitFor(() => {
+      expect(latest.showPreviewModal).toBe(true);
+      expect(latest.recordLoading).toBe(false);
+    });
+    expect(latest.inspectRecordID).toBe("");
+    expect(previewUrls().at(-1)).toMatch(/&profile=(&|$)/);
+  });
+
   it("a chosen profile rides the preview fetch as `at`", async () => {
     // A plot param that changes what is FETCHED rather than how it is drawn,
     // which is why the provider reads it at all.

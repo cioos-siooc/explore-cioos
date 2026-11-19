@@ -102,6 +102,11 @@ const constraintFor = (column, value) =>
     ? `${column}=${encodeURIComponent(value)}`
     : `${column}=~${encodeURIComponent(`"${escapeErddapRegex(value)}"`)}`;
 
+// A dataset with no id variable is one unnamed series: the record is the whole
+// dataset, so there is nothing to constrain on.
+const recordConstraint = (column, value) =>
+  column ? `&${constraintFor(column, value)}` : "";
+
 // Whether this record holds several profiles to step through. TimeSeriesProfile
 // and TrajectoryProfile set both id variables and the record is the outer one,
 // so the inner one is the step; a Profile record's own id is both, and a
@@ -150,7 +155,7 @@ ds AS (
 ),
 profile_feature AS (
   SELECT p.dataset_pk,
-         COALESCE(p.profile_id, p.timeseries_id) AS feature_id,
+         COALESCE(p.profile_id, p.timeseries_id, '') AS feature_id,
          p.time_min,
          p.time_max,
          p.n_records,
@@ -161,7 +166,9 @@ profile_feature AS (
           WHERE  lower(r) < params.before_day) AS data_end
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
-  WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
+  -- An empty id names a dataset's one unnamed series, whichever way the
+  -- harvest stored it.
+  WHERE  COALESCE(p.profile_id, p.timeseries_id, '') = :profile
 ),
 -- Under allProfiles a cast record stands for its station, so the window below
 -- is sized on the station: sized on the cast, it would fetch the whole station.
@@ -329,7 +336,7 @@ async function resolvePreview(query) {
     record_step,
   } = record;
 
-  if (!profile_variable) {
+  if (!profile_variable && profile_id !== "") {
     return {
       refusal: {
         status: 422,
@@ -342,8 +349,7 @@ async function resolvePreview(query) {
     };
   }
 
-  const constraint = constraintFor(profile_variable, profile_id);
-  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?${recordConstraint(profile_variable, profile_id)}`;
   // `at` names one profile inside the record, to reach one OUTSIDE the tail
   // window below, so the two are exclusive. A cast record with no `at` draws
   // its own cast.
@@ -589,7 +595,7 @@ router.get(
       record_step,
     } = rows.rows[0];
 
-    if (!profile_variable) {
+    if (!profile_variable && profile_id !== "") {
       return res.status(422).send({
         error: "NO_RECORD_ID_VARIABLE",
         dataset: dataset_id,
@@ -611,7 +617,7 @@ router.get(
         : `${step_variable},${TIME_COLUMN}`;
     const erddapQuery =
       `${erddap_url}/tabledap/${dataset_id}.json?${columns}` +
-      `&${constraintFor(profile_variable, profile_id)}&distinct()`;
+      `${recordConstraint(profile_variable, profile_id)}&distinct()`;
 
     try {
       const { data } = await axios.get(erddapQuery, {

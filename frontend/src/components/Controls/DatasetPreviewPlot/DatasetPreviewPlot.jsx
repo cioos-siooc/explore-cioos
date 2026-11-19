@@ -448,7 +448,7 @@ export default function DatasetPreviewPlot() {
     [split, touch],
   );
   let headerTitle = "";
-  if (hasProfileHeader) {
+  if (hasProfileHeader && inspectRecordID) {
     // The record may be the station or the cast, so its role comes from the
     // id column that holds it.
     const recordIdVariable = plan.titleColumns

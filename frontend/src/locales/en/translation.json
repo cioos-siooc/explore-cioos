@@ -1160,7 +1160,7 @@
   "directLinksTitle": "Query the sources myself",
   "datasetInspectorTracksText": "Tracks",
   "datasetInspectorCatalogueValueText": "from the catalogue record",
-  "datasetInspectorSingleSeriesText": "This dataset is a single unnamed series, so there is no record to preview here. Open it at its source to see the data.",
+  "datasetInspectorSingleSeriesText": "This dataset is a single unnamed series; \"Show data\" previews its data.",
   "datasetCardTracks_one": "{{count, number}} track",
   "datasetCardTracks_other": "{{count, number}} tracks",
   "datasetExitAddText": "Add to download",

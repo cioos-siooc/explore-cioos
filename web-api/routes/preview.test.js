@@ -135,6 +135,40 @@ test("422s NO_RECORD_ID_VARIABLE when the dataset declares no cf_role variable",
   assert.equal(axios.calls.length, 0);
 });
 
+test("previews a dataset with no cf_role variable as one unconstrained series", async () => {
+  db.queueRaw([{ ...FEATURE_ROW, profile_variable: null, profile_id: "" }]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2024-03-01"]] } },
+  });
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "" });
+  assert.equal(res.status, 200);
+  assert.equal(
+    axios.calls[0].url,
+    "https://erddap.example.com/erddap/tabledap/obs_270.json?",
+  );
+});
+
+test("constrains an unnamed series on its empty id", async () => {
+  db.queueRaw([
+    {
+      ...FEATURE_ROW,
+      cdm_data_type: "Trajectory",
+      profile_variable: "trajectory",
+      profile_id: "",
+    },
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2024-03-01"]] } },
+  });
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "" });
+  assert.equal(res.status, 200);
+  assert.match(axios.calls[0].url, /&trajectory=~%22%22$/);
+});
+
 test("404s NO_DATA when ERDDAP itself has nothing for the constraint", async () => {
   db.queueRaw([FEATURE_ROW]);
   axios.queueResponse({ data: { table: { columnNames: [], rows: [] } } });

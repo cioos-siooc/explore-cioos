@@ -424,8 +424,8 @@ export default function DatasetInspector({
 
   // While a fetch runs, the previous response may belong to another dataset.
   const footprint = loading || recordsError ? undefined : datasetRecords;
-  // A dataset without a cf_role id is one unnamed series: its record has
-  // nothing to preview or point out.
+  // A dataset without a cf_role id, or whose id is blank, is one unnamed
+  // series; its record id is "".
   const singleSeries =
     datasetRecords?.profiles?.length === 1 &&
     !datasetRecords.profiles[0].profile_id;
@@ -1004,7 +1004,7 @@ export default function DatasetInspector({
                     {t("apiErrorRetryButton")}
                   </button>
                 </div>
-              ) : singleSeries ? null : (
+              ) : (
                 <CardList
                   items={datasetRecords?.profiles}
                   keyOf={recordKeyOf}
@@ -1028,19 +1028,17 @@ export default function DatasetInspector({
                         selected={onMap}
                         actions={
                           <>
-                            {row.profile_id && (
-                              <button
-                                type="button"
-                                className="listCardButton"
-                                title={t("datasetInspectorShowDataTitle")}
-                                onClick={() =>
-                                  setInspectRecordID(row.profile_id)
-                                }
-                              >
-                                <GraphUp size={13} aria-hidden="true" />
-                                {t("datasetInspectorShowDataText")}
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="listCardButton"
+                              title={t("datasetInspectorShowDataTitle")}
+                              onClick={() =>
+                                setInspectRecordID(row.profile_id ?? "")
+                              }
+                            >
+                              <GraphUp size={13} aria-hidden="true" />
+                              {t("datasetInspectorShowDataText")}
+                            </button>
                             {(isTrajectoryDataset || row.profile_id) && (
                               <button
                                 type="button"

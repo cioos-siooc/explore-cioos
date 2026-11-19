@@ -208,7 +208,7 @@ export default function DatasetPreview({
       centered
       aria-labelledby={TITLE_ID}
     >
-      {inspectDataset && inspectRecordID && (
+      {inspectDataset && inspectRecordID !== undefined && (
         <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && (
@@ -237,17 +237,20 @@ export default function DatasetPreview({
                 title={inspectDataset.title}
               >
                 {inspectDataset.title}
-                {recordNamedBelow ? <span className="sr-only">:</span> : ":"}
+                {inspectRecordID &&
+                  (recordNamedBelow ? <span className="sr-only">:</span> : ":")}
               </span>{" "}
-              <i
-                className={
-                  recordNamedBelow
-                    ? "datasetPreviewRecord sr-only"
-                    : "datasetPreviewRecord"
-                }
-              >
-                {inspectRecordID}
-              </i>
+              {inspectRecordID && (
+                <i
+                  className={
+                    recordNamedBelow
+                      ? "datasetPreviewRecord sr-only"
+                      : "datasetPreviewRecord"
+                  }
+                >
+                  {inspectRecordID}
+                </i>
+              )}
               {inspectRecordPeriod && (
                 <span className="datasetPreviewPeriod">
                   {t("datasetPreviewPeriodText", inspectRecordPeriod)}
