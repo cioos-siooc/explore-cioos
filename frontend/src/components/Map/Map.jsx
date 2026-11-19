@@ -520,6 +520,9 @@ export default function CreateMap({
   onFirstPaint = () => {},
 }) {
   const { t, i18n } = useTranslation();
+  // useTranslation's t is fixed to the language it rendered in; handlers wired
+  // once to the map would keep the first one.
+  const tRef = useRef(t);
 
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -1004,7 +1007,7 @@ export default function CreateMap({
   const hexFillColor = () => rampExpression(colorStops.current, "count");
 
   const metricCountLabel = (value) =>
-    t("mapHexCountDays", { count: Number(value || 0) });
+    tRef.current("mapHexCountDays", { count: Number(value || 0) });
 
   // MapLibre cannot interpolate to or from a data-driven value: the transition
   // just holds the old value then snaps, which read as a glitch after the map
@@ -1939,6 +1942,7 @@ export default function CreateMap({
     onTrackClickRef.current = onTrackClick;
     onDepthQueryRef.current = onDepthQuery;
     depthToolActiveRef.current = depthToolActive;
+    tRef.current = t;
   });
 
   useEffect(() => {
@@ -2956,6 +2960,7 @@ export default function CreateMap({
   }
 
   function installHover() {
+    const t = (...args) => tRef.current(...args);
     // Hover only names what's under the cursor; detail is one click away in the
     // card. Lines are truncated rather than wrapped. Sized to the longest line
     // a rule produces: a full instant range (37 chars).
