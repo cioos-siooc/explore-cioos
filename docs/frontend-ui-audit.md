@@ -288,7 +288,11 @@ barely change.
    Wrapping it would mean overriding its keyboard, its value text and its
    vertical direction, more code than the Rail, which already has the slider
    role, keys and pointer capture; its `role="slider"` keeps a justified
-   disable. Initial JS: +22.4 kB gz (the date stack).
+   disable. The date stack (+22.4 kB gz, every calendar system included) loads
+   on demand: `ui/DateField` is a lazy shell over `ui/DateFieldInput`,
+   preloaded at idle, so it costs first paint nothing (+2.5 kB). Lazy-loading
+   the filter search as well made first paint bigger (its list code is shared
+   with the menus), and the whole Filters panel saved only 6 kB more.
 10. Modal core → RAC `Modal` (sheet and Back-dismiss on top); NoticeToast; TipCard positioning
     **Done for the Modal.** `ui/Modal.jsx` is RAC `ModalOverlay`/`Modal`/`Dialog`:
     focus contained and handed back, Escape for the top dialog only, the page

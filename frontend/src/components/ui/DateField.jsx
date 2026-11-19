@@ -1,17 +1,18 @@
 import * as React from "react";
-import { useState } from "react";
-import { parseDate } from "@internationalized/date";
-import {
-  DateField as AriaDateField,
-  DateInput,
-  DateSegment,
-  I18nProvider,
-} from "react-aria-components";
-import { useTranslation } from "react-i18next";
+import { lazy, Suspense } from "react";
 import classNames from "classnames";
 
-import { useChanged } from "../../utilities.jsx";
 import "./dateFieldStyles.css";
+
+// The react-aria date stack (every calendar system included) is the largest
+// piece of react-aria, and no date field shows on first paint: it loads on
+// demand, and at idle once the app is up (see preloadDateField).
+const loadInput = () => import("./DateFieldInput.jsx");
+const DateFieldInput = lazy(loadInput);
+
+export function preloadDateField() {
+  loadInput();
+}
 
 // Only a complete, real, in-range date commits; the segments hold anything
 // short of one (a year typed digit by digit passes through 0002, 0020, 0201).
@@ -21,64 +22,21 @@ export function isCommittable(value, min, max) {
   return (!min || value >= min) && (!max || value <= max);
 }
 
-function toDate(iso) {
-  try {
-    return iso ? parseDate(iso) : null;
-  } catch {
-    return null;
-  }
-}
-
 // ISO yyyy-mm-dd in and out, typed in year/month/day segments: the Canadian
 // order (-CA) in either language, whatever the browser's locale. A finished
-// in-range date commits at once; anything else is undone on blur.
-export default function DateField({
-  value,
-  min,
-  max,
-  onCommit,
-  label,
-  className,
-}) {
-  const { i18n } = useTranslation();
-  const [draft, setDraft] = useState(value);
-  const [editing, setEditing] = useState(false);
-
-  if (useChanged(value, editing) && !editing) setDraft(value);
-
-  const language = i18n.language?.startsWith("fr") ? "fr" : "en";
+// in-range date commits at once; anything else is undone on blur. Until it
+// loads, the same box shows the date as text.
+export default function DateField(props) {
+  const className = props.className || "railValueInput timeRailDateInput";
   return (
-    <I18nProvider locale={`${language}-CA`}>
-      <AriaDateField
-        className="cioosDateField"
-        aria-label={label}
-        value={toDate(draft)}
-        minValue={toDate(min)}
-        maxValue={toDate(max)}
-        granularity="day"
-        onChange={(date) => {
-          const iso = date ? date.toString() : "";
-          setDraft(iso);
-          if (isCommittable(iso, min, max)) onCommit(iso);
-        }}
-        onFocusChange={(focused) => {
-          setEditing(focused);
-          if (focused) return;
-          if (isCommittable(draft, min, max)) onCommit(draft);
-          else setDraft(value);
-        }}
-      >
-        <DateInput
-          className={classNames(
-            "cioosDateInput",
-            className || "railValueInput timeRailDateInput",
-          )}
-        >
-          {(segment) => (
-            <DateSegment className="cioosDateSegment" segment={segment} />
-          )}
-        </DateInput>
-      </AriaDateField>
-    </I18nProvider>
+    <Suspense
+      fallback={
+        <span className={classNames("cioosDateInput", className)}>
+          {props.value}
+        </span>
+      }
+    >
+      <DateFieldInput {...props} />
+    </Suspense>
   );
 }

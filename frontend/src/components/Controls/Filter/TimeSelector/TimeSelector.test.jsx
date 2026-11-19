@@ -40,7 +40,7 @@ describe("TimeSelector", () => {
 
   it("renders start/end date fields and a rail with two handles", async () => {
     await renderReady();
-    expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Start Date")).toBeInTheDocument();
     expect(screen.getByLabelText("End Date")).toBeInTheDocument();
     expect(screen.getAllByRole("slider")).toHaveLength(2);
   });

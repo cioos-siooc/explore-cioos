@@ -39,7 +39,7 @@ describe("DateField", () => {
         onCommit={onCommit}
       />,
     );
-    await typeDate(user, screen.getByLabelText("Start"), "2015-06-15");
+    await typeDate(user, await screen.findByLabelText("Start"), "2015-06-15");
     expect(onCommit).toHaveBeenLastCalledWith("2015-06-15");
   });
 
@@ -54,7 +54,7 @@ describe("DateField", () => {
         onCommit={onCommit}
       />,
     );
-    const field = screen.getByLabelText("Start");
+    const field = await screen.findByLabelText("Start");
     await typeDate(user, field, "2030-01-01");
     expect(onCommit).not.toHaveBeenCalledWith("2030-01-01");
     await user.tab();
@@ -63,20 +63,23 @@ describe("DateField", () => {
     await waitFor(() => expect(field).toHaveTextContent("2015-01-01"));
   });
 
-  it("follows an externally-changed committed value while idle", () => {
+  it("follows an externally-changed committed value while idle", async () => {
     const { rerender } = renderWithProviders(
       <DateField value="2015-01-01" label="Start" onCommit={() => {}} />,
     );
     rerender(
       <DateField value="2016-02-02" label="Start" onCommit={() => {}} />,
     );
-    expect(screen.getByLabelText("Start")).toHaveTextContent("2016-02-02");
+    expect(await screen.findByLabelText("Start")).toHaveTextContent(
+      "2016-02-02",
+    );
   });
 
   it("orders its segments year, month, day in French too", async () => {
     const { i18n } = renderWithProviders(
       <DateField value="2015-06-15" label="Début" onCommit={() => {}} />,
     );
+    await screen.findByLabelText("Début");
     await act(() => i18n.changeLanguage("fr"));
     expect(screen.getByLabelText("Début")).toHaveTextContent("2015-06-15");
     await act(() => i18n.changeLanguage("en"));
