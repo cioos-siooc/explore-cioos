@@ -119,12 +119,18 @@
   pointer-events: none;
 }
 
-/* A searched place names the area it applied; capped so a long name doesn't
-   push the row apart. */
+/* A searched place names the area it applied. It is the filter's only label,
+   so a long name wraps to a second line rather than losing its end; capped in
+   width so it doesn't run under the neighbouring captions. */
 .quickFilterCaptionPlace {
-  max-width: 10em;
+  display: -webkit-box;
+  max-width: 9em;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.15;
+  white-space: normal;
+  text-wrap: balance;
 }
 
 /* Area control: the caption steps aside while its menu (hung where the
@@ -223,6 +229,15 @@
     padding: 0;
     background: none;
     color: inherit;
+  }
+
+  /* One row of pills has no room for a second line: cut, full name in the
+     button's label. */
+  .quickFilterCaptionPlace {
+    display: inline-block;
+    max-width: 8em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   /* Near the screen edge: centred, the menu ran off the left. */
