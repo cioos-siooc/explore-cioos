@@ -73,6 +73,10 @@ const listEntries = (list) =>
 const firstEntry = (entries) =>
   entries.find((entry) => entry.matches(".datasetCard")) ?? entries[0] ?? null;
 
+// Focus moved here for the reader shows its ring even after a mouse click.
+const focusEntry = (entry) =>
+  entryStop(entry).focus({ preventScroll: true, focusVisible: true });
+
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
@@ -138,6 +142,7 @@ export default function DatasetsTable({
     if (listRef.current) listRef.current.scrollTop = 0;
     activeEntryRef.current = null;
   };
+  const wasHiddenRef = useRef(hidden);
   useLayoutEffect(() => {
     if (!hidden && listRef.current) {
       listRef.current.scrollTop = scrollTopRef.current;
@@ -170,6 +175,17 @@ export default function DatasetsTable({
     }
   }, []);
   useLayoutEffect(syncTabStops);
+  // Back from a dataset page, whose unmount dropped focus on the body, the
+  // card it was opened from takes focus again.
+  useEffect(() => {
+    const shown = wasHiddenRef.current && !hidden;
+    wasHiddenRef.current = hidden;
+    if (!shown || document.activeElement !== document.body) return;
+    const entries = listEntries(listRef.current);
+    if (entries.includes(activeEntryRef.current)) {
+      focusEntry(activeEntryRef.current);
+    }
+  }, [hidden]);
   const activateEntryOf = (target) => {
     const entry = target.closest(ENTRY);
     if (entry && entry !== activeEntryRef.current) {
@@ -588,7 +604,7 @@ export default function DatasetsTable({
     scrollListToTop();
     activeEntryRef.current = firstEntry(entries);
     syncTabStops();
-    entryStop(activeEntryRef.current).focus({ preventScroll: true });
+    focusEntry(activeEntryRef.current);
   }, [
     hidden,
     openedFocus,

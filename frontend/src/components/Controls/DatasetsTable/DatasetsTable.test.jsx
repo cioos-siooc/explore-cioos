@@ -421,6 +421,54 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     expect(screen.getByRole("button", { name: "Beta station" })).toHaveFocus();
   });
 
+  it("back from a dataset page, the card it was opened from has focus again", async () => {
+    const table = (hidden) => (
+      <DatasetsTable
+        datasets={ROWS.slice(0, 2)}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+        setInspectDataset={() => {}}
+        hidden={hidden}
+      />
+    );
+    const { user, rerender } = renderWithProviders(table(false), {
+      providers: "app",
+    });
+    await screen.findAllByTestId("dataset-card");
+    const beta = screen.getByRole("button", { name: "Beta station" });
+    await user.click(beta);
+    rerender(table(true));
+    // The dataset page that held focus unmounts.
+    act(() => beta.blur());
+    rerender(table(false));
+    await waitFor(() => expect(beta).toHaveFocus());
+  });
+
+  it("showing again doesn't take focus from a control that still has it", async () => {
+    const table = (hidden) => (
+      <>
+        <input aria-label="Search" />
+        <DatasetsTable
+          datasets={ROWS.slice(0, 2)}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+          setInspectDataset={() => {}}
+          hidden={hidden}
+        />
+      </>
+    );
+    const { rerender } = renderWithProviders(table(true), {
+      providers: "app",
+    });
+    await screen.findAllByTestId("dataset-card");
+    const search = screen.getByRole("textbox", { name: "Search" });
+    act(() => search.focus());
+    rerender(table(false));
+    expect(search).toHaveFocus();
+  });
+
   it("paginates: only PAGE_SIZES[0] rows render per page", async () => {
     const many = Array.from({ length: 30 }, (_, i) =>
       makeRow({ pk: i + 1, title: `Station ${String(i).padStart(2, "0")}` }),
