@@ -6,7 +6,6 @@ import { defaultStartDate } from "../../config.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, {
-  DateField,
   IntervalSelect,
   useTimeAxis,
   matchQuickPick,
@@ -17,6 +16,7 @@ import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
+import DateField from "../../ui/DateField.jsx";
 import "./styles.css";
 
 // Other overlays on the lower map take their clearance from this, since the

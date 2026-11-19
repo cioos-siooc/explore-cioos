@@ -7,6 +7,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
 import TimeBar from "./TimeBar.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { typeDate } from "../../../test/typeDate.js";
 
 function Harness() {
   const { catalogLoaded } = useFilters();
@@ -63,18 +64,17 @@ describe("TimeBar", () => {
   });
 
   it("typing a valid start date commits it", async () => {
-    await renderReady({ url: "/?timeMin=2015-01-01" });
+    const { user } = await renderReady({ url: "/?timeMin=2015-01-01" });
     const input = screen.getByLabelText("Start Date");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "2016-06-15" } });
-    await waitFor(() => expect(input.value).toBe("2016-06-15"));
+    await typeDate(user, input, "2016-06-15");
+    await waitFor(() => expect(input.textContent).toBe("2016-06-15"));
   });
 
   it("choosing an interval locks the range, so dragging a handle slides the whole window", async () => {
     const { user } = await renderReady({ url: "/?timeMin=2015-01-01" });
     await user.selectOptions(screen.getByLabelText("Interval"), "30");
-    const startBefore = screen.getByLabelText("Start Date").value;
-    const endBefore = screen.getByLabelText("End Date").value;
+    const startBefore = screen.getByLabelText("Start Date").textContent;
+    const endBefore = screen.getByLabelText("End Date").textContent;
     expect(startBefore < endBefore).toBe(true);
 
     // The picked window ends today, so it's already flush against the axis's
@@ -85,8 +85,8 @@ describe("TimeBar", () => {
     );
 
     await waitFor(() => {
-      const start = screen.getByLabelText("Start Date").value;
-      const end = screen.getByLabelText("End Date").value;
+      const start = screen.getByLabelText("Start Date").textContent;
+      const end = screen.getByLabelText("End Date").textContent;
       // The window kept its length (30 days) rather than just the start
       // handle moving on its own.
       expect(start < startBefore).toBe(true);
@@ -96,7 +96,7 @@ describe("TimeBar", () => {
 
   it("dragging a handle on a hand-set (unlocked) range moves only that end", async () => {
     await renderReady({ url: "/?timeMin=2015-01-01&timeMax=2015-06-01" });
-    const endBefore = screen.getByLabelText("End Date").value;
+    const endBefore = screen.getByLabelText("End Date").textContent;
 
     fireEvent.keyDown(
       screen.getByRole("slider", { name: "Time range start" }),
@@ -104,11 +104,11 @@ describe("TimeBar", () => {
     );
 
     await waitFor(() => {
-      const start = screen.getByLabelText("Start Date").value;
+      const start = screen.getByLabelText("Start Date").textContent;
       expect(start).toBe("2015-01-02");
     });
     // The end date is untouched — this range isn't one of the ready-made
     // windows, so a drag moves only the handle that moved.
-    expect(screen.getByLabelText("End Date").value).toBe(endBefore);
+    expect(screen.getByLabelText("End Date").textContent).toBe(endBefore);
   });
 });

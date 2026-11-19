@@ -5,13 +5,13 @@ import { useTranslation } from "react-i18next";
 import { defaultStartDate } from "../../../config.js";
 import { useFilters } from "../../../../state/filters/FilterProvider.jsx";
 import TimeRail, {
-  DateField,
   IntervalSelect,
   useTimeAxis,
   matchQuickPick,
   slideRange,
 } from "../../TimeRail/TimeRail.jsx";
 import { clampIso, todayIso } from "../../TimeRail/timeAxis.js";
+import DateField from "../../../ui/DateField.jsx";
 import "../styles.css";
 
 export default function TimeSelector(props) {
@@ -71,26 +71,32 @@ export default function TimeSelector(props) {
             }}
           />
         </label>
-        <label className="filterRangeRow">
-          <span className="filterRangeLabel">{t("timeSelectorStartDate")}</span>
+        <div className="filterRangeRow">
+          <span className="filterRangeLabel" aria-hidden="true">
+            {t("timeSelectorStartDate")}
+          </span>
           <DateField
             className="timeRailDateInput filterRangeInput"
+            label={t("timeSelectorStartDate")}
             value={startDate}
             min={defaultStartDate}
             max={endDate}
             onCommit={(value) => setFieldValue("start", value)}
           />
-        </label>
-        <label className="filterRangeRow">
-          <span className="filterRangeLabel">{t("timeSelectorEndDate")}</span>
+        </div>
+        <div className="filterRangeRow">
+          <span className="filterRangeLabel" aria-hidden="true">
+            {t("timeSelectorEndDate")}
+          </span>
           <DateField
             className="timeRailDateInput filterRangeInput"
+            label={t("timeSelectorEndDate")}
             value={endDate}
             min={startDate}
             max={maxIso}
             onCommit={(value) => setFieldValue("end", value)}
           />
-        </label>
+        </div>
       </div>
       <TimeRail
         axis={axis}

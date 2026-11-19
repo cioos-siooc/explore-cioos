@@ -1,0 +1,36 @@
+/* The caller's class draws the box (DateInput); this keeps its segments on
+   one line and marks the one being typed in. */
+.cioosDateField {
+  display: contents;
+}
+
+.cioosDateInput {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.cioosDateSegment {
+  padding: 0 1px;
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.cioosDateSegment[data-type="literal"] {
+  padding: 0;
+}
+
+.cioosDateSegment[data-placeholder] {
+  color: var(--cioos-ink-40);
+}
+
+.cioosDateSegment[data-focused] {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.cioosDateInput[data-invalid] {
+  border-color: var(--cioos-error);
+}

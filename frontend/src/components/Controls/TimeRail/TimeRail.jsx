@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { defaultStartDate } from "../../config.js";
@@ -13,51 +13,11 @@ import {
   todayIso,
   tickYearsFor,
 } from "./timeAxis.js";
-import { useChanged } from "../../../utilities.jsx";
 import "./styles.css";
 
 function keyboardStepDays(event) {
   if (event.key === "PageUp" || event.key === "PageDown") return 365;
   return event.shiftKey ? 30 : 1;
-}
-
-// `type=date` fires per keystroke ("2015" arrives as 0002, 0020, 0201), so
-// clamping each one would overwrite the typing; partial values are held
-// locally and only complete, in-range dates commit.
-export function isCommittable(value, min, max) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  if (Number.isNaN(new Date(`${value}T00:00:00Z`).getTime())) return false;
-  return (!min || value >= min) && (!max || value <= max);
-}
-
-export function DateField({ value, min, max, onCommit, label, className }) {
-  const [draft, setDraft] = useState(value);
-  const [editing, setEditing] = useState(false);
-
-  if (useChanged(value, editing) && !editing) setDraft(value);
-
-  return (
-    <input
-      type="date"
-      className={className || "railValueInput timeRailDateInput"}
-      aria-label={label}
-      value={draft}
-      min={min}
-      max={max}
-      onFocus={() => setEditing(true)}
-      onChange={(event) => {
-        setDraft(event.target.value);
-        if (isCommittable(event.target.value, min, max)) {
-          onCommit(event.target.value);
-        }
-      }}
-      onBlur={() => {
-        setEditing(false);
-        if (isCommittable(draft, min, max)) onCommit(draft);
-        else setDraft(value);
-      }}
-    />
-  );
 }
 
 export const QUICK_PICKS = [

@@ -277,6 +277,17 @@ barely change.
    removes the one in focus and focus stays among the chips; a press on a chip
    opens its filter. Initial JS: +9.3 kB gz.
 9. Rail → `Slider`; TimeRail date → `DateField`
+   **Done for the date; the Rail stays.** Every date input is `ui/DateField`
+   (RAC `DateField`): segments in year-month-day order in both languages
+   (`en-CA`/`fr-CA`), whatever the browser's locale; a finished in-range date
+   commits at once, anything else is undone on blur. RAC's `Slider` doesn't fit
+   the Rail: it is linear and drives a native range input per thumb, while the
+   Rail's time and depth axes are warped (`toPos`/`toValue`), step in days or
+   metres per key (Shift, Page Up/Down), and put the depth minimum at the top.
+   Wrapping it would mean overriding its keyboard, its value text and its
+   vertical direction, more code than the Rail, which already has the slider
+   role, keys and pointer capture; its `role="slider"` keeps a justified
+   disable. Initial JS: +22.4 kB gz (the date stack).
 10. Modal core → RAC `Modal` (sheet and Back-dismiss on top); NoticeToast; TipCard positioning
 
 Steps 1–5 fix every current accessibility gap. Each later step deletes a

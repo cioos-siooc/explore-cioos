@@ -166,7 +166,7 @@ export default function Rail({
           <button
             key={handle.key}
             type="button"
-            role="slider" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 9: Slider
+            role="slider" // eslint-disable-line no-restricted-syntax -- react-aria's Slider is linear; this axis is warped and steps in its own units
             className={`railHandle ${handle.className}`}
             style={at(handle.value)}
             aria-label={handle.label}

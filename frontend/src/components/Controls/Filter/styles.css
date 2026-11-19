@@ -230,7 +230,8 @@
   cursor: pointer;
 }
 
-.filterRangeSelector .filterRangeInput:focus-visible {
+.filterRangeSelector .filterRangeInput:focus-visible,
+.filterRangeSelector .filterRangeInput[data-focus-within] {
   outline: none;
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
