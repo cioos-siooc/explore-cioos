@@ -333,8 +333,10 @@
 
 .downloadEmailNotice {
   margin: 0;
-  font-size: var(--cioos-font-size-xs);
-  line-height: 1.25;
+  max-width: 68ch;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.4;
+  text-wrap: pretty;
   color: var(--cioos-ink-80);
 }
 
@@ -372,8 +374,10 @@
 /* --- The dataset list export --- */
 .directLinksDescription {
   margin: 0;
-  font-size: var(--cioos-font-size-xs);
-  line-height: 1.25;
+  max-width: 68ch;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.4;
+  text-wrap: pretty;
   color: var(--cioos-ink-80);
 }
 

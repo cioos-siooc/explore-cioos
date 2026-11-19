@@ -93,7 +93,7 @@
 }
 
 .quickFilterCount {
-  font-size: var(--cioos-font-size-3xs);
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1;
