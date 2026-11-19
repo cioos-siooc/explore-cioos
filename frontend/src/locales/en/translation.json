@@ -31,7 +31,7 @@
   "introFeedbackHeading": "Feedback",
   "introReopenText": "Reopen this window with the <icon/> button beside the title.",
   "tipInfoFeedback": "Something not working, or have an idea? We read every message.",
-  "introSources": "Data comes from ERDDAP™ servers run by CIOOS and its partners, and from OBIS (Ocean Biodiversity Information System).",
+  "introSources": "Data comes from ERDDAP™ servers run by CIOOS and its partners, and from OBIS (Ocean Biodiversity Information System). Descriptions, organizations and catalogue links come from the CIOOS national catalogue.",
   "tipNext": "Next tip",
   "tipPrevious": "Previous tip",
   "tipCounter": "Tip {{n}} of {{total}}",

@@ -31,7 +31,7 @@
   "introFeedbackHeading": "Commentaires",
   "introReopenText": "Rouvrez cette fenêtre avec le bouton <icon/> à côté du titre.",
   "tipInfoFeedback": "Quelque chose ne fonctionne pas, ou vous avez une idée? Nous lisons tous les messages.",
-  "introSources": "Les données proviennent de serveurs ERDDAP™ exploités par le SIOOC et ses partenaires, et d'OBIS (Système d'information sur la biodiversité océanique).",
+  "introSources": "Les données proviennent de serveurs ERDDAP™ exploités par le SIOOC et ses partenaires, et d'OBIS (Système d'information sur la biodiversité océanique). Les descriptions, les organisations et les liens de catalogue proviennent du catalogue national du SIOOC.",
   "tipNext": "Astuce suivante",
   "tipPrevious": "Astuce précédente",
   "tipCounter": "Astuce {{n}} sur {{total}}",
