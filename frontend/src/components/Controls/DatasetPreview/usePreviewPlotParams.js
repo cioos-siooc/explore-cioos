@@ -12,6 +12,7 @@ import { positionRowsFor, trackIndexFor } from "./previewTrackIndex.js";
 import { distanceRowsFor, trackDistancesFor } from "./previewTrackDistance.js";
 import {
   colorCandidatesFor,
+  colocatedVerticalFor,
   colorPlotAxesFor,
   COLUMNS,
   ROWS,
@@ -228,7 +229,34 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     },
     [searchParams, variablesByName],
   );
-  const planSharedAxis = (plan && plan.sharedAxis) || null;
+  // In the colour plot these are the colour variables.
+  const panelRequest = useMemo(
+    () =>
+      searchParams.has("pvars")
+        ? paramToList(searchParams.get("pvars"))
+        : (plan && plan.panelDefaults) || [],
+    [searchParams, plan],
+  );
+  // The default vertical axis is the one that shares rows with what is drawn
+  // against it; a named one is left alone.
+  const colocatedWith = useCallback(
+    (vertical) =>
+      vertical &&
+      colocatedVerticalFor(
+        variables,
+        plotData,
+        vertical,
+        panelRequest.filter((name) => variablesByName.has(name)),
+      ),
+    [variables, plotData, panelRequest, variablesByName],
+  );
+  const planSharedAxis = useMemo(
+    () =>
+      plan && plan.orientation === COLUMNS
+        ? colocatedWith(plan.sharedAxis)
+        : (plan && plan.sharedAxis) || null,
+    [plan, colocatedWith],
+  );
   const requestedSharedAxes = useMemo(
     () => knownListOr("paxis", planSharedAxis),
     [knownListOr, planSharedAxis],
@@ -264,10 +292,10 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // The colour plot's own X and Y — not `paxis`, because a profile's shared
   // axis is its depth, which the colour plot draws DOWN rather than across.
   // A link naming a column this dataset does not have falls back, like paxis.
-  const colorAxesDefault = useMemo(
-    () => colorPlotAxesFor(inspectDataset, variables, typePlan),
-    [inspectDataset, variables, typePlan],
-  );
+  const colorAxesDefault = useMemo(() => {
+    const axes = colorPlotAxesFor(inspectDataset, variables, typePlan);
+    return { ...axes, y: colocatedWith(axes.y) || null };
+  }, [inspectDataset, variables, typePlan, colocatedWith]);
   const colorXs = useMemo(
     () => knownListOr("pcx", colorAxesDefault.x),
     [knownListOr, colorAxesDefault],
@@ -315,12 +343,10 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     ],
   );
 
-  const panels = useMemo(() => {
-    const requested = searchParams.has("pvars")
-      ? paramToList(searchParams.get("pvars"))
-      : (plan && plan.panelDefaults) || [];
-    return resolveForLayout(requested);
-  }, [searchParams, plan, resolveForLayout]);
+  const panels = useMemo(
+    () => resolveForLayout(panelRequest),
+    [panelRequest, resolveForLayout],
+  );
 
   // The panels are what the panel layout is for, so they keep their several.
   const sharedAxes = useMemo(
@@ -334,7 +360,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   const setSharedAxes = useCallback(
     (columnNames) => {
-      const isDefault = plan && sameList(columnNames, [plan.sharedAxis]);
+      const isDefault = plan && sameList(columnNames, [planSharedAxis]);
       // Drop the new shared axes from the panels in the SAME write, or the URL
       // keeps a panel that is never drawn.
       const remaining = panels.filter((name) => !columnNames.includes(name));
@@ -344,7 +370,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
         pvars: panelsAreDefault ? null : listToParam(remaining),
       });
     },
-    [setParams, plan, panels],
+    [setParams, plan, panels, planSharedAxis],
   );
   const setSharedAxis = useCallback(
     (columnName) => setSharedAxes([columnName]),

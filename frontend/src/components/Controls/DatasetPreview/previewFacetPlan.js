@@ -8,6 +8,7 @@
 import {
   idVariablesFor,
   isDownwardVertical,
+  isPresent,
   isTimeLike,
   measurementsOf,
   preferWithData,
@@ -392,6 +393,55 @@ export const PLOT_BLOCKED = {
   NO_SHARED_AXIS: "noSharedAxis",
   NO_MEASUREMENTS: "noMeasurements",
 };
+
+// Rows holding the column and at least one of the panels.
+const rowsSharedWith = (data, column, panels) =>
+  (data || []).filter(
+    (row) =>
+      isPresent(row[column]) && panels.some((panel) => isPresent(row[panel])),
+  ).length;
+
+// Read the same way as depth, so they win a tie.
+const METRE_LIKE_UNITS = new Set(["m", "dbar", "decibar"]);
+
+// A Slocum glider logs its navigation and its CTD on separate rows: depth on
+// one, temperature and pressure on the other. Drawn against a depth that never
+// shares a row with them, the panels hold no point and the colour plot no
+// colour, so the vertical column sharing the most rows with them stands in.
+// The vertical axis given when it already shares one, or nothing does better.
+export function colocatedVerticalFor(variables, data, vertical, panels) {
+  if (
+    !panels.length ||
+    !isDownwardVertical(find(variables, (v) => v.columnName === vertical)) ||
+    rowsSharedWith(data, vertical, panels)
+  ) {
+    return vertical;
+  }
+  let best = null;
+  let bestRows = 0;
+  (variables || []).forEach((variable) => {
+    if (
+      variable.columnName === vertical ||
+      panels.includes(variable.columnName) ||
+      !variable.isNumeric ||
+      !isDownwardVertical(variable)
+    ) {
+      return;
+    }
+    const rows = rowsSharedWith(data, variable.columnName, panels);
+    if (
+      rows > bestRows ||
+      (rows > 0 &&
+        rows === bestRows &&
+        METRE_LIKE_UNITS.has(variable.unit) &&
+        !METRE_LIKE_UNITS.has(best.unit))
+    ) {
+      best = variable;
+      bestRows = rows;
+    }
+  });
+  return best ? best.columnName : vertical;
+}
 
 // One walk, two readings: the plan when there is one, otherwise what stopped it.
 // Shared so the answer and the excuse can never disagree about what is missing.

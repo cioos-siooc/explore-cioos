@@ -486,6 +486,45 @@ describe("usePreviewPlotParams", () => {
     });
   });
 
+  describe("a glider logging depth and its CTD on separate rows", () => {
+    const GLIDER_TABLE = {
+      columnNames: ["time", "depth", "pressure", "temperature"],
+      columnTypes: ["String", "float", "float", "float"],
+      columnUnits: ["UTC", "m", "dbar", "degree_C"],
+    };
+    const GLIDER_DATA = [
+      { time: "2024-01-01T00:00:00Z", depth: 10 },
+      { time: "2024-01-01T00:00:15Z", pressure: 11, temperature: 4.2 },
+      { time: "2024-01-01T00:01:00Z", depth: 20 },
+      { time: "2024-01-01T00:01:15Z", pressure: 21, temperature: 3.9 },
+    ];
+    const openGlider = (search) =>
+      renderWithProviders(
+        <Probe
+          dataset={{ ...STATION_DATASET, cdm_data_type: "TrajectoryProfile" }}
+          table={GLIDER_TABLE}
+          data={GLIDER_DATA}
+        />,
+        { url: `/?${search}` },
+      );
+
+    it("draws the CTD against the pressure that shares its rows", () => {
+      openGlider("playout=color&pvars=temperature");
+      expect(api.colorY).toBe("pressure");
+      expect(param("pcy")).toBeNull();
+    });
+
+    it("shares that pressure in the panel layout too", () => {
+      openGlider("playout=panels&pvars=temperature");
+      expect(api.sharedAxis).toBe("pressure");
+    });
+
+    it("keeps a depth the link names", () => {
+      openGlider("playout=color&pvars=temperature&pcy=depth");
+      expect(api.colorY).toBe("depth");
+    });
+  });
+
   describe("the colour plot", () => {
     it("is what a record of many profiles opens on, adding nothing to the link", () => {
       openStation();

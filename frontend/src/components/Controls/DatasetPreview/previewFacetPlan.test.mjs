@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { variablesFrom, withDataPresence } from "./previewVariables.js";
 import {
   axisDirectionsFor,
+  colocatedVerticalFor,
   colorCandidatesFor,
   colorPlotAxesFor,
   facetPlanFor,
@@ -67,6 +68,86 @@ test("a profile sharing a sea water pressure axis is reversed", () => {
   const plan = facetPlanFor(dataset, variablesFrom(table, dataset));
   assert.equal(plan.sharedAxis, "PRES");
   assert.equal(plan.sharedReversed, true);
+});
+
+// A Slocum glider: depth on its navigation rows, pressure and the CTD on others.
+const GLIDER = {
+  columnNames: [
+    "time",
+    "depth",
+    "sci_water_pressure",
+    "pressure",
+    "temperature",
+    "m_battery",
+  ],
+  columnTypes: ["String", "double", "double", "double", "double", "double"],
+  columnUnits: ["UTC", "m", "bar", "dbar", "Celsius", "volts"],
+  columnMeta: [
+    { name: "time", axis: "T", standard_name: "time" },
+    { name: "depth", axis: "Z", standard_name: "depth" },
+    { name: "sci_water_pressure", standard_name: "sea_water_pressure" },
+    { name: "pressure", standard_name: "sea_water_pressure" },
+    { name: "temperature", standard_name: "sea_water_temperature" },
+    { name: "m_battery" },
+  ],
+};
+const GLIDER_DATASET = { cdm_data_type: "TrajectoryProfile" };
+const GLIDER_ROWS = [
+  { time: "2026-11-16T14:06:01Z", depth: 10, m_battery: 14.1 },
+  {
+    time: "2026-11-16T14:06:16Z",
+    sci_water_pressure: 1.1,
+    pressure: 11,
+    temperature: 4.2,
+  },
+  { time: "2026-11-16T14:07:01Z", depth: 20, m_battery: 14.0 },
+  {
+    time: "2026-11-16T14:07:16Z",
+    sci_water_pressure: 2.1,
+    pressure: 21,
+    temperature: 3.9,
+  },
+];
+const gliderColocated = (panels, vertical = "depth") =>
+  colocatedVerticalFor(
+    withDataPresence(variablesFrom(GLIDER, GLIDER_DATASET), GLIDER_ROWS),
+    GLIDER_ROWS,
+    vertical,
+    panels,
+  );
+
+test("a depth sharing no row with the panels gives way to the pressure that does", () => {
+  assert.equal(gliderColocated(["temperature"]), "pressure");
+});
+
+test("a depth sharing a row with any panel stays", () => {
+  assert.equal(gliderColocated(["m_battery"]), "depth");
+  assert.equal(gliderColocated(["m_battery", "temperature"]), "depth");
+});
+
+test("only a vertical axis is ever swapped", () => {
+  assert.equal(gliderColocated(["temperature"], "time"), "time");
+});
+
+test("with nothing sharing a row, the vertical axis stays", () => {
+  const rows = [{ depth: 10 }, { temperature: 4 }];
+  const variables = withDataPresence(
+    variablesFrom(
+      {
+        ...GLIDER,
+        columnNames: ["depth", "temperature"],
+        columnTypes: ["double", "double"],
+        columnUnits: ["m", "Celsius"],
+        columnMeta: [GLIDER.columnMeta[1], GLIDER.columnMeta[4]],
+      },
+      GLIDER_DATASET,
+    ),
+    rows,
+  );
+  assert.equal(
+    colocatedVerticalFor(variables, rows, "depth", ["temperature"]),
+    "depth",
+  );
 });
 
 test("a timeseries stacks, sharing time, and is not reversed", () => {
