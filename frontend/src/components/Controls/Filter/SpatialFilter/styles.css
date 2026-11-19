@@ -241,7 +241,7 @@
   background-color: var(--cioos-surface-2);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
-  font-family: var(--cioos-font-mono, monospace);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: var(--cioos-font-size-xs);
   line-height: 1.5;
   color: var(--cioos-ink);
