@@ -420,12 +420,12 @@
   cursor: pointer;
 }
 
-.legendCreditsButton:hover {
+.legendCreditsButton[data-hovered] {
   color: var(--cioos-ink);
   background-color: var(--cioos-surface-2);
 }
 
-.legendCreditsButton:focus-visible {
+.legendCreditsButton[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }

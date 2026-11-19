@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import classNames from "classnames";
-import { useTranslation } from "react-i18next";
 
 import Skeleton from "../../ui/Skeleton.jsx";
+import ShowMoreButton from "../../ui/ShowMoreButton.jsx";
 import "./styles.css";
 
 export default function ListCard({ id, selected, pinned, actions, children }) {
@@ -72,7 +72,6 @@ export function useExpandableList(items, limit) {
 }
 
 export function CardTags({ values, limit = 3 }) {
-  const { t } = useTranslation();
   const { shown, hidden, expanded, toggle } = useExpandableList(
     values ?? [],
     limit,
@@ -86,21 +85,12 @@ export function CardTags({ values, limit = 3 }) {
           {value}
         </span>
       ))}
-      {(hidden > 0 || expanded) && (
-        <button
-          type="button"
-          className="listCardTagsMore"
-          onClick={toggle}
-          aria-expanded={expanded}
-          title={
-            expanded
-              ? t("listCardTagsFewerText")
-              : t("listCardTagsMoreTitle", { total: values.length })
-          }
-        >
-          {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
-        </button>
-      )}
+      <ShowMoreButton
+        expanded={expanded}
+        hidden={hidden}
+        total={values.length}
+        onToggle={toggle}
+      />
     </>
   );
 }

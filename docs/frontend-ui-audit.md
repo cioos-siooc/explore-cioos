@@ -250,6 +250,19 @@ barely change.
    (the legend's buttons). `aria-pressed`/`aria-checked` outside `ui/` are now
    lint errors. Initial JS: +8.0 kB gz.
 7. Collapsibles → `Disclosure`; Tabs
+   **Done:** the dataset page's Metadata/Data switch is RAC `Tabs` (`ui/Tabs.jsx`)
+   driven by the URL. Both panels are always the same `TabPanel`
+   (`shouldForceMount`, hidden by `[data-inert]`); widened, its `render` prop
+   draws a plain labelled region instead, so widening keeps what each view
+   holds. The Backspace-to-list shortcut keeps its window listener with a
+   justified disable: it belongs to the page, not to a control. Of the
+   `aria-expanded` toggles, only three are a trigger above a panel and became
+   `ui/Disclosure` (the OBIS group, the legend credits, the preview's
+   "Customize plot"); their panels now hide rather than unmount. Four
+   identical "+N" chip toggles are one `ui/ShowMoreButton`. The rest open
+   something that isn't a panel beside them (a list row group, the legend, a
+   dialog, the side pane) and keep `aria-expanded` on their button.
+   Initial JS: +3.2 kB gz.
 8. FilterSearch → `ComboBox`/`Autocomplete`; chips → `TagGroup`
 9. Rail → `Slider`; TimeRail date → `DateField`
 10. Modal core → RAC `Modal` (sheet and Back-dismiss on top); NoticeToast; TipCard positioning

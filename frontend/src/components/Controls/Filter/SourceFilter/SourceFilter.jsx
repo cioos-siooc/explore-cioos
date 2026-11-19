@@ -16,6 +16,8 @@ import {
 } from "../../../../utilities";
 import { featuredObisNodes } from "../../../config.js";
 import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
+import Button from "../../../ui/Button.jsx";
+import { Disclosure, DisclosurePanel } from "../../../ui/Disclosure.jsx";
 import "./styles.css";
 
 export default function SourceFilter({
@@ -82,15 +84,14 @@ export default function SourceFilter({
           forceExpanded={Boolean(search)}
         >
           {(moreNodesCount > 0 || showAllNodes) && !search && (
-            <button
-              type="button"
+            <Button
               className="sourceGroupMore"
-              onClick={() => setShowAllNodes(!showAllNodes)}
+              onPress={() => setShowAllNodes(!showAllNodes)}
             >
               {showAllNodes
                 ? t("sourceFilterShowFewer")
                 : t("sourceFilterShowMore", { count: moreNodesCount })}
-            </button>
+            </Button>
           )}
         </SourceGroup>
       )}
@@ -124,7 +125,11 @@ function SourceGroup({
   const childrenVisible = expanded || forceExpanded;
 
   return (
-    <>
+    <Disclosure
+      className="sourceGroup"
+      isExpanded={childrenVisible}
+      onExpandedChange={setExpanded}
+    >
       {/* The chevron sits beside the group's row, not in it: inside, it would
           be a button nested in the checkbox. */}
       <div className="sourceGroupRow">
@@ -155,36 +160,32 @@ function SourceGroup({
         >
           <span className="optionName">{label}</span>
         </FilterOption>
-        <button
-          type="button"
+        <Button
+          slot="trigger"
           className="sourceGroupChevron"
-          aria-expanded={childrenVisible}
           aria-label={t("sourceFilterGroupExpandLabel", { group: label })}
-          onClick={() => setExpanded(!expanded)}
         >
           {childrenVisible ? <ChevronDown /> : <ChevronRight />}
-        </button>
+        </Button>
       </div>
-      {childrenVisible && (
-        <div className="sourceGroupChildren">
-          {shown.map((option) => (
-            <FilterOption
-              key={option.pk}
-              label={option.title}
-              isSelected={option.isSelected}
-              isExcluded={option.isExcluded}
-              onInclude={() => update(option.pk, toggleOptionIncluded)}
-              onExclude={() => update(option.pk, toggleOptionExcluded)}
-              title={option.title}
-            >
-              <span className="optionName">
-                {capitalizeFirstLetter(option.title)}
-              </span>
-            </FilterOption>
-          ))}
-          {children}
-        </div>
-      )}
-    </>
+      <DisclosurePanel className="sourceGroupChildren">
+        {shown.map((option) => (
+          <FilterOption
+            key={option.pk}
+            label={option.title}
+            isSelected={option.isSelected}
+            isExcluded={option.isExcluded}
+            onInclude={() => update(option.pk, toggleOptionIncluded)}
+            onExclude={() => update(option.pk, toggleOptionExcluded)}
+            title={option.title}
+          >
+            <span className="optionName">
+              {capitalizeFirstLetter(option.title)}
+            </span>
+          </FilterOption>
+        ))}
+        {children}
+      </DisclosurePanel>
+    </Disclosure>
   );
 }

@@ -560,6 +560,11 @@
 
 /* Collapsible "Labels & colours" panel: one block per drawn variable, holding
    its colour and its display name. */
+/* The toggle and its panel stay items of the pane's own column. */
+.labelEditorDisclosure {
+  display: contents;
+}
+
 .labelEditorToggle {
   display: inline-flex;
   align-items: center;
@@ -575,7 +580,7 @@
   font-size: var(--cioos-font-size-xs);
 }
 
-.labelEditorToggle:hover {
+.labelEditorToggle[data-hovered] {
   color: var(--cioos-primary-800);
 }
 

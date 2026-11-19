@@ -305,6 +305,7 @@
   "datasetInspectorAddText": "Add",
   "datasetInspectorAddedText": "Added",
   "datasetInspectorMetadataTab": "Metadata",
+  "datasetInspectorTabsLabel": "Dataset views",
   "datasetInspectorDataTab": "Data",
   "datasetNotInResultsText": "This dataset doesn't match your current filters.",
   "datasetNotInResultsBackText": "Back to results",

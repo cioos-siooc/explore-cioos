@@ -305,6 +305,7 @@
   "datasetInspectorAddText": "Ajouter",
   "datasetInspectorAddedText": "Ajouté",
   "datasetInspectorMetadataTab": "Métadonnées",
+  "datasetInspectorTabsLabel": "Vues du jeu de données",
   "datasetInspectorDataTab": "Données",
   "datasetNotInResultsText": "Ce jeu de données ne correspond pas à vos filtres actuels.",
   "datasetNotInResultsBackText": "Retour aux résultats",

@@ -6,6 +6,16 @@
 }
 
 /* The brand tab strip's look: a teal wash at rest, solid teal when open. */
+/* The tabs' root wraps the list and the body without boxing them. */
+.datasetTabsRoot {
+  display: contents;
+}
+
+/* Kept mounted (shouldForceMount), so a view left behind holds its state. */
+.datasetTabsRoot [role="tabpanel"][data-inert] {
+  display: none;
+}
+
 .datasetTabs {
   flex: 0 0 auto;
   display: flex;
@@ -34,16 +44,16 @@
   transition: background-color 0.15s ease;
 }
 
-.datasetTab:hover {
+.datasetTab[data-hovered] {
   background-color: rgb(82 167 155 / 24%);
 }
 
-.datasetTab[aria-selected="true"] {
+.datasetTab[data-selected] {
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
 }
 
-.datasetTab:focus-visible {
+.datasetTab[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -433,7 +443,7 @@
 
 /* The data panel fills its scroller, so the record pager sits at its base
    even under a short list. */
-.datasetPanel-data:not([hidden]) {
+.datasetPanel-data:not([data-inert]) {
   display: flex;
   flex-direction: column;
 }
@@ -781,8 +791,7 @@
   overflow-wrap: normal;
 }
 
-.listCardTag,
-.listCardTagsMore {
+.listCardTag {
   padding: 1px 7px;
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-surface-2);
@@ -791,25 +800,9 @@
   color: var(--cioos-ink-80);
 }
 
-.listCardTagsMore {
-  border: 1px solid var(--cioos-hairline);
-  color: var(--cioos-primary-800);
-  cursor: pointer;
-}
-
 /* The card's hover wash is the tags' own surface-2, which would swallow them. */
 .listCard:hover .listCardTag {
   background-color: var(--cioos-white);
-}
-
-.listCardTagsMore:hover {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-white);
-}
-
-.listCardTagsMore:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
 }
 
 @media (max-width: 700px), (max-height: 500px) {
