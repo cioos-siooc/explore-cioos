@@ -235,12 +235,13 @@ export default function DatasetPreviewPlot() {
   const isGrid = isColorLayout
     ? colorXs.length > 1
     : sharedAxes.length > 1 || colorAxes.length > 1;
+  const colorRepeats = Math.max(colorAxes.length, 1);
   const gridColumns = isColorLayout
     ? colorXs.length
-    : panelXAxes.length * Math.max(colorAxes.length, 1);
+    : panelXAxes.length * (plan.colorRows ? 1 : colorRepeats);
   const gridRows = isColorLayout
     ? panels.length * colorYs.length
-    : panelYAxes.length;
+    : panelYAxes.length * (plan.colorRows ? colorRepeats : 1);
 
   // The figure's box and the title that shapes it. One call because the three
   // have to be derived in that order — see plotBoxFor.
@@ -260,8 +261,8 @@ export default function DatasetPreviewPlot() {
         ...shared,
         columns: gridColumns,
         rows: gridRows,
-        header: !isColorLayout && colorAxes.length > 1,
-        colorbars: isColorLayout,
+        header: !isColorLayout && !plan.colorRows && colorAxes.length > 1,
+        colorbars: isColorLayout || Boolean(plan.colorRows),
       });
     }
     return plotBoxFor({
@@ -355,6 +356,7 @@ export default function DatasetPreviewPlot() {
             yAxes: panelYAxes,
             panelAxis: plan.orientation === COLUMNS ? "x" : "y",
             colorAxes,
+            colorRows: plan.colorRows,
             data: plotData,
             colors: variableColors,
             labels: customLabels,

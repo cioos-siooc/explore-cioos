@@ -1422,6 +1422,36 @@ test("a grid repeats every X column once per colour column, side by side", () =>
   assert.equal(layout.coloraxis.showscale, false);
 });
 
+test("with colorRows, a grid repeats every Y row once per colour column, stacked", () => {
+  const { data, layout, colorLegends } = gridFigure({
+    xAxes: ["TE90_01", "PSAL_01"],
+    yAxes: ["depth"],
+    colorAxes: ["PSAL_01", "DOXY_01"],
+    colorRows: true,
+  });
+  assert.deepEqual(
+    data.map((trace) => [trace.xaxis, trace.yaxis, trace.marker.coloraxis]),
+    [
+      ["x", "y", "coloraxis"],
+      ["x2", "y", "coloraxis"],
+      ["x", "y2", "coloraxis2"],
+      ["x2", "y2", "coloraxis2"],
+    ],
+  );
+  // The repeat zooms with the first row, and the X axes run under the last.
+  assert.equal(layout.yaxis2.matches, "y");
+  assert.equal(layout.xaxis.anchor, "y2");
+  assert.ok(layout.yaxis.domain[0] > layout.yaxis2.domain[1]);
+  // Each colour is named by its own bar beside its row, not a header.
+  assert.equal(layout.annotations, undefined);
+  assert.deepEqual(colorLegends, []);
+  assert.deepEqual(
+    layout.coloraxis.colorbar.len,
+    layout.yaxis.domain[1] - layout.yaxis.domain[0],
+  );
+  assert.ok(layout.coloraxis.colorbar.y > layout.coloraxis2.colorbar.y);
+});
+
 test("a grid's colour headers wrap within their own column", () => {
   const { layout } = gridFigure({
     xAxes: ["TE90_01"],

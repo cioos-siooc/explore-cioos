@@ -367,6 +367,9 @@ function gridEdgesFor(columns, rows) {
   return edges;
 }
 
+export const COLORBAR_THICKNESS_PX = 12;
+export const COLORBAR_PAD_PX = 10;
+
 // A column's caption above the grid: what its panels are coloured by.
 const columnHeaderFor = (text, domain, labelFont) => ({
   text,
@@ -934,13 +937,16 @@ export function buildOverlayFigure({
  * Several variables on BOTH axes, and optionally several colour columns: one
  * panel per (X, Y, colour) triple. Columns are the X variables, each repeated
  * once per colour column side by side; rows are the Y variables, the first at
- * the top like a stack. A row shares its Y axis and a column its X axis, so
- * only the left column and the bottom row carry tick labels.
+ * the top like a stack. With `colorRows` the colour columns repeat the rows
+ * instead, colour-major, each beside its own colourbar. A row shares its Y axis
+ * and a column its X axis, so only the left column and the bottom row carry
+ * tick labels.
  *
  * @param xAxes, yAxes  the column names on each axis
  * @param panelAxis     which of the two is the panels' list ("x" | "y"): its
  *                      variables keep their panel colours
  * @param colorAxes     the columns shading the panels, [] for none
+ * @param colorRows     one row per colour column rather than one column
  * @param scales        { [columnName]: scale name } — the user's choices only
  * @param position      { column, ticks, labels } for a track's rank axis, or null
  * Every other parameter is buildFigure's.
@@ -951,6 +957,7 @@ export function buildGridFigure({
   yAxes,
   panelAxis = "y",
   colorAxes = [],
+  colorRows = false,
   data,
   colors = {},
   labels = {},
@@ -979,13 +986,20 @@ export function buildGridFigure({
     );
   });
   const shades = dimensions.length ? dimensions : [null];
-  const columnCount = xAxes.length * shades.length;
-  const rowCount = yAxes.length;
-  const header = dimensions.length > 1;
+  const across = colorRows ? [null] : shades;
+  const down = colorRows ? shades : [null];
+  const columnCount = xAxes.length * across.length;
+  const rowCount = yAxes.length * down.length;
+  // Across, a colour names its column from above; down, its colourbar does.
+  const header = !colorRows && dimensions.length > 1;
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
-  const margin = gridMarginFor(titleLines, { header, labelFont });
+  const margin = gridMarginFor(titleLines, {
+    header,
+    colorbars: colorRows,
+    labelFont,
+  });
   const plottingWidth = size.width
     ? Math.max(size.width - margin.l - margin.r, 0)
     : 0;
@@ -1018,6 +1032,33 @@ export function buildGridFigure({
   };
   if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
 
+  // A colour with rows of its own is named by a bar spanning them.
+  const colorbarFor = (shade, index) => {
+    const barDomain = [
+      rowDomains[(index + 1) * yAxes.length - 1][0],
+      rowDomains[index * yAxes.length][1],
+    ];
+    return {
+      x: 1,
+      xanchor: "left",
+      xpad: COLORBAR_PAD_PX,
+      y: (barDomain[0] + barDomain[1]) / 2,
+      yanchor: "middle",
+      len: barDomain[1] - barDomain[0],
+      lenmode: "fraction",
+      thickness: COLORBAR_THICKNESS_PX,
+      tickfont: { size: TICK_FONT_PX },
+      ...(shade.dimension.ticks || {}),
+      title: {
+        text: wrapAlong(
+          titleFor(shade.columnName),
+          plottingHeight * (barDomain[1] - barDomain[0]),
+        ),
+        side: "right",
+        font: { size: labelFont },
+      },
+    };
+  };
   dimensions.forEach((shade, index) => {
     if (!shade) return;
     layout[index === 0 ? "coloraxis" : `coloraxis${index + 1}`] = {
@@ -1025,17 +1066,28 @@ export function buildGridFigure({
       ...(shade.dimension.range
         ? { cmin: shade.dimension.range[0], cmax: shade.dimension.range[1] }
         : {}),
-      showscale: false, // drawn outside the figure — see ColorScaleLegend.jsx
+      ...(colorRows
+        ? { colorbar: colorbarFor(shade, index) }
+        : { showscale: false }), // drawn outside the figure — see ColorScaleLegend.jsx
     };
   });
 
   const columns = xAxes.flatMap((xAxis, xIndex) =>
-    shades.map((shade, shadeIndex) => ({
+    across.map((shade, shadeIndex) => ({
       xAxis,
       shade,
       shadeIndex,
       // Every repeat of an X variable zooms with its first column.
-      matches: shadeIndex > 0 ? axisRef("x", xIndex * shades.length) : null,
+      matches: shadeIndex > 0 ? axisRef("x", xIndex * across.length) : null,
+    })),
+  );
+  const rows = down.flatMap((shade, shadeIndex) =>
+    yAxes.map((yAxis, yIndex) => ({
+      yAxis,
+      shade,
+      shadeIndex,
+      // Every repeat of a Y variable zooms with its first row.
+      matches: shadeIndex > 0 ? axisRef("y", yIndex) : null,
     })),
   );
 
@@ -1064,7 +1116,7 @@ export function buildGridFigure({
       ),
     };
   });
-  yAxes.forEach((yAxis, row) => {
+  rows.forEach(({ yAxis, matches }, row) => {
     const domain = rowDomains[row];
     layout[axisKey("y", row)] = {
       ...AXIS_LINE,
@@ -1072,6 +1124,7 @@ export function buildGridFigure({
       anchor: "x",
       automargin: true,
       zeroline: false,
+      ...(matches ? { matches } : {}),
       ...positionTicksFor(position, yAxis, "y"),
       ...(reversedYAxes.has(yAxis) ? { autorange: "reversed" } : {}),
       title: axisTitle(
@@ -1087,8 +1140,11 @@ export function buildGridFigure({
   const panelColumns = panelAxis === "x" ? xAxes : yAxes;
   const lineTraces = [];
   const traces = [];
-  yAxes.forEach((yAxis, row) => {
-    columns.forEach(({ xAxis, shade, shadeIndex }, column) => {
+  rows.forEach((rowCell, row) => {
+    const { yAxis } = rowCell;
+    columns.forEach((columnCell, column) => {
+      const { xAxis } = columnCell;
+      const { shade, shadeIndex } = colorRows ? rowCell : columnCell;
       const panelColumn = panelAxis === "x" ? xAxis : yAxis;
       const color =
         colors[panelColumn] ||
@@ -1180,7 +1236,7 @@ export function buildGridFigure({
     );
   }
 
-  const colorLegends = dimensions
+  const colorLegends = (colorRows ? [] : dimensions)
     .map(
       (shade, index) =>
         shade && {
@@ -1200,8 +1256,6 @@ export function buildGridFigure({
   };
 }
 
-export const COLORBAR_THICKNESS_PX = 12;
-export const COLORBAR_PAD_PX = 10;
 // The grid's cells along an axis not measured yet.
 const UNMEASURED_CELLS = 200;
 const cellsAlong = (pixels) =>

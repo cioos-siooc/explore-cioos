@@ -111,7 +111,8 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // out of pointing the shared axis at a measurement.
 //
 // `colorPlot` marks the records holding many profiles: a filled section needs
-// several of them side by side, and it is what they open on.
+// several of them side by side, and it is what they open on. `colorRows` stacks
+// several colour columns as rows of the panel grid rather than columns.
 const CDM_LAYOUTS = {
   Profile: {
     defaultPanelCount: 3,
@@ -134,6 +135,7 @@ const CDM_LAYOUTS = {
     sharedAxisFor: verticalCoordinate,
     leadingAxesFor: trackLeadingAxes,
     colorPlot: true,
+    colorRows: true,
   },
   TimeSeries: {
     defaultPanelCount: 3,
@@ -509,6 +511,7 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
       (variable) => variable.columnName,
     ),
     panelDefaults,
+    colorRows: Boolean(layoutFor(dataset)?.colorRows),
   };
 }
 
