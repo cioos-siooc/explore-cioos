@@ -290,6 +290,8 @@
   "datasetsCardLoadFailedText": "The dataset list could not be loaded. Retry, or try again in a few minutes.",
   "datasetsPagerLabel": "Dataset list pages",
   "pagerRangeText": "{{first, number}}–{{last, number}} of {{total, number}}",
+  "datasetsPagerFoldedGrids_one": "Not counted here: {{count, number}} gridded dataset, folded into the group at the top of the list.",
+  "datasetsPagerFoldedGrids_other": "Not counted here: {{count, number}} gridded datasets, folded into the group at the top of the list.",
   "pagerPreviousTitle": "Previous page",
   "pagerNextTitle": "Next page",
   "pagerPageTitle": "Go to page {{page}}",

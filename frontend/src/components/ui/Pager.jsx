@@ -47,6 +47,8 @@ export default function Pager({
   onPageSizeChange,
   label,
   perPageLabel,
+  // Says what the total leaves out, when it isn't every item.
+  rangeTitle,
   // Shown after the range, e.g. the download modal's selection totals.
   children,
   "data-testid": testId,
@@ -58,7 +60,7 @@ export default function Pager({
 
   return (
     <nav className="pager" aria-label={label} data-testid={testId}>
-      <span className="pagerRange">
+      <span className="pagerRange" title={rangeTitle}>
         {t("pagerRangeText", {
           first: firstItem + 1,
           last: Math.min(firstItem + pageSize, total),

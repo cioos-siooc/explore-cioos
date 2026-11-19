@@ -290,6 +290,8 @@
   "datasetsCardLoadFailedText": "La liste des jeux de données n'a pas pu être chargée. Réessayez, ou revenez dans quelques minutes.",
   "datasetsPagerLabel": "Pages de la liste des jeux de données",
   "pagerRangeText": "{{first, number}}–{{last, number}} sur {{total, number}}",
+  "datasetsPagerFoldedGrids_one": "Non compté ici : {{count, number}} jeu de données maillé, replié dans le groupe en haut de la liste.",
+  "datasetsPagerFoldedGrids_other": "Non comptés ici : {{count, number}} jeux de données maillés, repliés dans le groupe en haut de la liste.",
   "pagerPreviousTitle": "Page précédente",
   "pagerNextTitle": "Page suivante",
   "pagerPageTitle": "Aller à la page {{page}}",

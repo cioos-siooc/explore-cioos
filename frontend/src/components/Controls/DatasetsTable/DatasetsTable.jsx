@@ -466,6 +466,10 @@ export default function DatasetsTable({
     [renderItems],
   );
 
+  const foldedGridCount = renderItems.find(
+    (item) => item.header && item.group === GRID_KEY && !isExpanded(GRID_KEY),
+  )?.count;
+
   const pageCount = Math.max(1, Math.ceil(totalRowCount / pageSize));
   // Clamped rather than stored: a page can vanish under the list (the filters
   // narrowed the results, a group was collapsed) between renders.
@@ -893,6 +897,11 @@ export default function DatasetsTable({
         onPageSizeChange={setPageSize}
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
+        rangeTitle={
+          foldedGridCount
+            ? t("datasetsPagerFoldedGrids", { count: foldedGridCount })
+            : undefined
+        }
       />
     </div>
   );
