@@ -1024,6 +1024,7 @@
   "spatialFilterPlaceRecord": "Details on NRCan GeoNames",
   "spatialFilterPlaceOption": "{{place}} ({{shape}})",
   "regionSearchLoading": "Searching places…",
+  "regionSearchFailed": "Place search (NRCan) is unavailable right now. Try again later.",
   "regionSearchGroup": "Places (NRCan GeoNames)",
   "regionSearchShape": "Filter places by",
   "regionSearchGoTo": "Go to",
