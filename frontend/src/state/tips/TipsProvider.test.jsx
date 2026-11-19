@@ -201,6 +201,16 @@ describe("contextual tips", () => {
     expect(card()).toHaveTextContent(/Includes all selected/);
   });
 
+  it("drops a window's tip once that window has been opened and closed", async () => {
+    returningVisitor();
+    const { user } = renderProbe();
+    await user.click(screen.getByText("offer exclude"));
+    expect(card()).toHaveTextContent(/leave things out/);
+    await user.click(screen.getByText("open filters"));
+    await user.click(screen.getByText("close filters"));
+    expect(card()).toBeNull();
+  });
+
   it("“Don't show tips” turns them off for good", async () => {
     returningVisitor();
     const { user } = renderProbe();
