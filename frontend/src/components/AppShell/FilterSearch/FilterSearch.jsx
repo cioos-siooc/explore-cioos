@@ -474,7 +474,6 @@ export default function FilterSearch({
               <X size={18} aria-hidden="true" />
             </Button>
           )}
-          <kbd className="filterSearchKey">Esc</kbd>
         </SearchField>
         <div className="filterSearchResults">
           {flat.length > 0 ? (

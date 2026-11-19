@@ -43,6 +43,11 @@
   color: var(--cioos-ink);
 }
 
+/* Its native counterpart is hidden: one clear control, ours. */
+.filterSearchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
 @media (max-width: 700px), (max-height: 500px) {
   .filterSearchField {
     min-height: 44px;
