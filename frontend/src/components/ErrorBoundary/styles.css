@@ -3,5 +3,20 @@
   left: 0;
   right: 0;
   top: 40%;
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 0 var(--cioos-space-lg);
   text-align: center;
+  font-size: var(--cioos-font-size-base);
+  color: var(--cioos-ink-80);
+  overflow-wrap: anywhere;
+}
+
+.errorBoundaryMessage h1 {
+  margin: var(--cioos-space-md) 0 var(--cioos-space-sm);
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-lg);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cioos-ink);
 }

@@ -1,5 +1,9 @@
 import * as React from "react";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Map as MapIcon } from "react-bootstrap-icons";
 
+import ErrorBoundary from "../ErrorBoundary/ErrorBoundary.jsx";
 import DrawHint from "./DrawHint/DrawHint.jsx";
 import Map from "./Map.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -118,51 +122,53 @@ export default function MapContainer() {
 
   return (
     <>
-      <Map
-        polygon={polygon}
-        setPolygon={setPolygon}
-        setLoading={setLoading}
-        setLoadingLayers={setLoadingLayers}
-        mapQueryString={mapQueryString}
-        initialView={mapView}
-        setMapView={setMapView}
-        rangeLevels={rangeLevels}
-        coverageRangeLevels={coverageRangeLevels}
-        onViewportHexRange={setViewportHexRange}
-        onViewportPointRange={setViewportPointRange}
-        onFeatureQuery={handleFeatureQuery}
-        featureQuery={featureQuery}
-        sharedFeatureQueryAt={sharedFeatureQueryAt}
-        onMarkerClick={onMarkerClick}
-        onTrackClick={selectTrajectoryFromMap}
-        onDepthQuery={readDepthAt}
-        depthReading={depthReading}
-        depthToolActive={depthToolActive}
-        onDepthToolExit={() => setDepthToolActive(false)}
-        setHoveredDataset={setHoveredDataset}
-        hoveredDataset={hoveredDataset}
-        inspectDataset={inspectDataset}
-        tracksMode={tracksMode}
-        scrubTime={debouncedScrubTime}
-        trailingDays={trailingDays}
-        selectedTrajectory={selectedTrajectory}
-        mappedRecord={mappedRecord}
-        dataLayers={dataLayers}
-        griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
-        griddapExtents={griddapCoverage}
-        dataLayersVisible={dataLayersVisible}
-        bathymetryVisible={bathymetryVisible}
-        bathymetryPalette={bathymetryPalette}
-        activeWmsOverlay={activeWmsOverlay}
-        projection={projection}
-        zoomTarget={zoomTarget}
-        drawRequest={drawRequest}
-        onTilesFailed={setTilesFailed}
-        tileRetryRequest={tileRetryRequest}
-        featureQueryRequest={featureQueryRequest}
-        onMapReady={setMapInstance}
-        onFirstPaint={reportFirstPaint}
-      />
+      <ErrorBoundary fallback={<MapUnavailable onShown={reportFirstPaint} />}>
+        <Map
+          polygon={polygon}
+          setPolygon={setPolygon}
+          setLoading={setLoading}
+          setLoadingLayers={setLoadingLayers}
+          mapQueryString={mapQueryString}
+          initialView={mapView}
+          setMapView={setMapView}
+          rangeLevels={rangeLevels}
+          coverageRangeLevels={coverageRangeLevels}
+          onViewportHexRange={setViewportHexRange}
+          onViewportPointRange={setViewportPointRange}
+          onFeatureQuery={handleFeatureQuery}
+          featureQuery={featureQuery}
+          sharedFeatureQueryAt={sharedFeatureQueryAt}
+          onMarkerClick={onMarkerClick}
+          onTrackClick={selectTrajectoryFromMap}
+          onDepthQuery={readDepthAt}
+          depthReading={depthReading}
+          depthToolActive={depthToolActive}
+          onDepthToolExit={() => setDepthToolActive(false)}
+          setHoveredDataset={setHoveredDataset}
+          hoveredDataset={hoveredDataset}
+          inspectDataset={inspectDataset}
+          tracksMode={tracksMode}
+          scrubTime={debouncedScrubTime}
+          trailingDays={trailingDays}
+          selectedTrajectory={selectedTrajectory}
+          mappedRecord={mappedRecord}
+          dataLayers={dataLayers}
+          griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
+          griddapExtents={griddapCoverage}
+          dataLayersVisible={dataLayersVisible}
+          bathymetryVisible={bathymetryVisible}
+          bathymetryPalette={bathymetryPalette}
+          activeWmsOverlay={activeWmsOverlay}
+          projection={projection}
+          zoomTarget={zoomTarget}
+          drawRequest={drawRequest}
+          onTilesFailed={setTilesFailed}
+          tileRetryRequest={tileRetryRequest}
+          featureQueryRequest={featureQueryRequest}
+          onMapReady={setMapInstance}
+          onFirstPaint={reportFirstPaint}
+        />
+      </ErrorBoundary>
       <DrawHint map={mapInstance} />
       {/* The bottom activity panel names what is loading; this is the mark
           over the map itself, where the eye is. */}
@@ -175,5 +181,31 @@ export default function MapContainer() {
         </div>
       )}
     </>
+  );
+}
+
+function supportsWebGL2() {
+  return Boolean(document.createElement("canvas").getContext("webgl2"));
+}
+
+// A map that can't start must not take the datasets list, filters and
+// downloads down with it.
+function MapUnavailable({ onShown }) {
+  const { t } = useTranslation();
+  useEffect(() => onShown(), [onShown]);
+  return (
+    <div className="map mapUnavailable" data-testid="map-unavailable">
+      <div className="mapUnavailableCard" role="status">
+        <MapIcon size={20} aria-hidden="true" />
+        <h2>{t("mapUnavailableTitle")}</h2>
+        <p>
+          {t(
+            supportsWebGL2()
+              ? "mapUnavailableCrashed"
+              : "mapUnavailableNoWebGL",
+          )}
+        </p>
+      </div>
+    </div>
   );
 }

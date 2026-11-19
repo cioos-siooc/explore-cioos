@@ -229,3 +229,40 @@
     display: none;
   }
 }
+
+.mapUnavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cioos-space-lg);
+  background-color: var(--cioos-sand);
+}
+
+.mapUnavailableCard {
+  max-width: 26rem;
+  padding: var(--cioos-space-lg) var(--cioos-space-xl);
+  border-radius: var(--cioos-radius-lg);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-3d);
+  color: var(--cioos-ink-80);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.mapUnavailableCard svg {
+  color: var(--cioos-primary);
+}
+
+.mapUnavailableCard h2 {
+  margin: var(--cioos-space-sm) 0 var(--cioos-space-xs);
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cioos-ink);
+}
+
+.mapUnavailableCard p {
+  margin: 0;
+}
