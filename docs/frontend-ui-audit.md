@@ -1,7 +1,7 @@
 # Frontend UI primitives audit
 
 Written 2026-11-18 to decide whether to replace the hand-built UI primitives
-with shadcn/ui or a newer alternative. Steps 1–2 of the
+with shadcn/ui or a newer alternative. Steps 1–3 of the
 [suggested order](#suggested-order) are in; every remaining step is tracked by
 the `eslint-disable` comments that name it (`grep -rn "frontend-ui-audit.md step" frontend/src`).
 
@@ -206,7 +206,16 @@ barely change.
    still lands on the map as the box's first corner; `MenuTrigger` reports
    that close as `"outside"` so it doesn't disarm. `ui/LocaleProvider.jsx`
    ties RAC's locale to the EN/FR switch. Initial JS: 744.9 kB gz (+45.4 kB).
-3. Tooltip → RAC `Tooltip` (gap 3)
+3. Tooltip → RAC `Tooltip` (gap 3).
+   **Done:** `ui/Tooltip.jsx` is RAC `TooltipTrigger` + `Focusable`, so the
+   bubble is the trigger's `aria-describedby`, opens on keyboard focus, closes
+   on Escape, flips at the edges, and no longer opens from a touch. Its child
+   must be a focusable element; text that only explains itself (the dataset
+   count, EOV chips with a definition, the download card's status) goes in
+   a `TooltipTarget`, an unstyled button. The help icon is a labelled,
+   focusable `img`. Found on the way: `FilterOption` spread its props after
+   its own `onKeyDown`, so a handler from a wrapper replaced Enter/Space.
+   Initial JS: 745.8 kB gz (+0.9 kB over step 2).
 4. Filter popover → `Popover` (gap 2, deletes `useOutsideAlerter`)
 5. FeatureCard shell (gap 4)
 6. `Button`, `ToggleButton`, `Switch`, `Checkbox`, `SearchField`

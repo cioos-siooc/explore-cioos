@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
+import { hoverWithMouse } from "../../../test/hoverWithMouse.js";
 import QuestionIconTooltip from "./QuestionIconTooltip.jsx";
 
 describe("QuestionIconTooltip", () => {
@@ -14,7 +15,7 @@ describe("QuestionIconTooltip", () => {
         size={16}
       />,
     );
-    await user.hover(document.querySelector(".helpIcon"));
+    await hoverWithMouse(user, screen.getByRole("img", { name: "Help" }));
     await waitFor(() =>
       expect(screen.getByText("Explains the thing")).toBeInTheDocument(),
     );

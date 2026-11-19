@@ -355,7 +355,7 @@
 }
 
 /* Tags and links share .filterButton's pill box. */
-.datasetMetaSheet .metadataChip[tabindex]:focus-visible {
+.datasetMetaSheet .metadataChip:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }

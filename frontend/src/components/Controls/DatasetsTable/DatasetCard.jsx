@@ -31,7 +31,7 @@ import {
 import erddapServersJSONfile from "../../../erddapServers.json";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import Spinner from "../../ui/Spinner.jsx";
-import Tooltip from "../../ui/Tooltip.jsx";
+import Tooltip, { TooltipTarget } from "../../ui/Tooltip.jsx";
 
 export default function DatasetCard({
   row,
@@ -162,7 +162,7 @@ export default function DatasetCard({
                 >
                   {/* Colour alone never carries the status: the word is on
                       the glyph's own <title>. */}
-                  <span className="datasetCardStatus">
+                  <TooltipTarget className="datasetCardStatus">
                     {row.internalDownload ? (
                       <Check2Circle
                         className="downloadableIcon success"
@@ -198,7 +198,7 @@ export default function DatasetCard({
                         )}`}
                       </span>
                     )}
-                  </span>
+                  </TooltipTarget>
                 </Tooltip>
               ) : estimatesFailed ? (
                 <span

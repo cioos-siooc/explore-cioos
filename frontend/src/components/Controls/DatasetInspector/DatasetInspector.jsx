@@ -70,7 +70,7 @@ import ListCard, {
 } from "./ListCard.jsx";
 import useTrajectoryPasses from "./useTrajectoryPasses.js";
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
-import Tooltip from "../../ui/Tooltip.jsx";
+import Tooltip, { TooltipTarget } from "../../ui/Tooltip.jsx";
 import ZoomToDataset, {
   useZoomToDataset,
 } from "../../AppShell/ZoomToDataset/ZoomToDataset.jsx";
@@ -889,22 +889,22 @@ export default function DatasetInspector({
                 )}
                 {shownEovs.map((eov) => {
                   const definition = eovDefinitions.get(eov)?.[i18n.language];
-                  return (
+                  return definition ? (
                     <Tooltip
                       key={eov}
                       placement="bottom"
                       delay={150}
                       content={definition}
                     >
-                      {/* Focusable so keyboard users reach the definition too. */}
-                      <span
-                        className="metadataChip"
-                        tabIndex={definition ? 0 : undefined} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex -- docs/frontend-ui-audit.md step 3: Tooltip trigger
-                        aria-description={definition}
-                      >
+                      {/* A target so keyboard users reach the definition too. */}
+                      <TooltipTarget className="metadataChip">
                         {t(eov)}
-                      </span>
+                      </TooltipTarget>
                     </Tooltip>
+                  ) : (
+                    <span key={eov} className="metadataChip">
+                      {t(eov)}
+                    </span>
                   );
                 })}
                 {(hiddenEovCount > 0 || eovsExpanded) && (

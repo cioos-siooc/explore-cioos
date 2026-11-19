@@ -55,14 +55,16 @@ export function FilterOption({
         role="checkbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Checkbox
         aria-checked={Boolean(isSelected)}
         tabIndex={0}
+        {...checkboxProps}
         onKeyDown={(event) => {
+          // A wrapping Tooltip passes its own (Escape closes it).
+          checkboxProps.onKeyDown?.(event);
           if (event.key === " " || event.key === "Enter") {
             // Space would otherwise scroll the pane out from under the row.
             event.preventDefault();
             onInclude();
           }
         }}
-        {...checkboxProps}
       >
         {icon || (
           <OptionStateIcon isSelected={isSelected} isExcluded={isExcluded} />

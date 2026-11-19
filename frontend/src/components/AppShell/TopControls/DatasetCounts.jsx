@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import Spinner from "../../ui/Spinner.jsx";
-import Tooltip from "../../ui/Tooltip.jsx";
+import Tooltip, { TooltipTarget } from "../../ui/Tooltip.jsx";
 import { server } from "../../../config.js";
 import fetchJson from "../../../state/fetchJson.js";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
@@ -59,24 +59,25 @@ export default function DatasetCounts() {
       {!countsReady ? (
         <Spinner size="xs" className="countSpinner" />
       ) : (
-        // Announced when a filter changes the tally; focusable so the popup
+        // Announced when a filter changes the tally; a target so the popup
         // reaches keyboard users too.
         <Tooltip content={popup}>
-          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- docs/frontend-ui-audit.md step 3: Tooltip trigger */}
-          <span role="status" tabIndex={0}>
-            {allDatasetsShown ? (
-              format(totalCount)
-            ) : (
-              <>
-                <span className="topBarCountsFiltered">
-                  <span aria-hidden="true">{format(totalCount)}</span>
-                  <span>{format(filteredCount)}</span>
-                </span>
-                /{format(totalCount)}
-              </>
-            )}{" "}
-            {t("topBarCountsUnit")}
-          </span>
+          <TooltipTarget>
+            <span role="status">
+              {allDatasetsShown ? (
+                format(totalCount)
+              ) : (
+                <>
+                  <span className="topBarCountsFiltered">
+                    <span aria-hidden="true">{format(totalCount)}</span>
+                    <span>{format(filteredCount)}</span>
+                  </span>
+                  /{format(totalCount)}
+                </>
+              )}{" "}
+              {t("topBarCountsUnit")}
+            </span>
+          </TooltipTarget>
         </Tooltip>
       )}
     </div>
