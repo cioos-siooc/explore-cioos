@@ -574,6 +574,7 @@
   "datasetPreviewPlotInteractionHelpTouch": "Tap the plot to read values.\nDrag to move around the plot.\nUse + and − in the toolbar to zoom, and Autoscale to reset the view.\nThe magnifier makes a drag zoom to a box; the crossed arrows make it move the plot again.\nDouble-tap to reset the view.\nCamera icon: download as a PNG.",
   "datasetPreviewPlotColor": "Color",
   "datasetPreviewPlotColorBy": "Color by",
+  "datasetPreviewPlotColorBySelf": "Each panel by its own values",
   "datasetPreviewPlotCurves": "Curves",
   "datasetPreviewPlotCurvesPanels": "Separate panels",
   "datasetPreviewPlotCurvesStacked": "Same plot",

@@ -26,6 +26,10 @@ import {
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
 
+// A colour list naming no column: every panel shaded by its own values, opted
+// into from the pane. `*` cannot occur in an ERDDAP variable name.
+export const SELF_COLOR = "*";
+
 const find = (variables, predicate) => (variables || []).find(predicate);
 
 const verticalCoordinate = (variables) =>
@@ -432,7 +436,7 @@ export function colocatedVerticalFor(variables, data, vertical, panels) {
 
 // One walk, two readings: the plan when there is one, otherwise what stopped it.
 // Shared so the answer and the excuse can never disagree about what is missing.
-function planOrBlockerFor(dataset, variables, data) {
+function planOrBlockerFor(dataset, variables, data, oneProfile) {
   const columns = (variables || []).map((variable) => variable.columnName);
   const cdmDataType = (dataset && dataset.cdm_data_type) || "";
   const blocked = (code, rest) => ({
@@ -477,6 +481,16 @@ function planOrBlockerFor(dataset, variables, data) {
         (variable) => variable.columnName === columnName,
       ),
     );
+    // One cast of a section has no "across": it is drawn as a profile, each
+    // variable against depth, still shaded by the section's first colour.
+    if (oneProfile) {
+      return {
+        plan: {
+          ...planFrom(dataset, COLUMNS, shared, variables, panelDefaults),
+          colorDefaults: colorDefaults.slice(0, 1),
+        },
+      };
+    }
     const down = colocatedVerticalFor(
       variables,
       data,
@@ -510,8 +524,10 @@ export function plotBlockerFor(dataset, variables, data) {
 // null when this record cannot be plotted — the caller shows the table, which is
 // what Grid and any unrecognised cdm_data_type get, and plotBlockerFor above
 // says which of the four reasons applied.
-export function facetPlanFor(dataset, variables, data) {
-  return planOrBlockerFor(dataset, variables, data).plan || null;
+// `oneProfile`: a single cast of a TimeSeriesProfile or TrajectoryProfile is
+// drawn, not the section.
+export function facetPlanFor(dataset, variables, data, { oneProfile } = {}) {
+  return planOrBlockerFor(dataset, variables, data, oneProfile).plan || null;
 }
 
 function planFrom(dataset, orientation, shared, variables, panelDefaults) {

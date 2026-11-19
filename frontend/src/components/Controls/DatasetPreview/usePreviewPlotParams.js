@@ -21,6 +21,7 @@ import {
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
+  SELF_COLOR,
 } from "./previewFacetPlan.js";
 import { parseColorsParam, formatColorsParam } from "./previewColors.js";
 import {
@@ -89,7 +90,14 @@ const RESETTABLE_PARAMS = PLOT_PARAMS.filter(
 const sameList = (a, b) =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
-export default function usePreviewPlotParams(inspectDataset, table, data) {
+// `currentProfile`: the cast /preview draws when no step is set, for a record
+// that is itself one cast of a station.
+export default function usePreviewPlotParams(
+  inspectDataset,
+  table,
+  data,
+  currentProfile = null,
+) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
 
@@ -176,9 +184,10 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   // The type's own plan, then the plan as drawn: `porient` moves the panels to
   // the other axis, so either X or Y can hold several variables, one at a time.
+  const oneProfile = Boolean(searchParams.get(STEP_PARAM) || currentProfile);
   const typePlan = useMemo(
-    () => facetPlanFor(inspectDataset, variables, plotData),
-    [inspectDataset, variables, plotData],
+    () => facetPlanFor(inspectDataset, variables, plotData, { oneProfile }),
+    [inspectDataset, variables, plotData, oneProfile],
   );
   // `colorRows` is settled once the axes are (drawnPlan below).
   const orientParam = searchParams.get("porient");
@@ -388,6 +397,9 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [stacked, colorCandidates, colorParam, panels, sharedAxes],
   );
   const colorAxis = colorAxes[0] ?? null;
+  // Each panel shaded by its own values: no colour column of its own, so it
+  // never multiplies the panels into a grid.
+  const colorBySelf = !stacked && colorParam === SELF_COLOR;
 
   // Every colour column's scale, keyed by column like
   // `pcolors`. A link from before per-column scales carries one `pzscale`,
@@ -424,8 +436,20 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       }),
     [setParams, variableScales, colorDefaults],
   );
+  const setColorBySelf = useCallback(
+    (on) => setColorAxes(on ? [SELF_COLOR] : colorDefaults),
+    [setColorAxes, colorDefaults],
+  );
   // Off: each colour column in its own scale. On: all in the first one's.
-  const colorColumns = colorAxes;
+  const colorColumns = useMemo(
+    () =>
+      colorBySelf
+        ? panels.filter((name) =>
+            colorCandidates.some((variable) => variable.columnName === name),
+          )
+        : colorAxes,
+    [colorBySelf, panels, colorCandidates, colorAxes],
+  );
   const sharedColorScale = searchParams.get("pzshare") === "1";
   const setSharedColorScale = useCallback(
     (shared) => setParams({ pzshare: shared ? "1" : null }),
@@ -557,7 +581,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // Changes with the axis set, so Plotly does not restore a zoom onto an axis
   // that no longer exists. A flipped Y counts too: a kept zoom would hold the
   // old direction's range.
-  const axisSet = `${stacked ? "stack|" : ""}${plan?.orientation}|${drawnPlan?.colorRows ? "zrows|" : ""}${sharedAxes.join(",")}|${panels.join(",")}|${colorAxes.join(",")}`;
+  const axisSet = `${stacked ? "stack|" : ""}${plan?.orientation}|${drawnPlan?.colorRows ? "zrows|" : ""}${sharedAxes.join(",")}|${panels.join(",")}|${colorBySelf ? SELF_COLOR : colorAxes.join(",")}`;
   const uirevision = `${axisSet}|${[...reversedYAxes].join(",")}`;
 
   // The whole search string: panning the map changes the link too.
@@ -598,6 +622,8 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setColorAxis,
       colorAxes,
       setColorAxes,
+      colorBySelf,
+      setColorBySelf,
       stacked,
       setStacked,
       variableScales,
@@ -645,6 +671,8 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setColorAxis,
       colorAxes,
       setColorAxes,
+      colorBySelf,
+      setColorBySelf,
       stacked,
       setStacked,
       variableScales,

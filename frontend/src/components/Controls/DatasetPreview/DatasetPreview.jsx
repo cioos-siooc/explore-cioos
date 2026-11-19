@@ -59,20 +59,20 @@ export default function DatasetPreview({
   // closes it. Only the six the header and the body need are read here; the rest
   // goes to the plot through the provider below.
   const mobile = useMediaQuery(MOBILE_QUERY);
-  const plotParams = usePreviewPlotParams(
-    inspectDataset,
-    datasetPreview?.table,
-    rows,
-  );
-  const { selectedVis, setSelectedVis, linkKey, step, before, rowLimit } =
-    plotParams;
-
   // Fetched separately from the rows and independent of them: a record whose
   // list fails simply gets no slider.
   const profiles = usePreviewProfiles(
     inspectDataset?.dataset_id,
     inspectRecordID,
   );
+  const plotParams = usePreviewPlotParams(
+    inspectDataset,
+    datasetPreview?.table,
+    rows,
+    profiles.current,
+  );
+  const { selectedVis, setSelectedVis, linkKey, step, before, rowLimit } =
+    plotParams;
 
   const drawsOneProfile = Boolean(step || profiles.current);
   // Said beside the title, so the table and the plot both say it.

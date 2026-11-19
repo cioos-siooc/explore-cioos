@@ -16,6 +16,7 @@ import {
   defaultVisFor,
   COLUMNS,
   ROWS,
+  SELF_COLOR,
 } from "./previewFacetPlan.js";
 import {
   POSITION_INDEX_COLUMN,
@@ -61,6 +62,29 @@ test("a record of many profiles opens as a section: time across, depth down, sha
     assert.equal(plan.colorRows, true, type);
     assert.equal(plan.defaultMode, "markers", type);
   }
+});
+
+test("one profile of a section is drawn as a profile, keeping the section's colour", () => {
+  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
+    const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+    const plan = facetPlanFor(dataset, variablesFrom(VIKING, dataset), [], {
+      oneProfile: true,
+    });
+    assert.equal(plan.orientation, COLUMNS, type);
+    assert.equal(plan.sharedAxis, "depth", type);
+    assert.equal(plan.sharedReversed, true, type);
+    assert.deepEqual(plan.panelDefaults, planFor("Profile").panelDefaults);
+    assert.deepEqual(plan.colorDefaults, ["TE90_01"], type);
+    assert.ok(!plan.colorDefaults.includes(SELF_COLOR), type);
+  }
+  // A Profile record is one cast already: nothing changes.
+  const profile = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  assert.deepEqual(
+    facetPlanFor(profile, variablesFrom(VIKING, profile), [], {
+      oneProfile: true,
+    }).colorDefaults,
+    [],
+  );
 });
 
 test("a profile sharing a sea water pressure axis is reversed", () => {

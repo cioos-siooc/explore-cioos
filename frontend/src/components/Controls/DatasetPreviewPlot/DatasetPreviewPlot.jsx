@@ -126,6 +126,8 @@ export default function DatasetPreviewPlot() {
     colorCandidates,
     colorAxes,
     setColorAxes,
+    colorBySelf,
+    setColorBySelf,
     stacked,
     setStacked,
     variableScales,
@@ -339,6 +341,8 @@ export default function DatasetPreviewPlot() {
       mode: plotType,
       colorAxis: colorAxes[0] ?? null,
       colorScale: scalesInUse[colorAxes[0]] ?? null,
+      colorBySelf,
+      scales: scalesInUse,
       sharedTicks: onPositionAxis ? trackIndex.ticks : null,
       sharedText: onPositionAxis ? trackIndex.labels : null,
       size: { width, height },
@@ -367,6 +371,7 @@ export default function DatasetPreviewPlot() {
     title,
     plotType,
     colorAxes,
+    colorBySelf,
     onPositionAxis,
     position,
     trackIndex,
@@ -715,7 +720,20 @@ export default function DatasetPreviewPlot() {
 
       {/* On one plot, colour already says which axis a curve reads on. */}
       {!stacked && (
-        <ControlRow caption={t("datasetPreviewPlotColorBy")} startsGroup>
+        <ControlRow
+          caption={t("datasetPreviewPlotColorBy")}
+          startsGroup
+          action={
+            <label className="paneCheckbox">
+              <input
+                type="checkbox"
+                checked={colorBySelf}
+                onChange={(event) => setColorBySelf(event.target.checked)}
+              />
+              {t("datasetPreviewPlotColorBySelf")}
+            </label>
+          }
+        >
           <VariablePicker
             label={t("datasetPreviewPlotColorBy")}
             choices={colorCandidates}

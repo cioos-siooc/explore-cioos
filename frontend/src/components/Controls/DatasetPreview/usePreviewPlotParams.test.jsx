@@ -514,6 +514,29 @@ describe("usePreviewPlotParams", () => {
       );
     });
 
+    it("draws one picked profile as a profile, keeping the section's colour", async () => {
+      openGlider("pstep=7");
+      expect(api.plan.orientation).toBe("columns");
+      expect(api.sharedAxis).toBe("pressure");
+      expect(api.panels).toEqual(["temperature"]);
+      expect(api.colorBySelf).toBe(false);
+      expect(api.colorAxes).toEqual(["temperature"]);
+      expect(param("pz")).toBeNull();
+    });
+
+    it("shades each panel by its own values on request, and back", async () => {
+      openGlider("pstep=7");
+      await run(() => api.setColorBySelf(true));
+      expect(param("pz")).toBe("*");
+      expect(api.colorBySelf).toBe(true);
+      expect(api.colorAxes).toEqual([]);
+      expect(api.colorColumns).toEqual(["temperature"]);
+
+      await run(() => api.setColorBySelf(false));
+      expect(param("pz")).toBeNull();
+      expect(api.colorAxes).toEqual(["temperature"]);
+    });
+
     it("keeps a depth the link names", () => {
       openGlider("pvars=depth");
       expect(api.panels).toEqual(["depth"]);

@@ -760,6 +760,33 @@ test("a colour column shades every panel, off one shared colour axis", () => {
   assert.ok(layout.coloraxis);
 });
 
+test("shaded by itself, each panel gets its own colour axis and legend", () => {
+  const panels = ["TE90_01", "PSAL_01", "FLOR_01"];
+  const { data, layout, colorLegends } = figureFrom(
+    VIKING_PALETTES,
+    "Profile",
+    panels,
+    { colorBySelf: true, scales: { PSAL_01: "KT_algae" } },
+  );
+  const axes = ["coloraxis", "coloraxis2", "coloraxis3"];
+  data.forEach((trace, index) => {
+    assert.equal(trace.marker.coloraxis, axes[index], `panel ${index}`);
+    assert.deepEqual(
+      trace.marker.color,
+      DATA.map((row) => row[panels[index]]),
+      `panel ${index}`,
+    );
+    // The colour IS the panel's value: no second hover line for it.
+    assert.ok(!trace.hovertemplate.includes("%{customdata}"));
+  });
+  axes.forEach((axis) => assert.equal(layout[axis].showscale, false));
+  assert.deepEqual(layout.coloraxis2.colorscale, paletteFor("KT_algae"));
+  assert.deepEqual(
+    colorLegends.map((legend) => legend.axis),
+    axes,
+  );
+});
+
 test("the scale is the layout's, so no trace carries one of its own", () => {
   const { data, layout } = colored(ALL_SIX);
   data.forEach((trace) => {

@@ -484,6 +484,9 @@ function contourTraceFor({
  *                      (the colour column filled under invisible markers)
  * @param colorAxis     column whose values shade EVERY panel, or null
  * @param colorScale    the user's scale for it, or null for the automatic one
+ * @param colorBySelf   each panel shaded by its own values instead, on a
+ *                      colour axis and legend of its own
+ * @param scales        { [columnName]: scale name } for colorBySelf
  * @param sharedTicks   { tickvals, ticktext } for a shared axis whose values are
  *                      ranks rather than a quantity, or null
  * @param sharedText    one string per row naming where that row is, or null
@@ -503,6 +506,8 @@ export function buildFigure({
   mode = "markers",
   colorAxis = null,
   colorScale = null,
+  colorBySelf = false,
+  scales = {},
   sharedTicks = null,
   sharedText = null,
   size = {},
@@ -527,12 +532,36 @@ export function buildFigure({
 
   // Decided here rather than taken on trust: a column with no numeric value in
   // it carries no ramp, and Plotly would ignore it in silence.
-  const colorVariable = colorAxis ? variablesByName.get(colorAxis) : undefined;
-  const colorDimension = colorDimensionFor(colorVariable, data);
-  const hasColorBar = Boolean(colorDimension);
-  const colorStops = hasColorBar
-    ? colorScaleForVariable(colorVariable, colorScale)
-    : null;
+  const shadeOf = (columnName, scale) => {
+    const variable = columnName ? variablesByName.get(columnName) : undefined;
+    const dimension = colorDimensionFor(variable, data);
+    return (
+      dimension && {
+        columnName,
+        dimension,
+        stops: colorScaleForVariable(variable, scale),
+      }
+    );
+  };
+  // ONE colour axis in the layout for a shared column, not one mapping per
+  // trace: Plotly ranges it across every trace that references it, so all the
+  // panels read against the one scale by construction. Self-shaded panels each
+  // get their own, numbered in panel order.
+  const sharedShade = colorBySelf ? null : shadeOf(colorAxis, colorScale);
+  let selfAxes = 0;
+  const panelShades = panels.map((columnName) => {
+    if (!colorBySelf) {
+      return sharedShade && { ...sharedShade, axis: "coloraxis" };
+    }
+    const shade = shadeOf(columnName, scales[columnName]);
+    if (!shade) return null;
+    selfAxes += 1;
+    return {
+      ...shade,
+      axis: selfAxes === 1 ? "coloraxis" : `coloraxis${selfAxes}`,
+    };
+  });
+  const hasColorBar = panelShades.some(Boolean);
   // The ramp's line is drawn by traces of its own — see previewColoredLine.js —
   // leaving the panel's trace the markers and the hover.
   const coloredLine = hasColorBar && mode.includes("lines");
@@ -616,21 +645,18 @@ export function buildFigure({
 
   if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
 
-  if (hasColorBar) {
-    // ONE colour axis in the layout, not one mapping per trace: Plotly ranges it
-    // across every trace that references it, so all the panels read against the
-    // one scale by construction.
-    //
-    // The range is stated rather than left to Plotly, because the legend beside
-    // the plot has to paint the same one.
-    layout.coloraxis = {
-      colorscale: colorStops,
-      ...(colorDimension.range
-        ? { cmin: colorDimension.range[0], cmax: colorDimension.range[1] }
+  // The range is stated rather than left to Plotly, because the legend beside
+  // the plot has to paint the same one.
+  panelShades.forEach((shade) => {
+    if (!shade || layout[shade.axis]) return;
+    layout[shade.axis] = {
+      colorscale: shade.stops,
+      ...(shade.dimension.range
+        ? { cmin: shade.dimension.range[0], cmax: shade.dimension.range[1] }
         : {}),
       showscale: false, // drawn outside the figure — see ColorScaleLegend.jsx
     };
-  }
+  });
 
   const sharedTitle = titleFor(sharedAxis);
   const tickOverride = rankTicksFor(sharedTicks, sharedLetter, plottingWidth);
@@ -667,6 +693,7 @@ export function buildFigure({
   const traces = panels.map((columnName, index) => {
     const domain = domains[index];
     const panelTitle = titleFor(columnName);
+    const shade = panelShades[index];
 
     layout[axisKey(panelLetter, index)] = {
       ...AXIS_LINE,
@@ -702,7 +729,8 @@ export function buildFigure({
       ? panels.includes(colorAxis)
       : colorAxis === columnName;
     const colorInHover =
-      hasColorBar &&
+      Boolean(shade) &&
+      !colorBySelf &&
       colorAxis !== sharedAxis &&
       !colorAlreadyPrinted &&
       (!arrangement.unifiedHover || index === 0);
@@ -714,7 +742,7 @@ export function buildFigure({
       !arrangement.unifiedHover && sharedText && sharedText.length;
 
     const fill =
-      hasColorBar &&
+      shade &&
       mode === CONTOUR_MODE &&
       contourTraceFor({
         variablesByName,
@@ -722,8 +750,8 @@ export function buildFigure({
         yColumn: sharedLetter === "y" ? sharedAxis : columnName,
         xValues: sharedLetter === "x" ? sharedValues : panelValues,
         yValues: sharedLetter === "y" ? sharedValues : panelValues,
-        dimension: colorDimension,
-        coloraxis: "coloraxis",
+        dimension: shade.dimension,
+        coloraxis: shade.axis,
         xref: sharedLetter === "x" ? "x" : axisRef("x", index),
         yref: sharedLetter === "y" ? "y" : axisRef("y", index),
         xPixels: plottingWidth * (panelLetter === "x" ? spanOf(domain) : 1),
@@ -731,13 +759,13 @@ export function buildFigure({
       });
     if (fill) fillTraces.push(fill);
 
-    if (coloredLine) {
+    if (shade && coloredLine) {
       coloredLineBinsFor({
         sharedValues,
         panelValues,
-        colorValues: colorDimension.values,
-        range: colorDimension.range,
-        stops: colorStops,
+        colorValues: shade.dimension.values,
+        range: shade.dimension.range,
+        stops: shade.stops,
         binLimit,
         fallbackColor: color,
       }).forEach((bin) =>
@@ -756,7 +784,7 @@ export function buildFigure({
 
     return {
       type: "scatter",
-      mode: coloredLine || mode === CONTOUR_MODE ? "markers" : mode,
+      mode: (shade && coloredLine) || mode === CONTOUR_MODE ? "markers" : mode,
       // Never drawn — <extra></extra> drops the box Plotly keeps it in — but
       // plain rather than wrapped: a <br> belongs to the panel that needed it.
       name: panelTitle,
@@ -776,10 +804,10 @@ export function buildFigure({
             : `${hoverLine(sharedAxis, `%{${sharedLetter}}`)}<br>${hoverLine(columnName, `%{${panelLetter}}`)}`) +
         (colorInHover ? `<br>${hoverLine(colorAxis, "%{customdata}")}` : "") +
         "<extra></extra>",
-      marker: hasColorBar
+      marker: shade
         ? {
-            color: colorDimension.values,
-            coloraxis: "coloraxis",
+            color: shade.dimension.values,
+            coloraxis: shade.axis,
             ...(mode.includes("markers") || (mode === CONTOUR_MODE && !fill)
               ? {}
               : { opacity: 0 }), // kept for the hover
@@ -787,7 +815,7 @@ export function buildFigure({
         : { color },
       line: { color },
       ...(positionInHover ? { text: sharedText } : {}),
-      ...(hasColorBar ? { customdata: colorDimension.hoverValues } : {}),
+      ...(shade ? { customdata: shade.dimension.hoverValues } : {}),
     };
   });
 
@@ -795,13 +823,17 @@ export function buildFigure({
   // over, so the strip above the plot and the markers cannot disagree about what
   // a colour means. Null when there is no colour column, which is what decides
   // whether the strip is rendered at all.
-  const colorLegend = hasColorBar
-    ? {
-        label: titleFor(colorAxis),
-        stops: colorStops,
-        ticks: legendTicksFor(colorDimension),
-      }
-    : null;
+  const legendOf = (shade) => ({
+    label: titleFor(shade.columnName),
+    stops: shade.stops,
+    ticks: legendTicksFor(shade.dimension),
+  });
+  const colorLegend = sharedShade ? legendOf(sharedShade) : null;
+  const colorLegends = colorBySelf
+    ? panelShades
+        .filter(Boolean)
+        .map((shade) => ({ ...legendOf(shade), axis: shade.axis }))
+    : undefined;
   layout.shapes = facetBoxesFor(panelLetter, panels.length);
   // First, so every panel's markers draw over its line.
   levelXTicks(layout, plottingWidth);
@@ -809,6 +841,7 @@ export function buildFigure({
     data: [...fillTraces, ...lineTraces, ...traces],
     layout,
     colorLegend,
+    colorLegends,
     pinnable: pinned,
   };
 }
