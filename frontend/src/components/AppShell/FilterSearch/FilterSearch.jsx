@@ -153,10 +153,14 @@ function GroupIcon({ groupKey, size = 14 }) {
   return Icon ? <Icon size={size} aria-hidden="true" /> : iconForKey(groupKey);
 }
 
+// Lists, menus, their triggers and popup dialogs (the date picker) take
+// typed letters and digits as typeahead.
 const isTypingTarget = (el) =>
   el instanceof Element &&
   (el.isContentEditable ||
-    el.closest("input, textarea, select, [contenteditable]") !== null);
+    el.closest(
+      "input, textarea, select, [contenteditable], [role=listbox], [role=menu], [role=dialog], [aria-haspopup]",
+    ) !== null);
 
 // Also opens on typing a letter or digit while no field has focus and no
 // dialog is up. Not symbols, which the map takes for zoom (+, -, =). The

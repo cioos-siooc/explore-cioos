@@ -94,6 +94,34 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-input")).toBeNull();
   });
 
+  it("leaves typeahead in a list, a list's trigger or a popup alone", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <button type="button" aria-haspopup="listbox">
+          Year
+        </button>
+        <div role="listbox" tabIndex={0} aria-label="Years" />
+        <div role="dialog" aria-label="Calendar">
+          <button type="button">Day</button>
+        </div>
+        <FiltersModal />
+      </>,
+      { providers: "app" },
+    );
+
+    for (const target of [
+      screen.getByRole("button", { name: "Year" }),
+      screen.getByRole("listbox"),
+      screen.getByRole("button", { name: "Day" }),
+    ]) {
+      target.focus();
+      await user.keyboard("19");
+    }
+
+    expect(screen.queryByTestId("filter-search-input")).toBeNull();
+  });
+
   it("leaves typing in a field inside a shadow root alone", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(<FiltersModal />, { providers: "app" });
