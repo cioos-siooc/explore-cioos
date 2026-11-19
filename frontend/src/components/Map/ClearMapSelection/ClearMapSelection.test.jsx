@@ -85,4 +85,30 @@ describe("ClearMapSelection", () => {
     expect(latestMap.featureQuery).toBeNull();
     expect(screen.queryByTestId("clear-map-selection")).not.toBeInTheDocument();
   });
+
+  it("clears the open dataset on Escape unless something nearer claims it", async () => {
+    renderWithProviders(
+      <>
+        <ClearMapSelection />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    await waitFor(() =>
+      expect(latestSelection.initialPointsQueryComplete).toBe(true),
+    );
+    act(() => latestSelection.setInspectDataset(latestSelection.pointsData[0]));
+    await screen.findByTestId("clear-map-selection");
+
+    const claimed = new KeyboardEvent("keydown", {
+      key: "Escape",
+      cancelable: true,
+    });
+    claimed.preventDefault();
+    act(() => window.dispatchEvent(claimed));
+    expect(latestSelection.inspectDataset).toBeTruthy();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(latestSelection.inspectDataset).toBeFalsy());
+  });
 });

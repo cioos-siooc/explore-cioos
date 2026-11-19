@@ -99,7 +99,10 @@ export default function TipCard({ inModal }) {
       role="status"
       data-testid="tip-card"
       onKeyDown={(e) => {
-        if (e.key === "Escape") dismissTip();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          dismissTip();
+        }
       }}
     >
       <div className="tipCardHeader">
