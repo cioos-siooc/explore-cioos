@@ -40,7 +40,7 @@
   font-variant-numeric: tabular-nums;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),

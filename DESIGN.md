@@ -9,7 +9,7 @@ colors:
   beach-sand: "#f3f0ec"
   white: "#fff"
   ink-80: "rgb(21 47 55 / 82%)"
-  ink-60: "rgb(21 47 55 / 62%)"
+  ink-60: "rgb(21 47 55 / 68%)"
   ink-40: "rgb(21 47 55 / 40%)"
   hairline: "#dce8e5"
   surface-wash: "#eef6f4"
@@ -178,7 +178,7 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 
 ### Neutral
 - **Deep Water Navy** (`deep-water-navy`): all body and heading text, the dark end of the hex ramp and the depth gradient.
-- **Ink 80 / 60 / 40**: navy at reduced alpha for secondary text (80 for small 12-14px text, 60 for larger or bolder secondary text, 40 for muted icons and disabled glyphs).
+- **Ink 80 / 60 / 40**: navy at reduced alpha for secondary text (80 for small 12-14px text, 60 for larger or bolder secondary text, 40 for muted icons and disabled glyphs). Ink 60 is the lightest text that still clears AA (4.5:1) on white, sand and surface wash; it does not on shallows.
 - **Beach Sand** (`beach-sand`): the warm ground under footers and quiet bands (e.g. the sidebar's Download footer).
 - **White** (`white`): every floating instrument's face, cards, modals, inputs.
 - **Hairline** (`hairline`): the 1px border between everything; sits between sand and shallows in tone.
