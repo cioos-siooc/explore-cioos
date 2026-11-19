@@ -48,6 +48,8 @@ describe("AppShell (composition)", () => {
   });
 
   it("states the selection count inside the Download button, not beside it", async () => {
+    // A returning visitor: the intro's modal would hide the page behind it.
+    window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<AppShell />, { providers: "app" });
     const footer = await screen.findByTestId("sidebar-footer");
     const button = screen.getByRole("button", { name: /Download/ });
@@ -141,7 +143,11 @@ describe("AppShell (composition)", () => {
       {},
       { timeout: 3000 },
     );
-    await user.click(screen.getByRole("button", { name: "Back to results" }));
+    // The palette stays open for more picks; the page is behind its backdrop.
+    await user.keyboard("{Escape}{Escape}");
+    await user.click(
+      await screen.findByRole("button", { name: "Back to results" }),
+    );
     await waitFor(() =>
       expect(screen.queryByTestId("sidebar-back")).toBeNull(),
     );

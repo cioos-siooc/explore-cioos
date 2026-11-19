@@ -30,6 +30,7 @@ import {
   labelFor,
   shortLabelFor,
 } from "../DatasetPreview/previewVariables.js";
+import topLayer from "../../ui/topLayer.js";
 
 const columnNameOf = (variable) => variable.columnName;
 
@@ -331,7 +332,7 @@ export default function VariablePicker({
                   : "datasetPreviewPlotAllVariablesSelected",
             )
           }
-          menuPortalTarget={document.body}
+          menuPortalTarget={topLayer()}
           menuPosition="fixed"
           styles={STYLES}
           // react-select skips its own handling of a key it sees prevented, which

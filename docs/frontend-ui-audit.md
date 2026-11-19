@@ -1,9 +1,10 @@
 # Frontend UI primitives audit
 
 Written 2026-11-18 to decide whether to replace the hand-built UI primitives
-with shadcn/ui or a newer alternative. Steps 1–5 of the
-[suggested order](#suggested-order) are in; every remaining step is tracked by
-the `eslint-disable` comments that name it (`grep -rn "frontend-ui-audit.md step" frontend/src`).
+with shadcn/ui or a newer alternative. All ten steps of the
+[suggested order](#suggested-order) are in; where a step left a control
+hand-built (the Rail, TipCard, NoticeToast), its entry says why, and the lint
+disables that remain say so in place.
 
 ## Goal
 
@@ -289,9 +290,24 @@ barely change.
    role, keys and pointer capture; its `role="slider"` keeps a justified
    disable. Initial JS: +22.4 kB gz (the date stack).
 10. Modal core → RAC `Modal` (sheet and Back-dismiss on top); NoticeToast; TipCard positioning
+    **Done for the Modal.** `ui/Modal.jsx` is RAC `ModalOverlay`/`Modal`/`Dialog`:
+    focus contained and handed back, Escape for the top dialog only, the page
+    behind locked and hidden from screen readers. The sheet drag, its exit slide
+    and Back-dismiss sit on top as before, and the hand-written Tab trap,
+    Escape listener and backdrop handler are gone. Only a press on the backdrop
+    itself dismisses (`shouldCloseOnInteractOutside`), so a tip card or a toast
+    over the page doesn't close the dialog. `role="dialog"` is now on
+    `.modal-content`; `data-testid` stays on the backdrop. A menu portalled out
+    of a dialog goes to `ui/topLayer.js` (`data-react-aria-top-layer`), or
+    react-aria would hide it too: the preview's variable pickers do. NoticeToast
+    stays: RAC's toast is still `UNSTABLE_` in 1.22. TipCard stays: it is a
+    status that never takes focus, sits in a dialog's DOM when it explains one,
+    and draws its own pointer to several targets, where a `Popover` positions
+    against one trigger and manages focus; its tour arrow keys and Escape keep
+    justified disables. Initial JS: +1.0 kB gz.
 
 Steps 1–5 fix every current accessibility gap. Each later step deletes a
-lint disable.
+lint disable or rewords it as a deliberate exception.
 
 ## Bundle
 

@@ -1,7 +1,11 @@
 import * as React from "react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useInRouterContext } from "react-router";
+import {
+  Dialog,
+  Modal as AriaModal,
+  ModalOverlay,
+} from "react-aria-components";
 import { useTranslation } from "react-i18next";
 
 import CloseButton from "./CloseButton.jsx";
@@ -20,10 +24,12 @@ const EXIT_BACKSTOP_MS = 1000;
 
 const ModalContext = createContext({ onHide: () => {} });
 
-// The open dialogs, oldest first. A help dialog can open over the one it
-// explains, and only the top one may answer Escape or own the body lock.
-const openModals = [];
+// How many are open: a help dialog can open over the one it explains, and the
+// body keeps its lock until the last one closes.
+let openCount = 0;
 
+// react-aria's ModalOverlay/Modal/Dialog: focus contained and given back on
+// close, Escape for the top dialog only, the page behind hidden and locked.
 // Emits Bootstrap-compatible class names so per-component CSS keeps applying.
 // On a phone, `sheet` makes it a bottom sheet: dragged down by its handle or
 // header, it slides out when closed and closes on Back (see useBackDismiss).
@@ -44,6 +50,7 @@ export default function Modal({
   sheet = false,
 }) {
   const contentRef = useRef(null);
+  const overlayRef = useRef(null);
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
   const asSheet = sheet && isMobile;
@@ -69,45 +76,14 @@ export default function Modal({
   // every render stole focus from inputs mid-word.
   useEffect(() => {
     if (!show) return undefined;
-    const previousFocus = document.activeElement;
-    openModals.push(contentRef);
+    openCount += 1;
     document.body.classList.add("cioos-modal-open");
-    (initialFocusRef?.current ?? contentRef.current)?.focus();
+    initialFocusRef?.current?.focus();
     return () => {
-      openModals.splice(openModals.indexOf(contentRef), 1);
-      if (openModals.length === 0)
-        document.body.classList.remove("cioos-modal-open");
-      previousFocus?.focus?.();
+      openCount -= 1;
+      if (openCount === 0) document.body.classList.remove("cioos-modal-open");
     };
   }, [show, initialFocusRef]);
-
-  useEffect(() => {
-    if (!show) return undefined;
-
-    function handleKeyDown(event) {
-      if (openModals.at(-1) !== contentRef) return;
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onHide();
-      } else if (event.key === "Tab") {
-        const focusables = contentRef.current?.querySelectorAll(
-          'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        if (!focusables || focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [show, onHide]);
 
   if (!mounted) return backDismiss || null;
 
@@ -126,56 +102,56 @@ export default function Modal({
   return (
     <>
       {backDismiss}
-      {createPortal(
-        <ModalContext.Provider value={{ onHide }}>
-          <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- docs/frontend-ui-audit.md step 10: Modal
-            className={[
-              "modal",
-              asSheet && "sheet",
-              !show && "sheetClosing",
-              className,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            data-testid={testId}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={ariaLabelledby}
-            aria-label={ariaLabel}
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) onHide();
-            }}
-          >
-            <div className={dialogClasses}>
-              <div
-                className="modal-content"
-                ref={contentRef}
-                tabIndex={-1}
-                onPointerDown={
-                  asSheet
-                    ? (event) => {
-                        if (event.target.closest(".sheetHandle, .modal-header"))
-                          startDrag(event);
-                      }
-                    : undefined
-                }
-                onTransitionEnd={(event) => {
-                  if (
-                    !show &&
-                    event.target === contentRef.current &&
-                    event.propertyName === "transform"
-                  )
-                    setMounted(false);
-                }}
-              >
-                {asSheet && <div className="sheetHandle" aria-hidden="true" />}
-                {children}
-              </div>
-            </div>
-          </div>
-        </ModalContext.Provider>,
-        document.body,
-      )}
+      <ModalOverlay
+        ref={overlayRef}
+        data-testid={testId}
+        isOpen
+        onOpenChange={(open) => open || onHide()}
+        isDismissable
+        // Only the backdrop: a tip card or a toast over the page is not "the
+        // page behind".
+        shouldCloseOnInteractOutside={(element) =>
+          element === overlayRef.current
+        }
+        className={[
+          "modal",
+          asSheet && "sheet",
+          !show && "sheetClosing",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <AriaModal className={dialogClasses}>
+          <ModalContext.Provider value={{ onHide }}>
+            <Dialog
+              className="modal-content"
+              ref={contentRef}
+              aria-labelledby={ariaLabelledby}
+              aria-label={ariaLabel}
+              onPointerDown={
+                asSheet
+                  ? (event) => {
+                      if (event.target.closest(".sheetHandle, .modal-header"))
+                        startDrag(event);
+                    }
+                  : undefined
+              }
+              onTransitionEnd={(event) => {
+                if (
+                  !show &&
+                  event.target === contentRef.current &&
+                  event.propertyName === "transform"
+                )
+                  setMounted(false);
+              }}
+            >
+              {asSheet && <div className="sheetHandle" aria-hidden="true" />}
+              {children}
+            </Dialog>
+          </ModalContext.Provider>
+        </AriaModal>
+      </ModalOverlay>
     </>
   );
 }

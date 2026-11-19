@@ -404,7 +404,7 @@ describe("DatasetPreviewPlot", () => {
         screen.queryByRole("dialog", { name: "Plot settings" }),
       ).toBeNull(),
     );
-    expect(gear).toHaveFocus();
+    await waitFor(() => expect(gear).toHaveFocus());
   });
 
   it("lets a finger pan the plot, with the pan tool kept to return to", async () => {

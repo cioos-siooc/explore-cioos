@@ -63,7 +63,7 @@ export default function TipCard({ inModal }) {
       event.preventDefault();
       stepTour(step);
     };
-    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 10: Popover
+    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- the tour's page-wide arrow keys, while a tip shows
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, stepTour]);
 
@@ -89,7 +89,7 @@ export default function TipCard({ inModal }) {
   // control it would jump into the flow whenever a search hid that control.
   const anchor = inModal ? undefined : targets[0];
   return (
-    <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- docs/frontend-ui-audit.md step 10: Popover
+    <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- Escape from the buttons inside a status that never takes focus itself
       className={classNames("tipCard", {
         tipCardInModal: inModal,
         tipCardAnchored: anchor,
