@@ -622,6 +622,13 @@
   text-decoration: underline;
 }
 
+/* The tag group and its list are react-aria's; the chips stay items of the
+   filter's own row. */
+.activeFilterTags,
+.activeFilterTagList {
+  display: contents;
+}
+
 .activeFilterItem {
   display: inline-flex;
   align-items: center;
@@ -634,6 +641,12 @@
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.activeFilterItem[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 .activeFilterItemLabel {
@@ -646,10 +659,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
 }
 
-.activeFilterItemLabel:hover {
+.activeFilterItem[data-hovered] .activeFilterItemLabel {
   text-decoration: underline;
 }
 
@@ -671,7 +683,7 @@
     color var(--cioos-transition-fast);
 }
 
-.activeFilterItemRemove:hover {
+.activeFilterItemRemove[data-hovered] {
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
 }
@@ -692,7 +704,7 @@
   color: var(--cioos-error-700);
 }
 
-.activeFilterItem.excluded .activeFilterItemRemove:hover {
+.activeFilterItem.excluded .activeFilterItemRemove[data-hovered] {
   background-color: var(--cioos-error);
 }
 

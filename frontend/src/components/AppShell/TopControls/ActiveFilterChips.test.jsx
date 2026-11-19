@@ -142,6 +142,26 @@ describe("ActiveFilterChips", () => {
     );
   });
 
+  it("drops the value in focus on Backspace, keeping focus among the chips", async () => {
+    const { user } = open("eovs=oxygen,subSurfaceTemperature");
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const [first] = within(group("eovs")).getAllByTestId("filter-chip-item");
+    first.focus();
+    await user.keyboard("{Backspace}");
+
+    await waitFor(() =>
+      expect(
+        within(group("eovs")).getAllByTestId("filter-chip-item"),
+      ).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(
+        within(group("eovs")).getByTestId("filter-chip-item"),
+      ).toHaveFocus(),
+    );
+  });
+
   it("clears a whole group from its trailing x", async () => {
     const { user } = open("eovs=oxygen&platforms=mooring");
     await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));

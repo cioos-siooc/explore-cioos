@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowCounterclockwise,
   BoundingBox,
@@ -17,6 +17,16 @@ import classNames from "classnames";
 
 import { server } from "../../../config.js";
 import { parseArea, useDebounce } from "../../../utilities.jsx";
+import {
+  Autocomplete,
+  Header,
+  Input,
+  ListBox,
+  ListBoxItem,
+  ListBoxSection,
+  SearchField,
+} from "../../ui/Autocomplete.jsx";
+import Button, { ToggleButton } from "../../ui/Button.jsx";
 import MatchHighlight from "../../ui/MatchHighlight.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
@@ -174,7 +184,7 @@ export function useFilterSearchShortcut(open) {
       e.preventDefault();
       open(e.key);
     }
-    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
+    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- a page-wide shortcut, not part of any control
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 }
@@ -212,15 +222,14 @@ function FilterSearchHelp({ showSpecies, onExample }) {
             </dt>
             <dd>
               {examples(row.help).map((example) => (
-                <button
+                <Button
                   key={example}
-                  type="button"
                   className="filterSearchHelpExample"
-                  onClick={() => onExample(example)}
+                  onPress={() => onExample(example)}
                   title={t("filterSearchHelpExampleTitle", { example })}
                 >
                   {example}
-                </button>
+                </Button>
               ))}
             </dd>
           </div>
@@ -243,8 +252,8 @@ export default function FilterSearch({
   const { obisDataAvailable, searchText, searchIn, setSearch } = useFilters();
   const { setOpenFilter, setShowFiltersModal } = useUI();
   const [canReset, resetAll] = useResetAllFilters();
-  const listId = useId();
-  const [activeIndex, setActiveIndex] = useState(0);
+  // The option in virtual focus, for the footer's key hints.
+  const [currentKey, setCurrentKey] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
@@ -371,14 +380,10 @@ export default function FilterSearch({
   const flat = shown.flatMap((group) =>
     group.options.map((option) => ({ group, option })),
   );
-  const active = Math.min(activeIndex, flat.length - 1);
-  const current = flat[active];
-
-  useEffect(() => {
-    document
-      .getElementById(`${listId}-${active}`)
-      ?.scrollIntoView?.({ block: "nearest" });
-  }, [listId, active]);
+  const optionKey = (group, option) => `${group.key}:${option.id}`;
+  const current = flat.find(
+    ({ group, option }) => optionKey(group, option) === currentKey,
+  );
 
   const targetFor = (option) =>
     exclude ? "exclude" : term ? "include" : option.state;
@@ -407,29 +412,21 @@ export default function FilterSearch({
     if (option.closes) setShowFiltersModal(false);
   }
 
-  function clearText() {
-    setText("");
-    setTouched(new Set());
-    setExpanded(new Set());
-    setActiveIndex(0);
+  // With no option in focus (nothing typed yet, or a paste, after which
+  // react-aria leaves focus unset), Enter takes the first.
+  function onKeyDown(e) {
+    if (e.key !== "Enter" || !flat.length) return;
+    if (e.currentTarget.getAttribute("aria-activedescendant")) return;
+    e.preventDefault();
+    const first = flat[0];
+    if (e.shiftKey && first.option.secondary) chooseSecondary(first.option);
+    else choose(first);
   }
 
-  function onKeyDown(e) {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (flat.length === 0) return;
-      const step = e.key === "ArrowDown" ? 1 : -1;
-      setActiveIndex((active + step + flat.length) % flat.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (e.shiftKey && current?.option.secondary)
-        chooseSecondary(current.option);
-      else if (current) choose(current);
-    } else if (e.key === "Escape" && text) {
-      // A first Escape empties the box; the next one is Modal's, and closes.
-      e.stopPropagation();
-      clearText();
-    }
+  function changeText(value) {
+    setText(value);
+    setTouched(new Set());
+    setExpanded(new Set());
   }
 
   return (
@@ -438,232 +435,139 @@ export default function FilterSearch({
       data-testid="filter-search"
     >
       <h3 className="filterOptionsTitle">{t("filterSearchLabel")}</h3>
-      <div
-        className={classNames("filterSearchField", { busy: places.loading })}
-      >
-        <Search size={16} aria-hidden="true" />
-        <input
-          ref={inputRef}
-          type="text"
-          role="combobox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
-          className="filterSearchInput"
-          data-testid="filter-search-input"
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setTouched(new Set());
-            setExpanded(new Set());
-            setActiveIndex(0);
-          }}
-          onKeyDown={onKeyDown}
-          placeholder={t("filterSearchPlaceholder")}
+      <Autocomplete inputValue={text} onInputChange={changeText}>
+        {/* A first Escape empties the box; the next one is Modal's, and
+            closes. */}
+        <SearchField
+          className={classNames("filterSearchField", {
+            busy: places.loading,
+          })}
           aria-label={t("filterSearchLabel")}
-          aria-autocomplete="list"
-          aria-expanded={flat.length > 0}
-          aria-controls={flat.length > 0 ? listId : undefined}
-          aria-activedescendant={current ? `${listId}-${active}` : undefined}
-          aria-busy={places.loading}
-        />
-        {text && (
-          <button
-            type="button"
-            className="filterSearchClear"
-            data-testid="filter-search-clear"
-            onClick={() => {
-              clearText();
-              inputRef.current?.focus();
-            }}
-            title={t("filterClearSearchTitle")}
-            aria-label={t("filterClearSearchTitle")}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        )}
-        <kbd className="filterSearchKey">Esc</kbd>
-      </div>
-      <div className="filterSearchResults">
-        {flat.length > 0 ? (
-          <div
-            id={listId}
-            role="listbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
-            className="filterSearchList"
-            aria-label={t("filterSearchLabel")}
-          >
-            {shown.map((group) => (
-              <div
-                key={group.key}
-                role="group"
-                aria-labelledby={`${listId}-${group.key}`}
-              >
-                <div
-                  id={`${listId}-${group.key}`}
-                  role="presentation"
-                  className="filterSearchGroupLabel"
-                >
-                  <GroupIcon groupKey={group.key} />
-                  {group.label}
-                  {group.shapes && (
-                    <span
-                      role="group"
-                      className="filterSearchGroupShapes"
-                      aria-label={t("regionSearchShape")}
-                    >
-                      {group.shapes.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          className="filterSearchGroupOpen"
-                          data-testid={`filter-search-region-${s.id}`}
-                          aria-pressed={s.pressed} // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={s.choose}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </span>
-                  )}
-                  {group.panelName && (
-                    <button
-                      type="button"
-                      className="filterSearchGroupOpen"
-                      data-testid="filter-search-open-panel"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setOpenFilter(group.panelName)}
-                      aria-label={t("filterSearchOpenInPanel", {
-                        filter: group.label,
-                      })}
-                    >
-                      {t("filterSearchAllOptions")}
-                      <ChevronRight size={12} aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-                {group.options.map((option) => {
-                  const i = flat.findIndex((f) => f.option === option);
-                  return (
-                    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- docs/frontend-ui-audit.md step 8: ComboBox
+        >
+          <Search size={16} aria-hidden="true" />
+          <Input
+            ref={inputRef}
+            className="filterSearchInput"
+            data-testid="filter-search-input"
+            placeholder={t("filterSearchPlaceholder")}
+            aria-busy={places.loading}
+            onKeyDown={onKeyDown}
+          />
+          {text && (
+            <Button
+              className="filterSearchClear"
+              data-testid="filter-search-clear"
+              title={t("filterClearSearchTitle")}
+              aria-label={t("filterClearSearchTitle")}
+            >
+              <X size={18} aria-hidden="true" />
+            </Button>
+          )}
+          <kbd className="filterSearchKey">Esc</kbd>
+        </SearchField>
+        <div className="filterSearchResults">
+          {flat.length > 0 ? (
+            <ListBox
+              className="filterSearchList"
+              aria-label={t("filterSearchLabel")}
+            >
+              {shown.map((group) => (
+                <ListBoxSection key={group.key} id={group.key}>
+                  <Header className="filterSearchGroupLabel">
+                    <GroupIcon groupKey={group.key} />
+                    {group.label}
+                    {group.shapes && (
+                      <span
+                        role="group"
+                        className="filterSearchGroupShapes"
+                        aria-label={t("regionSearchShape")}
+                      >
+                        {group.shapes.map((s) => (
+                          // Pressing one leaves focus in the box.
+                          <ToggleButton
+                            key={s.id}
+                            className="filterSearchGroupOpen"
+                            data-testid={`filter-search-region-${s.id}`}
+                            isSelected={s.pressed}
+                            onChange={s.choose}
+                            preventFocusOnPress
+                          >
+                            {s.label}
+                          </ToggleButton>
+                        ))}
+                      </span>
+                    )}
+                    {group.panelName && (
+                      <Button
+                        className="filterSearchGroupOpen"
+                        data-testid="filter-search-open-panel"
+                        onPress={() => setOpenFilter(group.panelName)}
+                        preventFocusOnPress
+                        aria-label={t("filterSearchOpenInPanel", {
+                          filter: group.label,
+                        })}
+                      >
+                        {t("filterSearchAllOptions")}
+                        <ChevronRight size={12} aria-hidden="true" />
+                      </Button>
+                    )}
+                  </Header>
+                  {group.options.map((option) => (
+                    <ListBoxItem
                       key={option.id}
-                      id={`${listId}-${i}`}
-                      role="option" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
-                      aria-selected={i === active}
+                      id={optionKey(group, option)}
+                      textValue={option.label}
                       className={classNames("filterSearchOption", {
-                        active: i === active,
                         shortcut: option.shortcut,
                       })}
                       data-testid="filter-search-option"
                       data-state={option.state ?? "none"}
-                      // Keeps focus in the box for consecutive picks.
-                      onMouseDown={(e) => e.preventDefault()}
-                      onMouseMove={() => setActiveIndex(i)}
-                      onClick={() => choose({ group, option })}
+                      onFocus={() => setCurrentKey(optionKey(group, option))}
+                      onPress={(e) =>
+                        e.shiftKey && option.secondary
+                          ? chooseSecondary(option)
+                          : choose({ group, option })
+                      }
                     >
-                      <span
-                        className="filterSearchOptionState"
-                        aria-hidden="true"
-                      >
-                        {option.icon && <option.icon size={14} />}
-                        {!option.command && (
-                          <OptionStateIcon
-                            isSelected={option.state === "include"}
-                            isExcluded={option.state === "exclude"}
-                          />
-                        )}
-                      </span>
-                      <span className="filterSearchOptionText">
-                        <span className="filterSearchOptionLabel">
-                          {option.state === "exclude" && (
-                            <span
-                              className="filterSearchOptionNot"
-                              aria-hidden="true"
-                            >
-                              {t("filterNotTag")}
-                            </span>
-                          )}
-                          {option.shortcut && (
-                            <span className="filterSearchOptionTag">
-                              {t("filterSearchCategoryTag")}
-                            </span>
-                          )}
-                          {group.key === "scientificName" ? (
-                            <MatchHighlight text={option.label} query={term} />
-                          ) : (
-                            option.label
-                          )}
-                          {option.hint && (
-                            <span className="filterSearchOptionHint">
-                              {group.key === "scientificName" ? (
-                                <MatchHighlight
-                                  text={option.hint}
-                                  query={term}
-                                />
-                              ) : (
-                                option.hint
-                              )}
-                            </span>
-                          )}
-                          <ExcludedLabel
-                            isExcluded={option.state === "exclude"}
-                          />
-                        </span>
-                        {option.description && (
-                          <span className="filterSearchOptionDescription">
-                            {option.description}
-                          </span>
-                        )}
-                      </span>
-                      <span className="filterSearchOptionAction">
-                        {actionLabel(option)}
-                      </span>
-                      {option.secondary && (
-                        <button
-                          type="button"
-                          className="filterSearchOptionSecondary"
-                          data-testid="filter-search-option-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            chooseSecondary(option);
-                          }}
-                          aria-label={`${option.secondary.label}: ${option.label}`}
-                        >
-                          <GeoAlt size={12} aria-hidden="true" />
-                          {option.secondary.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        ) : term ? (
-          <p className="filterSearchEmpty" role="status">
-            {t("filterSearchNoResults", { term })}
-          </p>
-        ) : (
-          <FilterSearchHelp
-            showSpecies={obisDataAvailable}
-            onExample={(example) => {
-              setText(example);
-              setTouched(new Set());
-              setActiveIndex(0);
-              inputRef.current?.focus();
-            }}
-          />
-        )}
-        {places.loading && (
-          <div role="status" className="filterSearchPending">
-            <span className="filterSearchGroupLabel">
-              <GroupIcon groupKey="region" />
-              {t("regionSearchGroup")}
-            </span>
-            <span className="filterSearchPendingText">
-              <Spinner size="sm" role={null} />
-              {t("regionSearchLoading")}
-            </span>
-          </div>
-        )}
-      </div>
+                      <FilterSearchOption
+                        group={group}
+                        option={option}
+                        term={term}
+                        actionLabel={actionLabel(option)}
+                        onSecondary={() => chooseSecondary(option)}
+                      />
+                    </ListBoxItem>
+                  ))}
+                </ListBoxSection>
+              ))}
+            </ListBox>
+          ) : term ? (
+            <p className="filterSearchEmpty" role="status">
+              {t("filterSearchNoResults", { term })}
+            </p>
+          ) : (
+            <FilterSearchHelp
+              showSpecies={obisDataAvailable}
+              onExample={(example) => {
+                changeText(example);
+                inputRef.current?.focus();
+              }}
+            />
+          )}
+          {places.loading && (
+            <div role="status" className="filterSearchPending">
+              <span className="filterSearchGroupLabel">
+                <GroupIcon groupKey="region" />
+                {t("regionSearchGroup")}
+              </span>
+              <span className="filterSearchPendingText">
+                <Spinner size="sm" role={null} />
+                {t("regionSearchLoading")}
+              </span>
+            </div>
+          )}
+        </div>
+      </Autocomplete>
       <footer className="filterSearchKeys" aria-hidden="true">
         <kbd className="filterSearchKey">↑↓</kbd>
         {t("filterSearchKeysNavigate")}
@@ -679,5 +583,67 @@ export default function FilterSearch({
         {t("filterSearchKeysClose")}
       </footer>
     </div>
+  );
+}
+
+function FilterSearchOption({ group, option, term, actionLabel, onSecondary }) {
+  const { t } = useTranslation();
+  const highlight = (text) =>
+    group.key === "scientificName" ? (
+      <MatchHighlight text={text} query={term} />
+    ) : (
+      text
+    );
+  return (
+    <>
+      <span className="filterSearchOptionState" aria-hidden="true">
+        {option.icon && <option.icon size={14} />}
+        {!option.command && (
+          <OptionStateIcon
+            isSelected={option.state === "include"}
+            isExcluded={option.state === "exclude"}
+          />
+        )}
+      </span>
+      <span className="filterSearchOptionText">
+        <span className="filterSearchOptionLabel">
+          {option.state === "exclude" && (
+            <span className="filterSearchOptionNot" aria-hidden="true">
+              {t("filterNotTag")}
+            </span>
+          )}
+          {option.shortcut && (
+            <span className="filterSearchOptionTag">
+              {t("filterSearchCategoryTag")}
+            </span>
+          )}
+          {highlight(option.label)}
+          {option.hint && (
+            <span className="filterSearchOptionHint">
+              {highlight(option.hint)}
+            </span>
+          )}
+          <ExcludedLabel isExcluded={option.state === "exclude"} />
+        </span>
+        {option.description && (
+          <span className="filterSearchOptionDescription">
+            {option.description}
+          </span>
+        )}
+      </span>
+      <span className="filterSearchOptionAction">{actionLabel}</span>
+      {option.secondary && (
+        <Button
+          className="filterSearchOptionSecondary"
+          data-testid="filter-search-option-secondary"
+          onPress={onSecondary}
+          preventFocusOnPress
+          aria-label={`${option.secondary.label}: ${option.label}`}
+        >
+          <GeoAlt size={12} aria-hidden="true" />
+          {option.secondary.label}
+        </Button>
+      )}
+    </>
   );
 }

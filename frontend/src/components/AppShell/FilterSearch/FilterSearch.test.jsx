@@ -123,7 +123,7 @@ describe("FilterSearch", () => {
     expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
     expect(box).toHaveValue("oxyg");
     expect(option("Oxygen")).toHaveAttribute("data-state", "include");
-    expect(option("Oxygen")).toHaveAttribute("aria-selected", "true");
+    expect(option("Oxygen")).toHaveAttribute("data-focused", "true");
 
     await user.keyboard("{Enter}");
     expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
@@ -474,7 +474,7 @@ describe("FilterSearch", () => {
 
     await user.type(box, "fundy");
     await screen.findByText("Bay of Fundy");
-    while (!option("Bay of Fundy").matches("[aria-selected=true]"))
+    while (!option("Bay of Fundy").matches("[data-focused]"))
       await user.keyboard("{ArrowDown}");
     await user.keyboard("{Shift>}{Enter}{/Shift}");
 

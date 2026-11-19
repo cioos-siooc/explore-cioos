@@ -264,6 +264,18 @@ barely change.
    dialog, the side pane) and keep `aria-expanded` on their button.
    Initial JS: +3.2 kB gz.
 8. FilterSearch → `ComboBox`/`Autocomplete`; chips → `TagGroup`
+   **Done:** the palette is RAC `Autocomplete` with a `SearchField` and a
+   sectioned `ListBox` (`ui/Autocomplete.jsx`): virtual focus, arrow keys,
+   scrolling and Escape-clears-then-closes come from react-aria, and the
+   hand-written key handler, ids and `aria-activedescendant` are gone. Each
+   option's `onPress` reads `shiftKey` for the place's "go to" action, and
+   `onFocus` feeds the footer's key hints. React-aria leaves no option in focus
+   after a paste (on purpose, for screen readers), so Enter with none in focus
+   still takes the first option, as before. The type-to-open listener stays as
+   a page shortcut with a justified disable. Each filter's value chips are a
+   `TagGroup` (`ui/TagGroup.jsx`): arrow keys between them, Backspace or Delete
+   removes the one in focus and focus stays among the chips; a press on a chip
+   opens its filter. Initial JS: +9.3 kB gz.
 9. Rail → `Slider`; TimeRail date → `DateField`
 10. Modal core → RAC `Modal` (sheet and Back-dismiss on top); NoticeToast; TipCard positioning
 

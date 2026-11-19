@@ -2,12 +2,15 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { X } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
+import classNames from "classnames";
 
 import useActiveFilters, {
   QUICK_FILTER_KEYS,
 } from "../../../state/useActiveFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
+import Button from "../../ui/Button.jsx";
+import { Tag, TagGroup, TagList } from "../../ui/TagGroup.jsx";
 
 // Short enough that a group's values stay on its label pill's row.
 const MAX_VISIBLE_VALUES = 2;
@@ -94,51 +97,68 @@ export default function ActiveFilterChips() {
                 <span className="activeFilterGroupLabelText">{f.label}</span>
               </button>
             </span>
-            {shownItems.map((item) => {
-              // The chip shows the "not" as its own tag instead.
-              const fullLabel = item.excluded
-                ? t("filterExcludedOption", { title: item.label })
-                : item.label;
-              return (
-                <span
-                  key={item.id}
-                  className={`activeFilterItem ${item.excluded ? "excluded" : ""}`}
-                  data-testid="filter-chip-item"
-                  data-item-id={item.id}
-                  data-excluded={Boolean(item.excluded)}
-                >
-                  {item.excluded && (
-                    <span className="activeFilterItemNot" aria-hidden="true">
-                      {t("filterNotTag")}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className="activeFilterItemLabel"
-                    data-testid="filter-chip-item-label"
-                    onClick={f.goToFilter}
-                    // The full value first: the label truncates.
-                    title={`${fullLabel}\n${t("activeFilterGoToFilterTitle", { filter: f.label })}`}
-                  >
-                    <span className="sr-only">
-                      {item.excluded && `${t("filterNotTag")} `}
-                    </span>
-                    {item.label}
-                  </button>
-                  <button
-                    type="button"
-                    className="activeFilterItemRemove"
-                    data-testid="filter-chip-item-remove"
-                    onClick={item.remove}
-                    title={t("activeFilterRemoveItemTitle")}
-                    // Unique per chip so tests and screen readers can tell them apart.
-                    aria-label={`${t("activeFilterRemoveItemTitle")}: ${fullLabel}`}
-                  >
-                    <X size={14} aria-hidden="true" />
-                  </button>
-                </span>
-              );
-            })}
+            <TagGroup
+              className="activeFilterTags"
+              aria-label={f.label}
+              onRemove={(keys) =>
+                f.items
+                  .filter((item) => keys.has(item.id))
+                  .forEach((item) => item.remove())
+              }
+            >
+              <TagList className="activeFilterTagList">
+                {shownItems.map((item) => {
+                  // The chip shows the "not" as its own tag instead.
+                  const fullLabel = item.excluded
+                    ? t("filterExcludedOption", { title: item.label })
+                    : item.label;
+                  return (
+                    <Tag
+                      key={item.id}
+                      id={item.id}
+                      textValue={fullLabel}
+                      className={classNames("activeFilterItem", {
+                        excluded: item.excluded,
+                      })}
+                      data-testid="filter-chip-item"
+                      data-item-id={item.id}
+                      data-excluded={Boolean(item.excluded)}
+                      onAction={f.goToFilter}
+                    >
+                      {item.excluded && (
+                        <span
+                          className="activeFilterItemNot"
+                          aria-hidden="true"
+                        >
+                          {t("filterNotTag")}
+                        </span>
+                      )}
+                      <span
+                        className="activeFilterItemLabel"
+                        data-testid="filter-chip-item-label"
+                        // The full value first: the label truncates.
+                        title={`${fullLabel}\n${t("activeFilterGoToFilterTitle", { filter: f.label })}`}
+                      >
+                        <span className="sr-only">
+                          {item.excluded && `${t("filterNotTag")} `}
+                        </span>
+                        {item.label}
+                      </span>
+                      <Button
+                        slot="remove"
+                        className="activeFilterItemRemove"
+                        data-testid="filter-chip-item-remove"
+                        title={t("activeFilterRemoveItemTitle")}
+                        // Unique per chip so tests and screen readers can tell them apart.
+                        aria-label={`${t("activeFilterRemoveItemTitle")}: ${fullLabel}`}
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </Button>
+                    </Tag>
+                  );
+                })}
+              </TagList>
+            </TagGroup>
             {hiddenCount > 0 && (
               <button
                 type="button"

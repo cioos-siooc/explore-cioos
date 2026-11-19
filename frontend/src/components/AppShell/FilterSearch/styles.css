@@ -109,12 +109,12 @@
   cursor: pointer;
 }
 
-.filterSearchClear:hover {
+.filterSearchClear[data-hovered] {
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink);
 }
 
-.filterSearchClear:focus-visible {
+.filterSearchClear[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -195,11 +195,11 @@
   cursor: pointer;
 }
 
-.filterSearchGroupOpen:hover {
+.filterSearchGroupOpen[data-hovered] {
   text-decoration: underline;
 }
 
-.filterSearchGroupOpen:focus-visible {
+.filterSearchGroupOpen[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -233,27 +233,28 @@
 }
 
 /* An outline, not a fill, so it stays visible over an applied row's colour. */
-.filterSearchOption.active {
+.filterSearchOption:is([data-focused], [data-hovered]) {
   background-color: var(--cioos-surface-2);
   box-shadow: inset 0 0 0 1px var(--cioos-primary-800);
 }
 
-.filterSearchPage.excluding .filterSearchOption.active {
+.filterSearchPage.excluding
+  .filterSearchOption:is([data-focused], [data-hovered]) {
   background-color: var(--cioos-error-bg);
   box-shadow: inset 0 0 0 1px var(--cioos-error-700);
 }
 
 .filterSearchPage.excluding
-  .filterSearchOption.active
+  .filterSearchOption:is([data-focused], [data-hovered])
   .filterSearchOptionAction {
   background-color: var(--cioos-error-700);
 }
 
-.filterSearchOption.active[data-state="include"] {
+.filterSearchOption:is([data-focused], [data-hovered])[data-state="include"] {
   background-color: var(--cioos-teal-light);
 }
 
-.filterSearchOption.active[data-state="exclude"] {
+.filterSearchOption:is([data-focused], [data-hovered])[data-state="exclude"] {
   background-color: var(--cioos-error-bg);
 }
 
@@ -335,7 +336,8 @@
   content: "↵ " / "";
 }
 
-.filterSearchOption.active .filterSearchOptionAction {
+.filterSearchOption:is([data-focused], [data-hovered])
+  .filterSearchOptionAction {
   visibility: visible;
 }
 
@@ -355,7 +357,7 @@
   cursor: pointer;
 }
 
-.filterSearchOptionSecondary:hover {
+.filterSearchOptionSecondary[data-hovered] {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-teal-light);
 }
@@ -424,8 +426,8 @@
   cursor: pointer;
 }
 
-.filterSearchHelpExample:hover,
-.filterSearchHelpExample:focus-visible {
+.filterSearchHelpExample[data-hovered],
+.filterSearchHelpExample[data-focus-visible] {
   border-color: var(--cioos-primary-800);
   background-color: var(--cioos-teal-light);
 }
