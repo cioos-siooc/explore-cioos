@@ -21,7 +21,6 @@ test("the preview owns the record param and the plot params", () => {
     "pz",
     "pzscale",
     "pzscales",
-    "pzrows",
     "pzshare",
     "pstack",
     "pyflip",

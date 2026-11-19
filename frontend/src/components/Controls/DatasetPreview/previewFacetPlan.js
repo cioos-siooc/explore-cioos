@@ -90,6 +90,20 @@ const TRACK_AXIS_COLUMNS = [
   TOTAL_DISTANCE_TRAVELED_COLUMN,
   EUCLIDEAN_DISTANCE_COLUMN,
 ];
+// Time or a track: the axes a record runs along.
+export const isAlongAxis = (variable) =>
+  Boolean(variable) &&
+  (TRACK_AXIS_COLUMNS.includes(variable.columnName) || isTimeLike(variable));
+
+// Several colour columns repeat the panels down when time or a track runs
+// across them (wide plots), across when a depth runs down them (tall ones),
+// otherwise as the cdm_data_type's layout says.
+export function colorRowsFor(plan, xVariables, yVariables) {
+  if (xVariables.some(isAlongAxis)) return true;
+  if (yVariables.some(isDownwardVertical)) return false;
+  return Boolean(plan && plan.colorRows);
+}
+
 const trackLeadingAxes = (variables) =>
   TRACK_AXIS_COLUMNS.map((columnName) =>
     find(variables, (variable) => variable.columnName === columnName),
@@ -107,8 +121,9 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // out of pointing the shared axis at a measurement.
 //
 // `colorRows` stacks several colour columns as rows of the panel grid rather
-// than columns. `section` opens a record of many profiles as a section: time
-// (else its track) across, depth down, shaded by its EOVs.
+// than columns when the axes drawn do not decide it (colorRowsFor). `section` opens a record of many profiles as a section: time
+// (else its track) across, depth down, shaded by its EOVs. `defaultMode` is the
+// plot type it opens in: a line joining a section's casts zigzags across it.
 const CDM_LAYOUTS = {
   Profile: {
     defaultPanelCount: 3,
@@ -124,6 +139,7 @@ const CDM_LAYOUTS = {
     leadingAxesFor: timeLeadingAxis,
     colorRows: true,
     section: true,
+    defaultMode: "markers",
   },
   TrajectoryProfile: {
     defaultPanelCount: 3,
@@ -133,6 +149,7 @@ const CDM_LAYOUTS = {
     leadingAxesFor: trackLeadingAxes,
     colorRows: true,
     section: true,
+    defaultMode: "markers",
   },
   TimeSeries: {
     defaultPanelCount: 3,
@@ -511,6 +528,7 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
     panelDefaults,
     colorDefaults: [],
     colorRows: Boolean(layoutFor(dataset)?.colorRows),
+    defaultMode: layoutFor(dataset)?.defaultMode ?? null,
   };
 }
 

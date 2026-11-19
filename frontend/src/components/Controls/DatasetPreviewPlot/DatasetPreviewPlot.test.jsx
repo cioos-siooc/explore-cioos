@@ -411,6 +411,7 @@ describe("DatasetPreviewPlot", () => {
   it("captions the colour scales once, with one picker each until shared", async () => {
     const user = open("/?pz=salinity,time&pmode=markers");
     await waitFor(() => expect(traceCount()).toBe(2));
+    await user.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getAllByText("Color scale")).toHaveLength(1);
     const row = rowCaptioned("Color scale");
     expect(row.querySelectorAll(".colorScaleItem")).toHaveLength(2);
@@ -422,27 +423,10 @@ describe("DatasetPreviewPlot", () => {
     expect(row.querySelectorAll(".colorScaleChip").length).toBeGreaterThan(0);
   });
 
-  it("offers the panels' direction only once there are several", async () => {
-    const user = open();
-    await plotted();
+  it("offers no panel direction control", async () => {
+    open("/?pz=salinity,time&pmode=markers");
+    await waitFor(() => expect(traceCount()).toBe(2));
     expect(screen.queryByText("Panels")).not.toBeInTheDocument();
-
-    await user.click(variableSearch("X axis"));
-    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
-    const row = await waitFor(() => rowCaptioned("Panels"));
-    expect(
-      within(row).getByRole("button", { name: "Side by side" }),
-    ).toHaveAttribute("aria-pressed", "true");
-
-    await user.click(within(row).getByRole("button", { name: "Stacked" }));
-    await waitFor(() =>
-      expect(screen.getByTestId("plotly")).toHaveAttribute(
-        "data-hovermode",
-        "x",
-      ),
-    );
-    expect(rowCaptioned("Y axis")).toHaveTextContent("temperature");
-    expect(rowCaptioned("X axis")).toHaveTextContent("depth");
   });
 
   it("moves the panels to the other axis when it takes a second variable", async () => {
@@ -570,20 +554,17 @@ describe("DatasetPreviewPlot", () => {
     expect(screen.queryByTestId("plotly")).not.toBeInTheDocument();
   });
 
-  it("switches the mode every panel is drawn in with one click", async () => {
+  it("switches the mode every panel is drawn in from its menu", async () => {
     const user = open();
     await plotted();
-    expect(
-      screen.getByRole("button", { name: "Markers + Line" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Markers + Line" }));
     await user.click(screen.getByRole("button", { name: "Markers" }));
     expect(screen.getByRole("button", { name: "Markers" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+      "aria-haspopup",
     );
     expect(
-      screen.getByRole("button", { name: "Markers + Line" }),
-    ).toHaveAttribute("aria-pressed", "false");
+      screen.queryByRole("button", { name: "Markers + Line" }),
+    ).not.toBeInTheDocument();
   });
 
   it("resets every plot setting and rename, disabled until there is one", async () => {
@@ -599,7 +580,7 @@ describe("DatasetPreviewPlot", () => {
     );
     expect(
       screen.getByRole("button", { name: "Markers + Line" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("temperature (degree_C)")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Reset plot" })).toBeDisabled();
   });
@@ -607,6 +588,7 @@ describe("DatasetPreviewPlot", () => {
   it("reveals the colour scale once a colour column is picked", async () => {
     const user = open();
     await plotted();
+    await user.click(screen.getByRole("button", { name: "More options" }));
     await user.click(variableSearch("Color by"));
     await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
     await waitFor(() =>
@@ -616,6 +598,8 @@ describe("DatasetPreviewPlot", () => {
 
   it("turns the colour column back off from its pill", async () => {
     const user = open("/?pz=salinity");
+    await plotted();
+    await user.click(screen.getByRole("button", { name: "More options" }));
     await waitFor(() =>
       expect(screen.getByText("Color scale")).toBeInTheDocument(),
     );

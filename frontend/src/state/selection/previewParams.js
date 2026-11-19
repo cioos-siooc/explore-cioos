@@ -68,10 +68,6 @@ export function parsePeriod(value) {
 //            `column~Scale` comma-separated
 //                                  (default: its own colorBarPalette, else
 //                                  Viridis — and never a rainbow)
-//   pzrows   1 | 0: several colour variables repeat the panels as rows
-//            (1) or as columns (0)
-//                                  (default: rows for TimeSeriesProfile
-//                                  and TrajectoryProfile, columns otherwise)
 //   pzshare  1: every colour variable in the first one's scale
 //                                  (default: each in its own)
 //   pstack   1: the panel variables on ONE plot, each on its own axis in its
@@ -100,7 +96,6 @@ export const PLOT_PARAMS = [
   "pz",
   "pzscale",
   "pzscales",
-  "pzrows",
   "pzshare",
   "pstack",
   "pyflip",

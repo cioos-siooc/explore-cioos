@@ -6,6 +6,7 @@ import {
   axisDirectionsFor,
   colocatedVerticalFor,
   colorCandidatesFor,
+  colorRowsFor,
   facetPlanFor,
   panelCandidatesFor,
   plotBlockerFor,
@@ -47,6 +48,7 @@ test("a profile faces across, sharing a reversed depth axis", () => {
   assert.equal(plan.sharedAxis, "depth");
   assert.equal(plan.sharedReversed, true);
   assert.deepEqual(plan.colorDefaults, []);
+  assert.equal(plan.defaultMode, null);
 });
 
 test("a record of many profiles opens as a section: time across, depth down, shaded by its EOVs", () => {
@@ -57,6 +59,7 @@ test("a record of many profiles opens as a section: time across, depth down, sha
     assert.deepEqual(plan.panelDefaults, ["depth"], type);
     assert.deepEqual(plan.colorDefaults, ["TE90_01"], type);
     assert.equal(plan.colorRows, true, type);
+    assert.equal(plan.defaultMode, "markers", type);
   }
 });
 
@@ -852,4 +855,20 @@ test("without an EOV, weather columns give way to the ocean ones", () => {
     variablesFrom(table, dataset),
   ).panelDefaults;
   assert.notEqual(first, "TE90_01");
+});
+
+test("colour repeats follow the axes drawn, then the cdm_data_type", () => {
+  const time = { columnName: "time", standardName: "time" };
+  const track = { columnName: POSITION_INDEX_COLUMN };
+  const depth = { columnName: "depth", standardName: "depth" };
+  const temperature = { columnName: "TEMP" };
+  const salinity = { columnName: "PSAL" };
+  const across = { colorRows: false };
+  const down = { colorRows: true };
+
+  assert.equal(colorRowsFor(across, [time], [depth]), true);
+  assert.equal(colorRowsFor(across, [track], [temperature]), true);
+  assert.equal(colorRowsFor(down, [temperature], [depth]), false);
+  assert.equal(colorRowsFor(down, [temperature], [salinity]), true);
+  assert.equal(colorRowsFor(across, [temperature], [salinity]), false);
 });

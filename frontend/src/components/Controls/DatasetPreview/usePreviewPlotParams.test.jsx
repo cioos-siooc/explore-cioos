@@ -378,55 +378,23 @@ describe("usePreviewPlotParams", () => {
     });
   });
 
-  describe("facet direction", () => {
-    it("offers no direction for a single panel", () => {
-      open();
-      expect(api.facetCount).toBe(1);
+  describe("colour repeats", () => {
+    it("lay across when a depth runs down the panels", () => {
+      open("pz=salinity,temperature&pzrows=1");
+      expect(api.plan.colorRows).toBe(false);
     });
 
-    it("turns side-by-side panels into stacked ones by swapping the axes", async () => {
-      open("pvars=temperature,salinity");
-      expect(api.facetDirection).toBe("across");
-      const before = api.uirevision;
-
-      await run(() => api.setFacetDirection("down"));
-      expect(param("porient")).toBe("rows");
-      expect(api.facetDirection).toBe("down");
-      expect(api.panels).toEqual(["temperature", "salinity"]);
-      expect(api.sharedAxis).toBe("depth");
-      expect(api.uirevision).not.toBe(before);
-
-      await run(() => api.setFacetDirection("across"));
-      expect(param("porient")).toBeNull();
-    });
-
-    it("reads several shared axes as running the other way", () => {
-      open("paxis=depth,time");
-      expect(api.facetDirection).toBe("down");
-    });
-
-    it("lays colour repeats across or down without moving the axes", async () => {
-      open("pz=salinity,temperature");
-      expect(api.facetDirection).toBe("across");
-
-      await run(() => api.setFacetDirection("down"));
-      expect(param("pzrows")).toBe("1");
-      expect(param("porient")).toBeNull();
+    it("stack when time runs across the panels", () => {
+      open("porient=rows&paxis=time&pvars=temperature&pz=salinity,depth");
       expect(api.plan.colorRows).toBe(true);
-
-      await run(() => api.setFacetDirection("across"));
-      expect(param("pzrows")).toBeNull();
     });
 
-    it("writes the way back from a type that stacks its colour repeats", async () => {
+    it("stack for a section, time across and depth down", () => {
       renderWithProviders(
         <Probe dataset={{ ...DATASET, cdm_data_type: "TimeSeriesProfile" }} />,
         { url: "/?pz=salinity,temperature" },
       );
-      expect(api.facetDirection).toBe("down");
-      await run(() => api.setFacetDirection("across"));
-      expect(param("pzrows")).toBe("0");
-      expect(api.plan.colorRows).toBe(false);
+      expect(api.plan.colorRows).toBe(true);
     });
   });
 
@@ -549,6 +517,16 @@ describe("usePreviewPlotParams", () => {
     it("keeps a depth the link names", () => {
       openGlider("pvars=depth");
       expect(api.panels).toEqual(["depth"]);
+    });
+
+    it("opens in markers, and keeps that default out of the link", async () => {
+      openGlider("");
+      expect(api.plotType).toBe("markers");
+
+      await run(() => api.setPlotType("markers+lines"));
+      expect(param("pmode")).toBe("markers+lines");
+      await run(() => api.setPlotType("markers"));
+      expect(param("pmode")).toBeNull();
     });
 
     it("offers a contour on the section, and draws it from the link", () => {

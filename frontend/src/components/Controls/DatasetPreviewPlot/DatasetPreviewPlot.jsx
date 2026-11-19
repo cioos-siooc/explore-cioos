@@ -10,6 +10,7 @@ import {
   Gear,
   QuestionCircle,
 } from "react-bootstrap-icons";
+import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import HelpModal from "../../ui/HelpModal.jsx";
 import Modal from "../../ui/Modal.jsx";
 import PaneDivider from "../../ui/PaneDivider.jsx";
@@ -77,11 +78,7 @@ import {
 } from "../DatasetPreview/previewColors.js";
 import { autoScaleNameFor } from "../DatasetPreview/previewColorScales.js";
 import { POSITION_INDEX_COLUMN } from "../DatasetPreview/previewTrackIndex.js";
-import {
-  MAX_COLOR_PANELS,
-  ACROSS,
-  DOWN,
-} from "../DatasetPreview/usePreviewPlotParams.js";
+import { MAX_COLOR_PANELS } from "../DatasetPreview/usePreviewPlotParams.js";
 import { usePreviewPlot } from "../DatasetPreview/PreviewPlotProvider.jsx";
 import { ROW_LIMITS } from "../../../state/selection/previewParams.js";
 
@@ -131,9 +128,6 @@ export default function DatasetPreviewPlot() {
     setColorAxes,
     stacked,
     setStacked,
-    facetCount,
-    facetDirection,
-    setFacetDirection,
     variableScales,
     setVariableScale,
     colorColumns,
@@ -685,16 +679,25 @@ export default function DatasetPreviewPlot() {
   const paneControls = (
     <>
       <ControlRow caption={t("plotType")}>
-        <SegmentedToggle
-          label={t("plotType")}
-          data-testid="preview-mode-toggle"
-          options={plotModes.map(({ value, labelKey }) => ({
-            value,
-            label: t(labelKey),
-          }))}
-          value={plotType}
-          onChange={setPlotType}
-        />
+        <DropdownButton
+          className="dropdownButtonLeft"
+          data-testid="preview-mode-picker"
+          title={
+            <span className="dropdownToggleLabel">
+              {t(plotModes.find(({ value }) => value === plotType).labelKey)}
+            </span>
+          }
+        >
+          {plotModes.map(({ value, labelKey }) => (
+            <Dropdown.Item
+              key={value}
+              active={value === plotType}
+              onClick={() => setPlotType(value)}
+            >
+              {t(labelKey)}
+            </Dropdown.Item>
+          ))}
+        </DropdownButton>
       </ControlRow>
 
       {sharedIsX ? (
@@ -721,23 +724,6 @@ export default function DatasetPreviewPlot() {
             onChange={setColorAxes}
             isMulti={panels.length <= 1 && sharedAxes.length <= 1}
             maxSelected={MAX_COLOR_PANELS}
-          />
-        </ControlRow>
-      )}
-
-      {colorScaleRow}
-
-      {facetCount > 1 && (
-        <ControlRow caption={t("datasetPreviewPlotFacets")}>
-          <SegmentedToggle
-            label={t("datasetPreviewPlotFacets")}
-            data-testid="preview-facet-toggle"
-            options={[
-              { value: ACROSS, label: t("datasetPreviewPlotFacetsAcross") },
-              { value: DOWN, label: t("datasetPreviewPlotFacetsDown") },
-            ]}
-            value={facetDirection}
-            onChange={setFacetDirection}
           />
         </ControlRow>
       )}
@@ -790,6 +776,7 @@ export default function DatasetPreviewPlot() {
               onChange={(value) => setStacked(value === "stacked")}
             />
           </ControlRow>
+          {colorScaleRow}
           {sharedAxes.map((columnName) => customizeRow(columnName, null))}
           {panels.map((columnName, index) => customizeRow(columnName, index))}
         </div>

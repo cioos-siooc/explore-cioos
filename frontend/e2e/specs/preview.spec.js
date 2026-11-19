@@ -75,29 +75,27 @@ test.describe("record preview", () => {
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);
 
-    const mode = (name) =>
-      page
-        .getByTestId("preview-mode-toggle")
-        .getByRole("button", { name, exact: true });
+    const mode = page.getByTestId("preview-mode-picker-toggle");
+    const pick = async (name) => {
+      await mode.click();
+      await page
+        .locator(".dropdown-menu")
+        .getByRole("button", { name, exact: true })
+        .click();
+    };
 
-    await expect(mode("Markers + Line")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await mode("Markers").click();
+    await expect(mode).toHaveText("Markers + Line");
+    await pick("Markers");
 
-    await expect(mode("Markers")).toHaveAttribute("aria-pressed", "true");
+    await expect(mode).toHaveText("Markers");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBe("markers");
 
     // Back to the default and the param goes, rather than being pinned at it.
-    await mode("Markers + Line").click();
+    await pick("Markers + Line");
 
-    await expect(mode("Markers + Line")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(mode).toHaveText("Markers + Line");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBeNull();
@@ -108,11 +106,9 @@ test.describe("record preview", () => {
   }) => {
     await openPreview(page, "&pmode=lines");
     await expect(plot(page).first()).toBeVisible();
-    const lineMode = page
-      .getByTestId("preview-mode-toggle")
-      .getByRole("button", { name: "Line", exact: true });
+    const mode = page.getByTestId("preview-mode-picker-toggle");
     await showSettings(page);
-    await expect(lineMode).toHaveAttribute("aria-pressed", "true");
+    await expect(mode).toHaveText("Line");
     await closeSettings(page);
 
     await page.getByRole("button", { name: "Table" }).click();
@@ -121,7 +117,7 @@ test.describe("record preview", () => {
 
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);
-    await expect(lineMode).toHaveAttribute("aria-pressed", "true");
+    await expect(mode).toHaveText("Line");
   });
 
   test("closing clears the record and every plot param with it", async ({
