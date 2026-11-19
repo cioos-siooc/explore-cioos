@@ -78,6 +78,8 @@ export default function DatasetsTable({
   handleSelectDataset,
   datasets,
   selectAll,
+  selectAllMixed,
+  selectAllDisabled,
   setInspectDataset,
   setHoveredDataset = () => {},
   isDownloadModal,
@@ -615,6 +617,10 @@ export default function DatasetsTable({
             <input
               type="checkbox"
               checked={selectAll}
+              disabled={selectAllDisabled}
+              ref={(input) => {
+                if (input) input.indeterminate = Boolean(selectAllMixed);
+              }}
               onChange={handleSelectAllDatasets}
             />
             {t("datasetsTableHeaderSelectAllTitle")}

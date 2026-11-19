@@ -2,6 +2,7 @@ import * as React from "react";
 import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
+import { ExclamationCircle } from "react-bootstrap-icons";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DownloadFormat from "./DownloadFormat.jsx";
@@ -55,7 +56,6 @@ export default function DownloadDetails({
   const { t } = useTranslation();
   const { areaPlace } = useSelection();
   const { packageFormat } = useDownload();
-  const [selectAll, setSelectAll] = useState(true);
   const [pointsData, setPointsData] = useState(
     pointsToReview
       // Griddap is metadata-only and must never reach the estimate/queue flow.
@@ -232,19 +232,38 @@ export default function DownloadDetails({
     setPointsData(result);
   }
 
+  const selectedCount = pointsData.filter((point) => point.selected).length;
+  const selectableCount = pointsData.filter(
+    (point) => !point.downloadDisabled,
+  ).length;
+  const overLimitCount = pointsData.length - selectableCount;
+  const allSelectableSelected =
+    selectableCount > 0 && selectedCount === selectableCount;
+
   function handleSelectAllDatasets() {
     setPointsData(
-      pointsData.map((p) => {
-        return {
-          ...p,
-          selected: p.downloadDisabled === false ? !selectAll : false,
-        };
-      }),
+      pointsData.map((p) => ({
+        ...p,
+        selected: !p.downloadDisabled && !allSelectableSelected,
+      })),
     );
-    setSelectAll(!selectAll);
   }
 
-  const selectedCount = pointsData.filter((point) => point.selected).length;
+  // Rows stay unticked when the estimate failed: the queue needs a size.
+  const estimatesFailed = !estimatesLoading && !downloadSizeEstimates;
+  const showSize = estimatesLoading || estimatesFailed || selectedCount > 0;
+  // The estimates reach the rows an effect later; until then nothing is ticked.
+  const rowsSized =
+    Boolean(downloadSizeEstimates) &&
+    pointsData.every((point) => point.sizeEstimate);
+  const blockedReason =
+    (estimatesFailed || rowsSized) &&
+    selectedCount === 0 &&
+    (estimatesFailed
+      ? t("downloadBlockedNoEstimate")
+      : selectableCount === 0
+        ? t("downloadBlockedAllOverLimit", { count: overLimitCount })
+        : t("downloadBlockedNoneSelected"));
   // Includes datasets the 1 GB ceiling deselected: the queue refuses them, and
   // the source queries have no ceiling. `!== false` because `selected` is unset until
   // the estimates land.
@@ -312,12 +331,18 @@ export default function DownloadDetails({
                 total: pointsData.length,
               })}
         </strong>
-        <span aria-hidden="true">{" · "}</span>
+        {!estimatesLoading && overLimitCount > 0 && (
+          <span className="downloadSummaryOverLimit">
+            {" "}
+            {t("downloadSummaryOverLimit", { count: overLimitCount })}
+          </span>
+        )}
+        {showSize && <span aria-hidden="true">{" · "}</span>}
         {estimatesLoading ? (
           <span className="downloadSummaryMuted">
             {t("downloadSummaryEstimating")}
           </span>
-        ) : Number.isFinite(dataTotal.filteredSize) ? (
+        ) : !showSize ? null : Number.isFinite(dataTotal.filteredSize) ? (
           <>
             <strong
               title={
@@ -380,7 +405,9 @@ export default function DownloadDetails({
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
-            selectAll={selectAll}
+            selectAll={allSelectableSelected}
+            selectAllMixed={selectedCount > 0 && !allSelectableSelected}
+            selectAllDisabled={!estimatesLoading && selectableCount === 0}
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
@@ -391,6 +418,12 @@ export default function DownloadDetails({
       </div>
 
       <div className="downloadFooter">
+        {blockedReason && (
+          <p className="downloadBlockedReason" data-testid="download-blocked">
+            <ExclamationCircle size={14} aria-hidden="true" />
+            {blockedReason}
+          </p>
+        )}
         {children}
         <DownloadLinks
           count={linkableDatasets.length}

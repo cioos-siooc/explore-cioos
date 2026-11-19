@@ -195,11 +195,18 @@
   color: var(--cioos-ink-60);
 }
 
+.downloadSummaryOverLimit {
+  font-weight: 600;
+  color: var(--cioos-error-700);
+}
+
 .downloadVariablesNote {
   flex-basis: 100%;
   margin: 0;
-  font-size: var(--cioos-font-size-xs);
+  max-width: 68ch;
+  font-size: var(--cioos-font-size-sm);
   line-height: 1.4;
+  text-wrap: pretty;
   color: var(--cioos-ink-80);
 }
 
@@ -210,6 +217,27 @@
   flex: 0 0 auto;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-sand);
+}
+
+/* Spans both exits: it says why the email one is shut and points at the other. */
+.downloadBlockedReason {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+  padding: 12px 16px 0;
+  max-width: 72ch;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.4;
+  color: var(--cioos-ink);
+  text-wrap: pretty;
+}
+
+.downloadBlockedReason svg {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--cioos-error-700);
 }
 
 .downloadSubmit,
