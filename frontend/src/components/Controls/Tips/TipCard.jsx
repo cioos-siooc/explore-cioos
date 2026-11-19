@@ -101,8 +101,6 @@ export default function TipCard({ inModal }) {
       onKeyDown={(e) => {
         if (e.key === "Escape") dismissTip();
       }}
-      // Stepping the tour shouldn't count as an outside click (useOutsideAlerter).
-      onMouseDown={inModal ? (e) => e.stopPropagation() : undefined}
     >
       <div className="tipCardHeader">
         <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />

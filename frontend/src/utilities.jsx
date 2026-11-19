@@ -889,21 +889,6 @@ export function useChanged(...values) {
   return true;
 }
 
-// https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
-export function useOutsideAlerter(ref, callback, value) {
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (ref.current && !ref.current.contains(event.target)) {
-        callback(value);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 4: Popover
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [ref, callback, value]);
-}
-
 export function getCookieValue(cookieName) {
   if (document.cookie.includes(cookieName)) {
     return document.cookie

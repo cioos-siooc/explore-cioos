@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   ChevronCompactDown,
   ChevronCompactUp,
@@ -8,16 +8,13 @@ import {
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
-import {
-  abbreviateString,
-  useChanged,
-  useOutsideAlerter,
-  useSearchInput,
-} from "../../../utilities";
+import { abbreviateString, useSearchInput } from "../../../utilities";
 
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
+// One row of the Filters panel's list; its page opens beside the list while
+// `openFilter` (the panel's single open page, kept in the URL) names it.
 export default function Filter({
   active,
   badgeTitle,
@@ -26,7 +23,6 @@ export default function Filter({
   disabled,
   disabledTooltip,
   icon,
-  controlled,
   openFilter,
   setOpenFilter,
   filterName,
@@ -46,22 +42,24 @@ export default function Filter({
   const { t } = useTranslation();
   const { tipHighlight } = useTips();
 
-  const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false);
-  const wrapperRef = useRef(null);
-  useOutsideAlerter(wrapperRef, setFilterOpen, false);
-
-  // Own state so an outside click can close a controlled Filter; mirrored
-  // during render, not in an effect, so the two never disagree for a frame.
-  if (useChanged(openFilter) && controlled) setFilterOpen(openFilter);
-
   // Debounced: the search re-filters a list thousands of options long.
   const [searchText, setSearchText, submitSearch] = useSearchInput(
     searchTerms ?? "",
     setSearchTerms,
   );
 
-  const isOpen = filterOpen && (!controlled || Boolean(openFilter));
+  const isOpen = Boolean(openFilter);
   const paneShown = isOpen && !disabled;
+
+  // Picking a searchable row puts the cursor in its search, as the next thing
+  // to do; a page restored from a link leaves focus where the modal put it.
+  const searchRef = useRef(null);
+  const focusSearch = useRef(false);
+  useEffect(() => {
+    if (!paneShown || !focusSearch.current) return;
+    focusSearch.current = false;
+    searchRef.current?.focus();
+  }, [paneShown]);
 
   const filterButton = (
     <button
@@ -73,9 +71,9 @@ export default function Filter({
       // Not `disabled`: that would drop pointer events on the explained row.
       aria-disabled={disabled ? "true" : undefined}
       onClick={() => {
-        if (disabled) return;
-        setFilterOpen(!filterOpen);
-        if (controlled) setOpenFilter(filterName);
+        if (disabled || isOpen) return;
+        focusSearch.current = true;
+        setOpenFilter(filterName);
       }}
     >
       {icon}
@@ -87,12 +85,7 @@ export default function Filter({
   );
 
   return (
-    <div
-      className="filter"
-      ref={wrapperRef}
-      data-testid="filter"
-      data-filter-name={filterName}
-    >
+    <div className="filter" data-testid="filter" data-filter-name={filterName}>
       {filterButton}
       {disabled && (disabledTooltip || tooltip) && (
         <div className="filterCaption">{disabledTooltip || tooltip}</div>
@@ -126,7 +119,7 @@ export default function Filter({
               }}
             >
               <input
-                autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- docs/frontend-ui-audit.md step 4: Popover
+                ref={searchRef}
                 className="filterSearch"
                 type="text"
                 value={searchText}

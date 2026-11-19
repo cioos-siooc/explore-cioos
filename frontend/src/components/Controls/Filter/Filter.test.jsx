@@ -7,9 +7,20 @@ import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import Filter from "./Filter.jsx";
 
-const render = (ui) => renderWithProviders(ui);
+// The panel's single open page, as FiltersPanel keeps it in the UI state.
+function Panel({ children }) {
+  const [open, setOpen] = useState();
+  return React.Children.map(children, (child) =>
+    React.cloneElement(child, {
+      openFilter: open === child.props.filterName,
+      setOpenFilter: setOpen,
+    }),
+  );
+}
 
-describe("Filter (uncontrolled)", () => {
+const render = (ui) => renderWithProviders(<Panel>{ui}</Panel>);
+
+describe("Filter", () => {
   it("starts closed and opens on click", async () => {
     const user = userEvent.setup();
     render(
@@ -23,32 +34,64 @@ describe("Filter (uncontrolled)", () => {
     expect(screen.getByText("options here")).toBeInTheDocument();
   });
 
-  it("closes again on a second click", async () => {
+  // A page beside the list, not a popover: only picking another row (or the
+  // panel's search) leaves it, so the URL and the screen always agree.
+  it("stays open on a second click and on a click elsewhere", async () => {
     const user = userEvent.setup();
-    render(
-      <Filter badgeTitle="Ocean variables" filterName="eovs">
-        <div>options here</div>
-      </Filter>,
-    );
-    await user.click(screen.getByTestId("filter-header"));
-    await user.click(screen.getByTestId("filter-header"));
-    expect(screen.queryByTestId("filter-options")).not.toBeInTheDocument();
-  });
-
-  it("closes on an outside click", async () => {
-    const user = userEvent.setup();
-    render(
+    renderWithProviders(
       <>
-        <Filter badgeTitle="Ocean variables" filterName="eovs">
-          <div>options here</div>
-        </Filter>
+        <Panel>
+          <Filter badgeTitle="Ocean variables" filterName="eovs">
+            <div>options here</div>
+          </Filter>
+        </Panel>
         <button>elsewhere</button>
       </>,
     );
     await user.click(screen.getByTestId("filter-header"));
-    expect(screen.getByTestId("filter-options")).toBeInTheDocument();
+    await user.click(screen.getByTestId("filter-header"));
     await user.click(screen.getByRole("button", { name: "elsewhere" }));
-    expect(screen.queryByTestId("filter-options")).not.toBeInTheDocument();
+    expect(screen.getByTestId("filter-options")).toBeInTheDocument();
+    expect(screen.getByTestId("filter-header")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("puts the cursor in the search of the row just picked", async () => {
+    const user = userEvent.setup();
+    render(
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        searchable
+        searchTerms=""
+        setSearchTerms={() => {}}
+        searchPlaceholder="Search"
+      >
+        <div>options here</div>
+      </Filter>,
+    );
+    await user.click(screen.getByTestId("filter-header"));
+    expect(screen.getByPlaceholderText("Search")).toHaveFocus();
+  });
+
+  it("leaves focus alone for a page it was opened on", () => {
+    renderWithProviders(
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        openFilter
+        setOpenFilter={() => {}}
+        searchable
+        searchTerms=""
+        setSearchTerms={() => {}}
+        searchPlaceholder="Search"
+      >
+        <div>options here</div>
+      </Filter>,
+    );
+    expect(screen.getByPlaceholderText("Search")).not.toHaveFocus();
   });
 
   it("keeps its controls outside the scrolling options body", async () => {
@@ -119,7 +162,7 @@ describe("Filter (disabled)", () => {
   });
 });
 
-describe("Filter (controlled)", () => {
+describe("Filter, several in a panel", () => {
   function Harness() {
     const [openFilter, setOpenFilter] = useState();
     return (
@@ -127,7 +170,6 @@ describe("Filter (controlled)", () => {
         <Filter
           badgeTitle="Ocean variables"
           filterName="eovs"
-          controlled
           openFilter={openFilter === "eovs"}
           setOpenFilter={setOpenFilter}
         >
@@ -136,7 +178,6 @@ describe("Filter (controlled)", () => {
         <Filter
           badgeTitle="Platforms"
           filterName="platforms"
-          controlled
           openFilter={openFilter === "platforms"}
           setOpenFilter={setOpenFilter}
         >
@@ -146,7 +187,7 @@ describe("Filter (controlled)", () => {
     );
   }
 
-  it("opening one controlled filter closes the other — only one pane at a time", async () => {
+  it("opening one filter closes the other — only one pane at a time", async () => {
     const user = userEvent.setup();
     render(<Harness />);
     const [eovHeader, platformHeader] = screen.getAllByTestId("filter-header");

@@ -1,7 +1,7 @@
 # Frontend UI primitives audit
 
 Written 2026-11-18 to decide whether to replace the hand-built UI primitives
-with shadcn/ui or a newer alternative. Steps 1–3 of the
+with shadcn/ui or a newer alternative. Steps 1–4 of the
 [suggested order](#suggested-order) are in; every remaining step is tracked by
 the `eslint-disable` comments that name it (`grep -rn "frontend-ui-audit.md step" frontend/src`).
 
@@ -216,7 +216,14 @@ barely change.
    focusable `img`. Found on the way: `FilterOption` spread its props after
    its own `onKeyDown`, so a handler from a wrapper replaced Enter/Space.
    Initial JS: 745.8 kB gz (+0.9 kB over step 2).
-4. Filter popover → `Popover` (gap 2, deletes `useOutsideAlerter`)
+4. Filter popover → `Popover` (gap 2, deletes `useOutsideAlerter`).
+   **Done, without a Popover:** every `Filter` is a row of the Filters modal
+   whose page opens beside the list, so the uncontrolled popover mode,
+   `useOutsideAlerter` (and TipCard's guard against it) and the `autoFocus`
+   are gone; the page follows the panel's `openFilter` alone. That fixed a
+   click on blank space hiding the open page while its row and the URL still
+   named it. Picking a searchable row still moves the cursor into its search;
+   a page restored from a link leaves focus where the modal put it.
 5. FeatureCard shell (gap 4)
 6. `Button`, `ToggleButton`, `Switch`, `Checkbox`, `SearchField`
 7. Collapsibles → `Disclosure`; Tabs

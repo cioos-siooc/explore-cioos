@@ -320,7 +320,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               badgeTitle={textSearchBadgeTitle}
               tooltip={t("textSearchFilterTooltip")}
               icon={<CardText />}
-              controlled
               searchable
               searchTerms={appliedSearchText}
               setSearchTerms={(text) => setSearch(text, searchIn)}
@@ -349,7 +348,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               badgeTitle={dataLayersBadgeTitle}
               tooltip={t("dataLayersFilterTooltip")}
               icon={<Stack />}
-              controlled
               filterName={dataLayersFilterTranslationKey}
               legend={<OptionStateLegend />}
               openFilter={openFilter === dataLayersFilterTranslationKey}
@@ -366,7 +364,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setOptionsSelected={setEovsSelected}
               tooltip={t("oceanVariableFilterTooltip")}
               icon={<Water />}
-              controlled
               searchable
               searchTerms={eovsSearchTerms}
               setSearchTerms={setEovsSearchTerms}
@@ -405,7 +402,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setOptionsSelected={setPlatformsSelected}
               tooltip={t("platformFilterTooltip")}
               icon={<Cursor />}
-              controlled
               searchable
               searchTerms={platformsSearchTerms}
               setSearchTerms={setPlatformsSearchTerms}
@@ -446,7 +442,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setOptionsSelected={setOrgsSelected}
               tooltip={t("organizationFilterTooltip")}
               icon={<Building />}
-              controlled
               searchable
               searchTerms={orgsSearchTerms}
               setSearchTerms={setOrgsSearchTerms}
@@ -483,7 +478,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               badgeTitle={sourcesBadgeTitle}
               tooltip={t("sourceFilterTooltip")}
               icon={<Server />}
-              controlled
               searchable
               searchTerms={sourcesSearchTerms}
               setSearchTerms={setSourcesSearchTerms}
@@ -522,7 +516,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               badgeTitle={spatialFilterBadgeTitle}
               tooltip={t("spatialFilterMenuTitle")}
               icon={<SpatialFilterIcon />}
-              controlled
               filterName={spatialFilterTranslationKey}
               openFilter={openFilter === spatialFilterTranslationKey}
               setOpenFilter={setOpenFilter}
@@ -541,7 +534,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               }}
               tooltip={t("timeframeFilterTooltip")}
               icon={<CalendarWeek />}
-              controlled
               filterName={timeframesFilterName}
               openFilter={openFilter === timeframesFilterName}
               setOpenFilter={setOpenFilter}
@@ -566,7 +558,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               }}
               tooltip={t("depthrangeFilterTooltip")}
               icon={<ArrowsExpand />}
-              controlled
               filterName={depthRangeFilterName}
               openFilter={openFilter === depthRangeFilterName}
               setOpenFilter={setOpenFilter}
@@ -587,7 +578,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               badgeTitle={t("realtimeFilterName")}
               tooltip={t("realtimeFilterTooltip")}
               icon={<BroadcastPin />}
-              controlled
               filterName={realtimeFilterName}
               openFilter={openFilter === realtimeFilterName}
               setOpenFilter={setOpenFilter}
@@ -609,7 +599,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               badgeTitle={t("datasetsCardOnlyInViewText")}
               tooltip={t("inViewFilterTooltip")}
               icon={<Eye />}
-              controlled
               filterName={inViewFilterName}
               openFilter={openFilter === inViewFilterName}
               setOpenFilter={setOpenFilter}
@@ -637,7 +626,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                 disabled={!showObis}
                 disabledTooltip={t("scientificNameFilterDisabledTooltip")}
                 icon={<Tag />}
-                controlled
                 searchable
                 searchTerms={scientificNameSearchTerms}
                 setSearchTerms={setScientificNameSearchTerms}
