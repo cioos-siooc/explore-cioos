@@ -180,7 +180,10 @@ export default function DatasetCard({
                           : t("downloadSizeUnavailableTitle")
                       }
                     >
-                      {formatSizeEstimate(row?.sizeEstimate?.filteredSize)}
+                      {formatSizeEstimate(
+                        row?.sizeEstimate?.filteredSize,
+                        i18n.language,
+                      )}
                     </span>
                     {/* Shown only when the map's filters narrowed it. */}
                     {row?.sizeEstimate?.filteredSize !==
@@ -188,6 +191,7 @@ export default function DatasetCard({
                       <span className="datasetCardSizeTotal">
                         {`/ ${formatSizeEstimate(
                           row?.sizeEstimate?.unfilteredSize,
+                          i18n.language,
                         )}`}
                       </span>
                     )}

@@ -53,7 +53,7 @@ export default function DownloadDetails({
   setSubmissionState,
   children,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { areaPlace } = useSelection();
   const { packageFormat } = useDownload();
   const [pointsData, setPointsData] = useState(
@@ -352,14 +352,14 @@ export default function DownloadDetails({
               }
             >
               {t("downloadSummarySize", {
-                size: `${formatSize(dataTotal.filteredSize)}${dataTotal.filteredPartial ? "+" : ""}`,
+                size: `${formatSize(dataTotal.filteredSize, i18n.language)}${dataTotal.filteredPartial ? "+" : ""}`,
               })}
             </strong>
             {sizeFiltered && (
               <span className="downloadSummaryMuted">
                 {" "}
                 {t("downloadSummarySizeFull", {
-                  size: `${formatSize(dataTotal.unfilteredSize)}${dataTotal.unfilteredPartial ? "+" : ""}`,
+                  size: `${formatSize(dataTotal.unfilteredSize, i18n.language)}${dataTotal.unfilteredPartial ? "+" : ""}`,
                 })}
               </span>
             )}
