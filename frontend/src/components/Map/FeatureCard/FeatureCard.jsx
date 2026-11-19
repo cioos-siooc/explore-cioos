@@ -6,6 +6,7 @@ import classNames from "classnames";
 import groupBy from "lodash-es/groupBy";
 
 import CloseButton from "../../ui/CloseButton.jsx";
+import PanelDialog from "../../ui/PanelDialog.jsx";
 import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -61,15 +62,6 @@ export default function FeatureCard() {
     setExpanded(false);
     setGridsOpen(false);
   }
-
-  useEffect(() => {
-    if (!featureQuery) return undefined;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 5: Popover
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [featureQuery, close]);
 
   // The query is left alone so the card picks back up once neither the
   // sidebar nor a dataset view is in the way.
@@ -150,14 +142,17 @@ export default function FeatureCard() {
   };
 
   return (
-    <div
+    // Non-modal: the map stays live beside it for the next click, which
+    // updates the card in place without taking focus from the map again.
+    <PanelDialog
+      isOpen={open}
+      onClose={close}
       data-testid="feature-card"
       data-map-cover={open || undefined}
       className={classNames("featureCard", {
         open,
         featureCardEmpty: empty,
       })}
-      role="dialog" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 5: Popover
       aria-label={t("featureCardTitle")}
     >
       <div className="featureCardHeader">
@@ -235,6 +230,6 @@ export default function FeatureCard() {
           )}
         </>
       )}
-    </div>
+    </PanelDialog>
   );
 }

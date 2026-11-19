@@ -2,9 +2,7 @@ import { expect, test } from "../support/test.js";
 import { openApp, waitForMapReady } from "../support/appPage.js";
 
 // axe can't see Escape, arrow keys or where focus lands, so these walk the
-// overlays by keyboard. test.fail() marks a gap the named step of
-// docs/frontend-ui-audit.md closes; it errors once the gap is fixed, so the
-// marker goes with the migration.
+// overlays by keyboard.
 
 test.describe("keyboard", () => {
   test("a modal takes focus, closes on Escape and hands focus back", async ({
@@ -50,8 +48,9 @@ test.describe("keyboard", () => {
     await expect(page.getByTestId("coverage-modal")).toBeVisible();
   });
 
-  test("the map's card takes focus and closes on Escape", async ({ page }) => {
-    test.fail(true, "docs/frontend-ui-audit.md step 5: FeatureCard shell");
+  test("the map's card takes focus, closes on Escape and hands focus back", async ({
+    page,
+  }) => {
     // Canvas clicks are slow on a two-core runner; see mapInteraction.spec.js.
     test.slow();
     // The recorded hex mapInteraction.spec.js opens its card on.
@@ -64,8 +63,12 @@ test.describe("keyboard", () => {
       await expect(card).toBeVisible({ timeout: 1_000 });
     }).toPass({ timeout: 20_000 });
 
-    await expect(card.locator(":focus")).toHaveCount(1);
+    // The dialog itself takes focus, so its label is read first.
+    await expect(
+      page.locator('[data-testid="feature-card"]:focus-within'),
+    ).toHaveCount(1);
     await page.keyboard.press("Escape");
     await expect(card).toHaveCount(0);
+    await expect(page.locator(".maplibregl-canvas")).toBeFocused();
   });
 });

@@ -148,6 +148,24 @@ describe("FeatureCard", () => {
     expect(latestMap.featureQuery).toBeNull();
   });
 
+  it("takes focus on opening, so Escape reaches it, and gives focus back", async () => {
+    const { user } = await renderReady();
+    const row = pointQueryFixture[0];
+    const map = document.createElement("button");
+    document.body.append(map);
+    map.focus();
+    click({
+      nonce: 7,
+      items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
+    });
+    const card = screen.getByRole("dialog", { name: "What's here" });
+    await waitFor(() => expect(card).toHaveFocus());
+    await user.keyboard("{Escape}");
+    expect(latestMap.featureQuery).toBeNull();
+    await waitFor(() => expect(map).toHaveFocus());
+    map.remove();
+  });
+
   it("Escape closes the card", async () => {
     const { user } = await renderReady();
     const row = pointQueryFixture[0];
@@ -167,15 +185,17 @@ describe("FeatureCard", () => {
       nonce: 5,
       items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
     });
-    const toggle = screen.getByRole("checkbox", {
-      name: new RegExp(`: ${RegExp.escape(row.title)}$`),
-    });
-    await user.click(toggle);
+    // Looked up each time: the card re-renders its rows as it hides and shows.
+    const toggle = () =>
+      screen.getByRole("checkbox", {
+        name: new RegExp(`: ${RegExp.escape(row.title)}$`),
+      });
+    await user.click(toggle());
     await waitFor(() =>
       expect(latestSelection.selectedPks.has(row.pk)).toBe(true),
     );
     expect(latestMap.featureQuery).not.toBeNull();
-    await user.click(toggle);
+    await user.click(toggle());
     await waitFor(() =>
       expect(latestSelection.selectedPks.has(row.pk)).toBe(false),
     );

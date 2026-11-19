@@ -1,7 +1,7 @@
 # Frontend UI primitives audit
 
 Written 2026-11-18 to decide whether to replace the hand-built UI primitives
-with shadcn/ui or a newer alternative. Steps 1–4 of the
+with shadcn/ui or a newer alternative. Steps 1–5 of the
 [suggested order](#suggested-order) are in; every remaining step is tracked by
 the `eslint-disable` comments that name it (`grep -rn "frontend-ui-audit.md step" frontend/src`).
 
@@ -139,8 +139,8 @@ modal), not a floating popover. Step 4 still removes its `useOutsideAlerter`
 and `autoFocus`.
 
 `frontend/e2e/specs/keyboard.spec.js` walks the Filters modal, a Dropdown
-and the FeatureCard by keyboard; the FeatureCard one is `test.fail()` until
-step 5, and errors once fixed so the marker is removed with that step.
+and the FeatureCard by keyboard: open, navigate, Escape, and where focus
+lands.
 
 ## Guardrails
 
@@ -224,7 +224,15 @@ barely change.
    click on blank space hiding the open page while its row and the URL still
    named it. Picking a searchable row still moves the cursor into its search;
    a page restored from a link leaves focus where the modal put it.
-5. FeatureCard shell (gap 4)
+5. FeatureCard shell (gap 4).
+   **Done, as a non-modal dialog:** the card hangs in a corner rather than off
+   a trigger, so not a `Popover`. `ui/PanelDialog.jsx` (react-aria
+   `useDialog`, `FocusScope restoreFocus` and `useKeyboard`) takes focus when
+   the card opens, closes on Escape from inside it, and gives focus back to
+   the map; closed but still sliding out, it is a plain `div`. The window
+   `keydown` listener is gone, so Escape no longer closes the card once focus
+   has left it. A later map click updates the open card without taking focus
+   again.
 6. `Button`, `ToggleButton`, `Switch`, `Checkbox`, `SearchField`
 7. Collapsibles → `Disclosure`; Tabs
 8. FilterSearch → `ComboBox`/`Autocomplete`; chips → `TagGroup`
