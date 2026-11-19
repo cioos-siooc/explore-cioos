@@ -46,7 +46,7 @@ test.describe("the datasets sidebar", () => {
     const cards = panel.getByTestId("dataset-card");
     const datasetPk = await cards.first().getAttribute("data-dataset-pk");
     const card = panel.locator(`[data-dataset-pk="${datasetPk}"]`);
-    await card.getByRole("checkbox", { name: "Add to selection" }).click();
+    await card.locator(".datasetCardSelect").click();
     await expect(card).toHaveAttribute("data-selected", "true");
 
     await page.getByTestId("sidebar-collapse").click();
@@ -67,7 +67,7 @@ test.describe("the datasets sidebar", () => {
     // same control is what un-selects it.
     if (await card.isVisible()) {
       await expect(card).toHaveAttribute("data-selected", "true");
-      await card.getByRole("checkbox", { name: "Add to selection" }).click();
+      await card.locator(".datasetCardSelect").click();
       await expect(card).toHaveAttribute("data-selected", "false");
     }
   });
