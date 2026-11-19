@@ -453,7 +453,7 @@ export default function DatasetInspector({
       returnToList();
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 7: Tabs
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [returnToList]);
 
@@ -743,9 +743,9 @@ export default function DatasetInspector({
       </div>
       {/* Widened, both views sit side by side and need no tabs. */}
       {!wide && (
-        <div
+        <div // eslint-disable-line jsx-a11y/interactive-supports-focus -- docs/frontend-ui-audit.md step 7: Tabs
           className="datasetTabs"
-          role="tablist"
+          role="tablist" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 7: Tabs
           ref={tabListRef}
           onKeyDown={onTabKeyDown}
         >
@@ -756,7 +756,7 @@ export default function DatasetInspector({
             <button
               key={key}
               type="button"
-              role="tab"
+              role="tab" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 7: Tabs
               id={`datasetTab-${key}`}
               aria-selected={tab === key}
               aria-controls={`datasetPanel-${key}`}
@@ -899,7 +899,7 @@ export default function DatasetInspector({
                       {/* Focusable so keyboard users reach the definition too. */}
                       <span
                         className="metadataChip"
-                        tabIndex={definition ? 0 : undefined}
+                        tabIndex={definition ? 0 : undefined} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex -- docs/frontend-ui-audit.md step 3: Tooltip trigger
                         aria-description={definition}
                       >
                         {t(eov)}

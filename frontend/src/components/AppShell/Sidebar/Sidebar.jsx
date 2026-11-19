@@ -88,7 +88,7 @@ export default function Sidebar() {
     const onKeyDown = (event) => {
       if (event.key === "Escape" && !event.defaultPrevented) setWide(false);
     };
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- keep: Escape collapses the wide sidebar unless an overlay claimed it first
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [wide, setWide]);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;

@@ -174,7 +174,7 @@ export function useFilterSearchShortcut(open) {
       e.preventDefault();
       open(e.key);
     }
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 }
@@ -445,7 +445,7 @@ export default function FilterSearch({
         <input
           ref={inputRef}
           type="text"
-          role="combobox"
+          role="combobox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
           className="filterSearchInput"
           data-testid="filter-search-input"
           value={text}
@@ -485,7 +485,7 @@ export default function FilterSearch({
         {flat.length > 0 ? (
           <div
             id={listId}
-            role="listbox"
+            role="listbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
             className="filterSearchList"
             aria-label={t("filterSearchLabel")}
           >
@@ -542,10 +542,10 @@ export default function FilterSearch({
                 {group.options.map((option) => {
                   const i = flat.findIndex((f) => f.option === option);
                   return (
-                    <div
+                    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- docs/frontend-ui-audit.md step 8: ComboBox
                       key={option.id}
                       id={`${listId}-${i}`}
-                      role="option"
+                      role="option" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 8: ComboBox
                       aria-selected={i === active}
                       className={classNames("filterSearchOption", {
                         active: i === active,

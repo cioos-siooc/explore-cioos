@@ -1949,7 +1949,7 @@ export default function CreateMap({
     const exitOnEscape = (e) => {
       if (e.key === "Escape") onDepthToolExit();
     };
-    window.addEventListener("keydown", exitOnEscape);
+    window.addEventListener("keydown", exitOnEscape); // eslint-disable-line no-restricted-syntax -- keep: Escape leaves the depth-tool map mode
     return () => {
       window.removeEventListener("keydown", exitOnEscape);
       if (canvas) canvas.style.cursor = "grab";

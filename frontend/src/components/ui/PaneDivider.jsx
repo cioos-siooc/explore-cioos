@@ -45,7 +45,7 @@ export default function PaneDivider({
   };
 
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- keep: window splitter pattern, react-aria has no splitter
       className="paneDivider"
       role="separator"
       aria-orientation="vertical"
@@ -54,7 +54,7 @@ export default function PaneDivider({
       aria-valuemin={min}
       aria-valuemax={max}
       aria-controls={controls}
-      tabIndex={0}
+      tabIndex={0} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex -- keep: window splitter pattern, react-aria has no splitter
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         drag.current = { x: event.clientX, from: value };

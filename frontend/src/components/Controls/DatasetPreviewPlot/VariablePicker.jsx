@@ -192,7 +192,7 @@ function SortableMultiValue(props) {
         "aria-label": `Remove ${props.children}`,
       }}
     >
-      <span
+      <span // eslint-disable-line jsx-a11y/no-static-element-interactions -- keep: dnd-kit spreads the drag handle's role and keyboard handlers
         className="variableSelectDragHandle"
         ref={setActivatorNodeRef}
         {...attributes}

@@ -64,7 +64,7 @@ export default function QuickFilters() {
     function onPointerDown(e) {
       if (!areaRef.current?.contains(e.target)) setAreaMenuOpen(false);
     }
-    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 2: Menu
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [areaMenuOpen]);
 
@@ -139,7 +139,7 @@ export default function QuickFilters() {
       aria-label={t("topBarQuickFiltersLabel")}
       data-testid="quick-filters"
     >
-      <div
+      <div // eslint-disable-line jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 2: Menu
         ref={areaRef}
         className={classNames("quickFilterArea", { open: areaMenuOpen })}
         onBlur={(e) => {

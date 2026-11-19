@@ -42,7 +42,7 @@ export function FilterOption({
 }) {
   const { t } = useTranslation();
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Checkbox
       className={classNames(
         optionStateClass({ isSelected, isExcluded }),
         className,
@@ -52,7 +52,7 @@ export function FilterOption({
     >
       <div
         className="optionToggle"
-        role="checkbox"
+        role="checkbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Checkbox
         aria-checked={Boolean(isSelected)}
         tabIndex={0}
         onKeyDown={(event) => {

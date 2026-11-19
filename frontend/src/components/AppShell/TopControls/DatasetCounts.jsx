@@ -62,6 +62,7 @@ export default function DatasetCounts() {
         // Announced when a filter changes the tally; focusable so the popup
         // reaches keyboard users too.
         <Tooltip content={popup}>
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- docs/frontend-ui-audit.md step 3: Tooltip trigger */}
           <span role="status" tabIndex={0}>
             {allDatasetsShown ? (
               format(totalCount)

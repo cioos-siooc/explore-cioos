@@ -128,7 +128,7 @@ export default function Modal({
       {backDismiss}
       {createPortal(
         <ModalContext.Provider value={{ onHide }}>
-          <div
+          <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- docs/frontend-ui-audit.md step 10: Modal
             className={[
               "modal",
               asSheet && "sheet",

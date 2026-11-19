@@ -8,6 +8,8 @@
 
 **Never build from scratch what a dependency already does** — reach for what is installed (`@turf/*`, `lodash-es`, `d3-scale`, `maplibre-gl`, `@mapbox/mapbox-gl-draw`, `react-data-table-component`, `react-plotly.js`, `react-bootstrap-icons`, `react-i18next`, `react-router`), or a well-scoped new dependency, before writing custom code.
 
+**Interactive controls come from `src/components/ui/`, which wraps `react-aria-components`** — feature code imports controls from `ui/` only; if `ui/` lacks one, add a RAC-backed wrapper there (style it through RAC's `data-*` state attributes, see `DESIGN.md`). Outside `ui/`, ESLint rejects hand-written widget `role=`s and `document`/`window` keydown/mousedown/pointerdown listeners; existing ones carry a disable naming the `docs/frontend-ui-audit.md` migration step that removes them — delete the disable with the migration, never add a new one.
+
 ## Design work
 
 UI design, critique and polish go through the `impeccable` skill. It isn't vendored here; install it in your agent's user-level skills directory (e.g. `~/.claude/skills/impeccable` for Claude Code). Its committed context is `DESIGN.md`, `PRODUCT.md` and `.impeccable/design.json` at the repo root — keep them in sync with `src/components/theme.css`; per-machine state under `.impeccable/` stays untracked.

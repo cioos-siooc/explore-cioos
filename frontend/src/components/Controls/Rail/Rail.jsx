@@ -166,7 +166,7 @@ export default function Rail({
           <button
             key={handle.key}
             type="button"
-            role="slider"
+            role="slider" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 9: Slider
             className={`railHandle ${handle.className}`}
             style={at(handle.value)}
             aria-label={handle.label}

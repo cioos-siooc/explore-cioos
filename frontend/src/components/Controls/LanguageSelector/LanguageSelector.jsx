@@ -12,7 +12,7 @@ export default function LanguageSelector({ className }) {
   const otherLanguage = i18n.languages.filter((l) => l !== lang).pop();
 
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
       className={className + " languageSelector"}
       title={t("languageSelectorTitle")}
       onClick={() => {

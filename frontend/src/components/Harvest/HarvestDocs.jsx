@@ -95,7 +95,7 @@ export default function HarvestDocs() {
         ))}
       </nav>
       {html ? (
-        <article
+        <article // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- keep: delegated click on rendered markdown links, which are focusable
           ref={contentRef}
           className="harvest-doc"
           onClick={onContentClick}

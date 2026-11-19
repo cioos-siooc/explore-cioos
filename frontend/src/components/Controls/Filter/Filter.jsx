@@ -126,7 +126,7 @@ export default function Filter({
               }}
             >
               <input
-                autoFocus
+                autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- docs/frontend-ui-audit.md step 4: Popover
                 className="filterSearch"
                 type="text"
                 value={searchText}

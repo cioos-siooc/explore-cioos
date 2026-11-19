@@ -169,7 +169,7 @@ export default function MultiCheckboxFilter({
           <>
             <div
               className="searchResultsButton"
-              role="checkbox"
+              role="checkbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Checkbox
               aria-checked={optionsSelected.every(isChecked)}
               tabIndex={0}
               data-testid="filter-select-all-results"

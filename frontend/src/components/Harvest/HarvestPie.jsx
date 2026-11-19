@@ -170,7 +170,7 @@ export default function HarvestPie({
       {bar ? (
         <div className="harvest-stack-bar" role="img" aria-label={label}>
           {slices.map((s) => (
-            <span
+            <span // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
               key={s.key}
               style={{
                 flexGrow: s.n,

@@ -2,10 +2,31 @@ import js from "@eslint/js";
 import globals from "globals";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import prettier from "eslint-config-prettier";
 
 // Three runtimes live in this repo, so each gets its own scope: the frontend is
 // browser ESM with JSX, web-api is Node CommonJS, test/ is Node ESM.
+// Interactive controls come from frontend/src/components/ui/, which wraps
+// react-aria-components. Hand-built widget roles and global key/pointer
+// listeners are where focus, Escape and touch handling get forgotten.
+const WIDGET_ROLES =
+  "menu|menuitem|listbox|option|dialog|tooltip|tab|tablist|switch|slider|checkbox|combobox";
+const handBuiltControls = [
+  "error",
+  {
+    selector: `JSXAttribute[name.name='role'] > Literal[value=/^(${WIDGET_ROLES})$/]`,
+    message:
+      "Hand-built widget role: use (or add) a react-aria-components wrapper in src/components/ui/.",
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name='addEventListener'][callee.object.name=/^(document|window)$/][arguments.0.value=/^(keydown|mousedown|pointerdown)$/]",
+    message:
+      "Global key/pointer listener: Escape, click-outside and arrow keys come from react-aria-components via src/components/ui/.",
+  },
+];
+
 const shared = {
   eqeqeq: ["error", "always", { null: "ignore" }],
   "no-var": "error",
@@ -61,6 +82,15 @@ export default [
   },
   reactHooks.configs.flat.recommended,
   {
+    files: ["frontend/src/**/*.{js,jsx}"],
+    ...jsxA11y.flatConfigs.recommended,
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
+      // `role` on a component is a prop (Spinner's role={null}), not ARIA.
+      "jsx-a11y/aria-role": ["error", { ignoreNonDOM: true }],
+    },
+  },
+  {
     files: ["frontend/**/*.{js,jsx,mjs}"],
     rules: {
       ...shared,
@@ -69,6 +99,15 @@ export default [
       // debounce, a one-shot, an imperative map command), each marked inline.
       "react-hooks/exhaustive-deps": "warn",
     },
+  },
+  {
+    files: ["frontend/src/**/*.{js,jsx}"],
+    ignores: [
+      "frontend/src/components/ui/**",
+      "frontend/src/**/*.test.{js,jsx}",
+      "frontend/src/test/**",
+    ],
+    rules: { "no-restricted-syntax": handBuiltControls },
   },
   {
     // Vite config runs in Node, not the browser.

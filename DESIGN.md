@@ -322,6 +322,14 @@ The Datasets / Time coverage / Filters segments welded to the brand card's base.
 ### Legend
 - A raised white panel in the bottom-right with uppercase letter-spaced section labels, teal toggles per layer, and the hex ramp drawn as a continuous bar with count ticks.
 
+### Interactive primitives (react-aria-components)
+Controls are react-aria-components wrapped once in `frontend/src/components/ui/`. RAC ships behaviour, not looks: each wrapper keeps its existing class names and styles state through RAC's attributes instead of `:hover`/`:focus`/`:active`.
+- **Focus:** `[data-focus-visible]` takes the `--cioos-focus` ring; keyboard only, so a tap or click never leaves a ring behind.
+- **Hover / Pressed:** `[data-hovered]` deepens the fill as Buttons do; `[data-pressed]` holds it deep. RAC never reports hover from touch, so nothing sticks on after a tap.
+- **Selected / Open:** `[data-selected]` and `[data-open]` take the same treatment as the component's Applied or Active state above.
+- **Disabled:** `[data-disabled]` follows the Buttons rule (surface wash, ink-60), never a fade.
+- **Overlays:** `[data-entering]` / `[data-exiting]` carry the open and close transitions, and `[data-placement]` points the arrow at the trigger after a flip.
+
 ## Do's and Don'ts
 
 ### Do:

@@ -357,14 +357,14 @@ export default function SpatialFilter() {
         </h3>
         <p className="spatialFilterSectionHint">{t("spatialFilterDrawHint")}</p>
         <div className="multiCheckboxFilter">
-          <div
+          <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
             className={`optionButton ${activeMode === "box" ? "selected" : ""}`}
             onClick={() => startDraw("box")}
           >
             <BoundingBox />
             <span className="optionName">{t("drawBoundingBoxOption")}</span>
           </div>
-          <div
+          <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Button
             className={`optionButton ${activeMode === "polygon" ? "selected" : ""}`}
             onClick={() => startDraw("polygon")}
           >

@@ -31,6 +31,7 @@ export default class ErrorBoundary extends React.Component {
           <img
             className="errorLogo"
             src={this.props.logoSource}
+            alt="CIOOS"
             width="153px"
             height="60px"
           />

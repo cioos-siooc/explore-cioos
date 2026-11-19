@@ -897,7 +897,7 @@ export function useOutsideAlerter(ref, callback, value) {
         callback(value);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 4: Popover
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };

@@ -86,7 +86,7 @@ export default function DatasetCard({
     : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
 
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 6: Checkbox
       data-testid="dataset-card"
       data-dataset-pk={row.pk}
       data-selected={Boolean(selected)}
@@ -107,7 +107,7 @@ export default function DatasetCard({
               cannot. */}
           <button
             type="button"
-            role="checkbox"
+            role="checkbox" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 6: Checkbox
             aria-checked={Boolean(selected)}
             className={classNames("datasetCardSelect", { checked: selected })}
             title={selectTitle}

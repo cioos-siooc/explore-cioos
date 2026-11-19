@@ -67,7 +67,7 @@ export default function FeatureCard() {
     const onKeyDown = (e) => {
       if (e.key === "Escape") close();
     };
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 5: Popover
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [featureQuery, close]);
 
@@ -157,7 +157,7 @@ export default function FeatureCard() {
         open,
         featureCardEmpty: empty,
       })}
-      role="dialog"
+      role="dialog" // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 5: Popover
       aria-label={t("featureCardTitle")}
     >
       <div className="featureCardHeader">
