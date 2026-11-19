@@ -27,6 +27,18 @@
   flex: 0 1 auto;
 }
 
+/* A phone has no room for both pills, and "Sort T…" names nothing: wrap
+   rather than truncate. */
+@media (max-width: 700px), (max-height: 500px) {
+  .datasetsCardToolbar {
+    flex-wrap: wrap;
+  }
+
+  .datasetsCardToolbar .selectPill {
+    flex-shrink: 0;
+  }
+}
+
 .datasetsCardToolbar .selectPillLabel {
   font-size: var(--cioos-font-size-xs);
 }
@@ -209,7 +221,10 @@
   display: inline-flex;
   align-items: center;
   min-height: calc(var(--cioos-font-size-base) * 1.35);
-  padding: 0;
+
+  /* Grows the target to 24px around the icon without moving it. */
+  padding: 4px;
+  margin: -4px;
   border: none;
   background: transparent;
 
@@ -228,7 +243,7 @@
 
 .datasetCardSelect[data-focus-visible] {
   outline: 2px solid var(--cioos-primary-800);
-  outline-offset: 2px;
+  outline-offset: -2px;
   border-radius: 50%;
 }
 

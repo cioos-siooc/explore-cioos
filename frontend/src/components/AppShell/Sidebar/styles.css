@@ -291,8 +291,10 @@
 .sidebarFooterHintMore {
   display: inline-flex;
   vertical-align: -2px;
-  margin-left: 4px;
-  padding: 0;
+
+  /* A 24px target around the 13px icon, without growing the line. */
+  margin: -6px -6px -6px -2px;
+  padding: 6px;
   border: 0;
   background: none;
   color: var(--cioos-primary-800);

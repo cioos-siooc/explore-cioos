@@ -253,7 +253,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px;
+  padding: 6px;
+  margin: -4px;
   border: none;
   border-radius: 50%;
   background: transparent;
