@@ -1,8 +1,8 @@
 # Frontend UI primitives audit
 
 Written 2026-11-18 to decide whether to replace the hand-built UI primitives
-with shadcn/ui or a newer alternative. Step 1 of the
-[suggested order](#suggested-order) is in; every remaining step is tracked by
+with shadcn/ui or a newer alternative. Steps 1–2 of the
+[suggested order](#suggested-order) are in; every remaining step is tracked by
 the `eslint-disable` comments that name it (`grep -rn "frontend-ui-audit.md step" frontend/src`).
 
 ## Goal
@@ -138,9 +138,9 @@ row that opens its page beside the list (`aria-current`, Escape closes the
 modal), not a floating popover. Step 4 still removes its `useOutsideAlerter`
 and `autoFocus`.
 
-`frontend/e2e/specs/keyboard.spec.js` walks the Filters modal (passes), a
-Dropdown and the FeatureCard by keyboard; the last two are `test.fail()` until
-steps 2 and 5, and error once fixed so the marker is removed with the step.
+`frontend/e2e/specs/keyboard.spec.js` walks the Filters modal, a Dropdown
+and the FeatureCard by keyboard; the FeatureCard one is `test.fail()` until
+step 5, and errors once fixed so the marker is removed with that step.
 
 ## Guardrails
 
@@ -198,7 +198,14 @@ barely change.
 1. **Foundation and guardrails:** add `react-aria-components`, the `AGENTS.md`
    rule, the lint rules (with tracked disables), the keyboard e2e spec, and
    the DESIGN.md pattern. Measure the bundle here.
-2. Dropdown → RAC `Menu`/`Select`, plus the QuickFilters area menu (gap 1)
+2. Dropdown → RAC `Menu`/`Select`, plus the QuickFilters area menu (gap 1).
+   **Done:** `ui/Dropdown.jsx` is RAC `MenuTrigger`/`Menu` (pick lists are
+   `menuitemradio`s via `selectedKey`) plus a `PopoverButton` (`Dialog` in a
+   `Popover`) for the colour picker, whose custom-colour field a menu can't
+   hold. The area menu is a non-modal popover so the click that closes it
+   still lands on the map as the box's first corner; `MenuTrigger` reports
+   that close as `"outside"` so it doesn't disarm. `ui/LocaleProvider.jsx`
+   ties RAC's locale to the EN/FR switch. Initial JS: 744.9 kB gz (+45.4 kB).
 3. Tooltip → RAC `Tooltip` (gap 3)
 4. Filter popover → `Popover` (gap 2, deletes `useOutsideAlerter`)
 5. FeatureCard shell (gap 4)

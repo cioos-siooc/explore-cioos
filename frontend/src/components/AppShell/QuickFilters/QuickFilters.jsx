@@ -23,6 +23,13 @@ import {
   useMapView,
 } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import {
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuSection,
+  MenuTrigger,
+} from "../../ui/Dropdown.jsx";
 import "./styles.css";
 
 // drawRequest is a *last* request, not a current one (see MapStateProvider),
@@ -50,23 +57,12 @@ export default function QuickFilters() {
     if (zoomedIn) offerTip("inView");
   }, [zoomedIn, offerTip]);
 
-  const areaMenuId = useId();
   const inViewCountId = useId();
   const realtimeCountId = useId();
-  const areaRef = useRef(null);
-  const areaButtonRef = useRef(null);
   const [areaMenuOpen, setAreaMenuOpen] = useState(false);
   const [armedMode, setArmedMode] = useState(null);
-
-  // Pointer, not only blur: Safari never focuses a clicked button.
-  useEffect(() => {
-    if (!areaMenuOpen) return;
-    function onPointerDown(e) {
-      if (!areaRef.current?.contains(e.target)) setAreaMenuOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown); // eslint-disable-line no-restricted-syntax -- docs/frontend-ui-audit.md step 2: Menu
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [areaMenuOpen]);
+  // Picking an item closes the menu too; that close mustn't disarm the pick.
+  const picked = useRef(false);
 
   const hasShape = Boolean(polygon);
   const boxDrawn = hasShape && polygonIsRectangle(polygon);
@@ -107,29 +103,26 @@ export default function QuickFilters() {
   }
 
   function chooseArea(mode) {
+    picked.current = true;
     requestDraw(mode);
     setArmedMode(mode === "clear" ? null : mode);
-    setAreaMenuOpen(false);
-    areaButtonRef.current?.focus();
   }
 
   // Opening arms the box tool so one click starts drawing; arming wipes the
-  // drawn shape, so not when there is one.
-  function openAreaMenu() {
-    setAreaMenuOpen(true);
-    if (hasShape) return;
-    requestDraw("box");
-    setArmedMode("box");
-  }
-
-  // A click elsewhere closes the menu without disarming: it is usually the
-  // first corner of the box.
-  function dismissAreaMenu() {
-    setAreaMenuOpen(false);
-    areaButtonRef.current?.focus();
-    if (hasShape || !armedMode) return;
-    requestDraw("clear");
-    setArmedMode(null);
+  // drawn shape, so not when there is one. A click elsewhere closes the menu
+  // without disarming: it is usually the first corner of the box.
+  function onAreaMenuOpenChange(open, reason) {
+    setAreaMenuOpen(open);
+    const keepArmed = picked.current || reason === "outside";
+    picked.current = false;
+    if (open) {
+      if (hasShape) return;
+      requestDraw("box");
+      setArmedMode("box");
+    } else if (!keepArmed && !hasShape && armedMode) {
+      requestDraw("clear");
+      setArmedMode(null);
+    }
   }
 
   return (
@@ -139,93 +132,85 @@ export default function QuickFilters() {
       aria-label={t("topBarQuickFiltersLabel")}
       data-testid="quick-filters"
     >
-      <div // eslint-disable-line jsx-a11y/no-static-element-interactions -- docs/frontend-ui-audit.md step 2: Menu
-        ref={areaRef}
+      <div
         className={classNames("quickFilterArea", { open: areaMenuOpen })}
-        onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget))
-            setAreaMenuOpen(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" && areaMenuOpen) dismissAreaMenu();
-        }}
+        title={
+          areaPlace
+            ? `${t("spatialFilterFilterName")}: ${areaPlace.name}`
+            : t("quickFilterAreaTitle")
+        }
       >
-        <button
-          ref={areaButtonRef}
-          type="button"
-          className={classNames("quickFilterButton", { applied: hasShape })}
-          data-testid="quick-filter-area"
-          onClick={areaMenuOpen ? dismissAreaMenu : openAreaMenu}
-          aria-expanded={areaMenuOpen}
-          aria-controls={areaMenuOpen ? areaMenuId : undefined}
-          title={
-            areaPlace
-              ? `${t("spatialFilterFilterName")}: ${areaPlace.name}`
-              : t("quickFilterAreaTitle")
-          }
-          aria-label={
-            areaPlace
-              ? `${t("quickFilterCaptionArea")}: ${areaPlace.name}`
-              : t("quickFilterCaptionArea")
-          }
+        {/* Non-modal: the map stays live under it for that first corner. */}
+        <MenuTrigger
+          isOpen={areaMenuOpen}
+          onOpenChange={onAreaMenuOpenChange}
+          nonModal
+          className="quickFilterAreaMenu"
         >
-          {polygonDrawn ? (
-            <Pentagon size={18} aria-hidden="true" />
-          ) : (
-            <BoundingBox size={18} aria-hidden="true" />
-          )}
-          <span
-            className={classNames("quickFilterCaption", {
-              quickFilterCaptionPlace: areaPlace,
-            })}
-            aria-hidden="true"
+          <MenuButton
+            className={classNames("quickFilterButton", { applied: hasShape })}
+            data-testid="quick-filter-area"
+            aria-label={
+              areaPlace
+                ? `${t("quickFilterCaptionArea")}: ${areaPlace.name}`
+                : t("quickFilterCaptionArea")
+            }
           >
-            {areaPlace ? areaPlace.name : t("quickFilterCaptionArea")}
-          </span>
-        </button>
-        {areaMenuOpen && (
-          <div
-            id={areaMenuId}
-            className="quickFilterAreaMenu"
-            data-testid="quick-filter-area-menu"
-          >
-            <button
-              type="button"
-              className={classNames("quickFilterAreaItem", {
-                selected: boxActive,
-              })}
-              data-testid="quick-filter-area-box"
-              onClick={() => chooseArea("box")}
-              aria-pressed={boxActive}
-            >
-              <BoundingBox size={16} aria-hidden="true" />
-              {t("drawBoundingBoxOption")}
-            </button>
-            <button
-              type="button"
-              className={classNames("quickFilterAreaItem", {
-                selected: polygonActive,
-              })}
-              data-testid="quick-filter-area-polygon"
-              onClick={() => chooseArea("polygon")}
-              aria-pressed={polygonActive}
-            >
-              <Pentagon size={16} aria-hidden="true" />
-              {t("drawPolygonOption")}
-            </button>
-            {hasShape && (
-              <button
-                type="button"
-                className="quickFilterAreaItem"
-                data-testid="quick-filter-area-clear"
-                onClick={() => chooseArea("clear")}
-              >
-                <Trash size={16} aria-hidden="true" />
-                {t("quickFilterAreaClear")}
-              </button>
+            {polygonDrawn ? (
+              <Pentagon size={18} aria-hidden="true" />
+            ) : (
+              <BoundingBox size={18} aria-hidden="true" />
             )}
-          </div>
-        )}
+            <span
+              className={classNames("quickFilterCaption", {
+                quickFilterCaptionPlace: areaPlace,
+              })}
+              aria-hidden="true"
+            >
+              {areaPlace ? areaPlace.name : t("quickFilterCaptionArea")}
+            </span>
+          </MenuButton>
+          <Menu data-testid="quick-filter-area-menu" onAction={chooseArea}>
+            <MenuSection
+              selectionMode="single"
+              selectedKeys={
+                boxActive ? ["box"] : polygonActive ? ["polygon"] : []
+              }
+            >
+              <MenuItem
+                id="box"
+                className="quickFilterAreaItem"
+                data-testid="quick-filter-area-box"
+                textValue={t("drawBoundingBoxOption")}
+              >
+                <BoundingBox size={16} aria-hidden="true" />
+                {t("drawBoundingBoxOption")}
+              </MenuItem>
+              <MenuItem
+                id="polygon"
+                className="quickFilterAreaItem"
+                data-testid="quick-filter-area-polygon"
+                textValue={t("drawPolygonOption")}
+              >
+                <Pentagon size={16} aria-hidden="true" />
+                {t("drawPolygonOption")}
+              </MenuItem>
+            </MenuSection>
+            {hasShape && (
+              <MenuSection>
+                <MenuItem
+                  id="clear"
+                  className="quickFilterAreaItem"
+                  data-testid="quick-filter-area-clear"
+                  textValue={t("quickFilterAreaClear")}
+                >
+                  <Trash size={16} aria-hidden="true" />
+                  {t("quickFilterAreaClear")}
+                </MenuItem>
+              </MenuSection>
+            )}
+          </Menu>
+        </MenuTrigger>
       </div>
       {hasShape && (
         <button

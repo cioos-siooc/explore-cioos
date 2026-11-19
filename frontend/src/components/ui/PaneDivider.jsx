@@ -59,11 +59,8 @@ export default function PaneDivider({
         if (event.button !== 0) return;
         drag.current = { x: event.clientX, from: value };
         onDragChange(true);
-        // Deliberately no preventDefault, unlike Rail: the compatibility
-        // mousedown is what ui/Dropdown closes an open menu on, and a menu left
-        // open would hang over the plot at the position it was measured at
-        // before the drag. setPointerCapture is optional-called because jsdom
-        // does not implement it at all.
+        // setPointerCapture is optional-called because jsdom does not
+        // implement it at all.
         event.currentTarget.setPointerCapture?.(event.pointerId);
       }}
       onPointerMove={(event) => {

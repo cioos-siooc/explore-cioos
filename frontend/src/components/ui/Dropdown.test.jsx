@@ -1,140 +1,230 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { DropdownButton, Dropdown } from "./Dropdown.jsx";
+import {
+  Dropdown,
+  DropdownButton,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuTrigger,
+  PopoverButton,
+} from "./Dropdown.jsx";
+
+const renderSort = (props = {}) =>
+  render(
+    <DropdownButton title="Sort" data-testid="sort" {...props}>
+      <Dropdown.Item id="az">A-Z</Dropdown.Item>
+      <Dropdown.Item id="za">Z-A</Dropdown.Item>
+    </DropdownButton>,
+  );
 
 describe("DropdownButton / Dropdown.Item", () => {
   it("renders the toggle closed, with the menu absent", () => {
-    render(
-      <DropdownButton title="Sort">
-        <Dropdown.Item>A-Z</Dropdown.Item>
-      </DropdownButton>,
-    );
-    expect(screen.getByRole("button", { name: "Sort" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(screen.queryByText("A-Z")).not.toBeInTheDocument();
+    renderSort();
+    const toggle = screen.getByRole("button", { name: "Sort" });
+    expect(toggle).toHaveAttribute("aria-haspopup", "true");
+    expect(toggle).not.toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("opens the menu on toggle click, closes it on a second click", async () => {
+  it("opens a menu of items on toggle click", async () => {
     const user = userEvent.setup();
-    render(
-      <DropdownButton title="Sort">
-        <Dropdown.Item>A-Z</Dropdown.Item>
-      </DropdownButton>,
+    renderSort();
+    await user.click(screen.getByRole("button", { name: "Sort" }));
+    expect(screen.getByTestId("sort-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
     );
-    const toggle = screen.getByRole("button", { name: "Sort" });
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("A-Z")).toBeInTheDocument();
+    expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual(
+      ["A-Z", "Z-A"],
+    );
+  });
 
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("A-Z")).not.toBeInTheDocument();
+  it("walks the items with the arrow keys and closes on Escape, back on the toggle", async () => {
+    const user = userEvent.setup();
+    renderSort();
+    screen.getByRole("button", { name: "Sort" }).focus();
+    await user.keyboard("{Enter}");
+    const [first, second] = screen.getAllByRole("menuitem");
+    expect(first).toHaveFocus();
+
+    await user.keyboard("{ArrowDown}");
+    expect(second).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    // react-aria restores focus on the next frame.
+    await waitFor(() =>
+      expect(screen.getByTestId("sort-toggle")).toHaveFocus(),
+    );
   });
 
   it("closes the menu on an outside click", async () => {
     const user = userEvent.setup();
-    render(
-      <>
-        <DropdownButton title="Sort">
-          <Dropdown.Item>A-Z</Dropdown.Item>
-        </DropdownButton>
-        <button>elsewhere</button>
-      </>,
-    );
+    renderSort();
     await user.click(screen.getByRole("button", { name: "Sort" }));
-    expect(screen.getByText("A-Z")).toBeInTheDocument();
+    expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "elsewhere" }));
-    expect(screen.queryByText("A-Z")).not.toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("an item click fires onClick and closes the menu", async () => {
+  it("an item's action fires and closes the menu", async () => {
     const user = userEvent.setup();
-    const onClick = vi.fn();
+    const onAction = vi.fn();
     render(
       <DropdownButton title="Sort">
-        <Dropdown.Item onClick={onClick}>A-Z</Dropdown.Item>
+        <Dropdown.Item onAction={onAction}>A-Z</Dropdown.Item>
       </DropdownButton>,
     );
     await user.click(screen.getByRole("button", { name: "Sort" }));
-    await user.click(screen.getByText("A-Z"));
-    expect(onClick).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("A-Z")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "A-Z" }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("reports open/close through onOpenChange", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
-    render(
-      <DropdownButton title="Sort" onOpenChange={onOpenChange}>
-        <Dropdown.Item>A-Z</Dropdown.Item>
-      </DropdownButton>,
-    );
-    await user.click(screen.getByRole("button", { name: "Sort" }));
+    renderSort({ onOpenChange });
+    await user.click(screen.getByTestId("sort-toggle"));
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
-    await user.click(screen.getByRole("button", { name: "Sort" }));
+    await user.keyboard("{Escape}");
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
-  it("leaves the menu width to menuClassName when one is given", async () => {
-    // The floor is an inline style, so it would silently beat menuClassName.
+  it("checks the selected item", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(
-      <DropdownButton title="Sort">
-        <Dropdown.Item>A-Z</Dropdown.Item>
-      </DropdownButton>,
+    renderSort({ selectedKey: "az" });
+    await user.click(screen.getByTestId("sort-toggle"));
+    expect(screen.getByRole("menuitemradio", { name: "A-Z" })).toHaveAttribute(
+      "aria-checked",
+      "true",
     );
-    await user.click(screen.getByRole("button", { name: "Sort" }));
-    expect(document.querySelector(".dropdown-menu").style.minWidth).not.toBe(
-      "",
+    expect(screen.getByRole("menuitemradio", { name: "Z-A" })).toHaveAttribute(
+      "aria-checked",
+      "false",
     );
+  });
 
-    rerender(
-      <DropdownButton title="Sort" menuClassName="wideMenu">
-        <Dropdown.Item>A-Z</Dropdown.Item>
-      </DropdownButton>,
-    );
+  it("floors the menu at the toggle's width unless menuClassName sizes it", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderSort();
+    await user.click(screen.getByTestId("sort-toggle"));
+    expect(
+      document
+        .querySelector(".dropdown-menu")
+        .style.getPropertyValue("min-width"),
+    ).toBe("var(--trigger-width)");
+    unmount();
+
+    renderSort({ menuClassName: "wideMenu" });
+    await user.click(screen.getByTestId("sort-toggle"));
     const menu = document.querySelector(".dropdown-menu");
     expect(menu).toHaveClass("wideMenu");
-    expect(menu.style.minWidth).toBe("");
+    expect(menu.style.getPropertyValue("min-width")).toBe("");
   });
 
-  it("marks the active item", async () => {
-    const user = userEvent.setup();
+  it("puts the tooltip on hover and an icon toggle's name on aria-label", () => {
     render(
-      <DropdownButton title="Sort">
-        <Dropdown.Item active>A-Z</Dropdown.Item>
-        <Dropdown.Item>Z-A</Dropdown.Item>
+      <DropdownButton title={<span />} tooltip="Colour" aria-label="Colour">
+        <Dropdown.Item>Red</Dropdown.Item>
       </DropdownButton>,
     );
-    await user.click(screen.getByRole("button", { name: "Sort" }));
-    expect(screen.getByText("A-Z")).toHaveClass("active");
-    expect(screen.getByText("Z-A")).not.toHaveClass("active");
+    expect(screen.getByRole("button", { name: "Colour" })).toBeInTheDocument();
+    expect(document.querySelector(".dropdown")).toHaveAttribute(
+      "title",
+      "Colour",
+    );
+  });
+});
+
+describe("PopoverButton", () => {
+  it("holds content a menu can't, and closes from inside", async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    render(
+      <PopoverButton title="Colour">
+        {({ close }) => (
+          <>
+            <Dropdown.Option
+              isSelected
+              onChange={() => {
+                onPick("red");
+                close();
+              }}
+            >
+              Red
+            </Dropdown.Option>
+            <input aria-label="Custom" />
+          </>
+        )}
+      </PopoverButton>,
+    );
+    await user.click(screen.getByRole("button", { name: "Colour" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Custom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Red" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Red" }));
+    expect(onPick).toHaveBeenCalledWith("red");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("MenuTrigger (nonModal)", () => {
+  function Area({ onOpenChange }) {
+    const [open, setOpen] = React.useState(false);
+    return (
+      <>
+        <MenuTrigger
+          isOpen={open}
+          nonModal
+          onOpenChange={(next, reason) => {
+            setOpen(next);
+            onOpenChange(next, reason);
+          }}
+        >
+          <MenuButton>Area</MenuButton>
+          <Menu>
+            <MenuItem id="box">Box</MenuItem>
+          </Menu>
+        </MenuTrigger>
+        <button>map</button>
+      </>
+    );
+  }
+
+  it("leaves the page usable and tells an outside close apart", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const onMap = vi.fn();
+    render(<Area onOpenChange={onOpenChange} />);
+    screen.getByRole("button", { name: "map" }).onclick = onMap;
+
+    await user.click(screen.getByRole("button", { name: "Area" }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "map" }));
+
+    expect(onMap).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(onOpenChange).toHaveBeenLastCalledWith(false, "outside");
   });
 
-  it("keeps a menu wider than the room beside its toggle on screen", async () => {
-    // A 300px end-aligned menu under a toggle ending 100px from the left edge
-    // would start at -200px.
-    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
-      left: 40,
-      right: 100,
-      width: 60,
-      bottom: 30,
-    });
-    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(300);
+  it("hands focus back to the trigger after a pick", async () => {
     const user = userEvent.setup();
-    render(
-      <DropdownButton title="Sort" menuClassName="wideMenu" align="end">
-        <Dropdown.Item>A-Z</Dropdown.Item>
-      </DropdownButton>,
-    );
-    await user.click(screen.getByRole("button", { name: "Sort" }));
-    expect(document.querySelector(".dropdown-menu").style.left).toBe("8px");
-    vi.restoreAllMocks();
+    const onOpenChange = vi.fn();
+    render(<Area onOpenChange={onOpenChange} />);
+    await user.click(screen.getByRole("button", { name: "Area" }));
+    await user.click(screen.getByRole("menuitem", { name: "Box" }));
+
+    expect(screen.getByRole("button", { name: "Area" })).toHaveFocus();
+    expect(onOpenChange).toHaveBeenLastCalledWith(false, undefined);
   });
 });

@@ -27,7 +27,6 @@ test.describe("keyboard", () => {
   test("a menu opens on Enter, walks with arrows and closes on Escape", async ({
     page,
   }) => {
-    test.fail(true, "docs/frontend-ui-audit.md step 2: Dropdown → Menu");
     await openApp(page);
     await page.getByTestId("topbar-coverage-button").click();
     const trigger = page.getByTestId("coverage-count-dropdown-toggle");
@@ -35,10 +34,14 @@ test.describe("keyboard", () => {
     await page.keyboard.press("Enter");
 
     const popup = page.locator('[role="menu"], [role="listbox"]');
-    const items = popup.locator('[role^="menuitem"], [role="option"]');
-    await expect(items.first()).toBeFocused();
+    // A pick list opens on what is picked.
+    const checked = popup.locator(
+      '[aria-checked="true"], [aria-selected="true"]',
+    );
+    await expect(checked).toBeFocused();
     await page.keyboard.press("ArrowDown");
-    await expect(items.nth(1)).toBeFocused();
+    await expect(checked).not.toBeFocused();
+    await expect(popup.locator(":focus")).toHaveCount(1);
 
     await page.keyboard.press("Escape");
     await expect(popup).toHaveCount(0);

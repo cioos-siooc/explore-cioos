@@ -85,6 +85,7 @@ export default function WmsLegend({
               size="sm"
               variant="outline-secondary"
               tooltip={t("griddapVariableSelect")}
+              selectedKey={overlay.variable?.name}
               title={
                 <span className="wmsLegendVariableName">
                   {overlay.variable ? variableLabel(overlay.variable) : ""}
@@ -94,8 +95,8 @@ export default function WmsLegend({
               {variables.map((variable) => (
                 <Dropdown.Item
                   key={variable.name}
-                  active={variable.name === overlay.variable?.name}
-                  onClick={() => setActiveWmsOverlay({ ...overlay, variable })}
+                  id={variable.name}
+                  onAction={() => setActiveWmsOverlay({ ...overlay, variable })}
                 >
                   {variableLabel(variable)}
                 </Dropdown.Item>
