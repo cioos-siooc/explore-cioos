@@ -6,28 +6,32 @@ import {
   variablesFrom,
   byColumnName,
   isDownwardVertical,
+  isTimeLike,
   withDataPresence,
 } from "./previewVariables.js";
-import { positionRowsFor, trackIndexFor } from "./previewTrackIndex.js";
-import { distanceRowsFor, trackDistancesFor } from "./previewTrackDistance.js";
+import {
+  POSITION_INDEX_COLUMN,
+  positionRowsFor,
+  trackIndexFor,
+} from "./previewTrackIndex.js";
+import {
+  EUCLIDEAN_DISTANCE_COLUMN,
+  TOTAL_DISTANCE_TRAVELED_COLUMN,
+  distanceRowsFor,
+  trackDistancesFor,
+} from "./previewTrackDistance.js";
+import { CONTOUR_MODE } from "./previewFacetFigure.js";
 import {
   colorCandidatesFor,
   colocatedVerticalFor,
-  colorPlotAxesFor,
   COLUMNS,
   ROWS,
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
-  defaultPlotLayoutFor,
-  hasColorPlotFor,
-  plotLayoutFor,
 } from "./previewFacetPlan.js";
 import { parseColorsParam, formatColorsParam } from "./previewColors.js";
 import {
-  COLOR_LAYOUT,
-  LAYOUT_PARAM,
-  PANELS_LAYOUT,
   PLOT_PARAMS,
   STEP_PARAM,
   ROWS_PARAM,
@@ -56,24 +60,28 @@ export const PLOT_MODES = [
   { value: "markers", labelKey: "markers" },
   { value: "lines", labelKey: "line" },
   { value: "markers+lines", labelKey: "markersAndLine" },
+  { value: CONTOUR_MODE, labelKey: "contour" },
 ];
 
 const DEFAULT_MODE = "markers+lines";
+
+// What a contour fills between: casts side by side along time or the track.
+const TRACK_COLUMNS = new Set([
+  POSITION_INDEX_COLUMN,
+  TOTAL_DISTANCE_TRAVELED_COLUMN,
+  EUCLIDEAN_DISTANCE_COLUMN,
+]);
+
+export const ACROSS = "across";
+export const DOWN = "down";
 
 // X, Y and colour each multiply the grid, so only one of them may hold several
 // variables: `list` keeps just its first when any of `others` already does.
 export const onlyOneMulti = (list, ...others) =>
   others.some((other) => other.length > 1) ? list.slice(0, 1) : list;
 
-// The arrangements, in the order the picker offers them. `panels` draws one
-// variable per panel against a shared axis; `color` draws the same X and Y in
-// every panel and shades each by its own variable.
-export const PLOT_LAYOUTS = [
-  { value: PANELS_LAYOUT, labelKey: "datasetPreviewPlotLayoutPanels" },
-  { value: COLOR_LAYOUT, labelKey: "datasetPreviewPlotLayoutColor" },
-];
-// Each filled panel needs its height and its own colourbar; past this the
-// stack scrolls apart panels meant to be read against each other.
+// Each colour column repeats every panel with its own colourbar; past this the
+// grid scrolls apart panels meant to be read against each other.
 export const MAX_COLOR_PANELS = 5;
 
 // Unticking every variable must not read as "use the defaults", so it writes a
@@ -190,23 +198,30 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     () => facetPlanFor(inspectDataset, variables, plotData),
     [inspectDataset, variables, plotData],
   );
+  // `pzrows` stacks the colour columns' repeats as rows, or lays them across.
   const orientParam = searchParams.get("porient");
+  const colorRowsParam = searchParams.get("pzrows");
   const plan = useMemo(() => {
+    if (!typePlan) return typePlan;
+    const colorRows =
+      colorRowsParam === "1" || colorRowsParam === "0"
+        ? colorRowsParam === "1"
+        : typePlan.colorRows;
     if (
-      !typePlan ||
       (orientParam !== ROWS && orientParam !== COLUMNS) ||
       orientParam === typePlan.orientation
     ) {
-      return typePlan;
+      return { ...typePlan, colorRows };
     }
     return {
       ...typePlan,
+      colorRows,
       orientation: orientParam,
       sharedReversed:
         orientParam === COLUMNS &&
         isDownwardVertical(variablesByName.get(typePlan.sharedAxis)),
     };
-  }, [typePlan, orientParam, variablesByName]);
+  }, [typePlan, orientParam, colorRowsParam, variablesByName]);
 
   const defaultVis = defaultVisFor(inspectDataset);
   const visParam = searchParams.get("vis");
@@ -229,7 +244,6 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     },
     [searchParams, variablesByName],
   );
-  // In the colour plot these are the colour variables.
   const panelRequest = useMemo(
     () =>
       searchParams.has("pvars")
@@ -262,23 +276,9 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [knownListOr, planSharedAxis],
   );
 
-  // A link may ask for the colour plot on a record that has one profile.
-  const colorPlotAvailable = hasColorPlotFor(inspectDataset);
-  const plotLayout = plotLayoutFor(
-    inspectDataset,
-    searchParams.get(LAYOUT_PARAM),
-  );
-  const isColorLayout = plotLayout === COLOR_LAYOUT;
-  const defaultLayout = defaultPlotLayoutFor(inspectDataset);
-  const setPlotLayout = useCallback(
-    (layout) =>
-      setParams({ [LAYOUT_PARAM]: layout === defaultLayout ? null : layout }),
-    [setParams, defaultLayout],
-  );
-
   // One plot with an axis per panel variable: a single shared axis, and no
   // colour dimension, since colour says which axis a curve is read against.
-  const stacked = !isColorLayout && searchParams.get("pstack") === "1";
+  const stacked = searchParams.get("pstack") === "1";
   const setStacked = useCallback(
     (value) => setParams({ pstack: value ? "1" : null }),
     [setParams],
@@ -289,63 +289,18 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [variables],
   );
 
-  // The colour plot's own X and Y — not `paxis`, because a profile's shared
-  // axis is its depth, which the colour plot draws DOWN rather than across.
-  // A link naming a column this dataset does not have falls back, like paxis.
-  const colorAxesDefault = useMemo(() => {
-    const axes = colorPlotAxesFor(inspectDataset, variables, typePlan);
-    return { ...axes, y: colocatedWith(axes.y) || null };
-  }, [inspectDataset, variables, typePlan, colocatedWith]);
-  const colorXs = useMemo(
-    () => knownListOr("pcx", colorAxesDefault.x),
-    [knownListOr, colorAxesDefault],
-  );
-  const colorYs = useMemo(
-    () =>
-      onlyOneMulti(
-        knownListOr("pcy", colorAxesDefault.y).filter(
-          (name) => !colorXs.includes(name),
-        ),
-        colorXs,
-      ),
-    [knownListOr, colorAxesDefault, colorXs],
-  );
-  const colorX = colorXs[0] || null;
-  const colorY = colorYs[0] || null;
-
-  // In the colour plot the panels ARE the colour variables, so `pvars` carries
-  // them and a switch of layout keeps what was picked. Only a column a ramp can
-  // order shades a panel, and neither X nor Y is worth shading by.
-  const resolveForLayout = useCallback(
+  const resolveRequestedPanels = useCallback(
     (requested) =>
-      isColorLayout
-        ? onlyOneMulti(
-            resolvePanels(requested, colorCandidates, [
-              ...colorXs,
-              ...colorYs,
-            ]).slice(0, MAX_COLOR_PANELS),
-            colorXs,
-            colorYs,
-          )
-        : resolvePanels(
-            requested,
-            variables,
-            stacked ? requestedSharedAxes.slice(0, 1) : requestedSharedAxes,
-          ).slice(0, stacked ? MAX_STACKED_AXES : undefined),
-    [
-      isColorLayout,
-      stacked,
-      colorCandidates,
-      colorXs,
-      colorYs,
-      variables,
-      requestedSharedAxes,
-    ],
+      resolvePanels(
+        requested,
+        variables,
+        stacked ? requestedSharedAxes.slice(0, 1) : requestedSharedAxes,
+      ).slice(0, stacked ? MAX_STACKED_AXES : undefined),
+    [variables, stacked, requestedSharedAxes],
   );
-
   const panels = useMemo(
-    () => resolveForLayout(panelRequest),
-    [panelRequest, resolveForLayout],
+    () => resolveRequestedPanels(panelRequest),
+    [panelRequest, resolveRequestedPanels],
   );
 
   // The panels are what the panel layout is for, so they keep their several.
@@ -397,11 +352,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   const setPanels = useCallback(
     (nextPanels) => {
-      const cleaned = resolveForLayout(nextPanels);
+      const cleaned = resolveRequestedPanels(nextPanels);
       const isDefault = plan && sameList(cleaned, plan.panelDefaults);
       setParams({ pvars: isDefault ? null : listToParam(cleaned) });
     },
-    [setParams, plan, resolveForLayout],
+    [setParams, plan, resolveRequestedPanels],
   );
 
   // Keyed by column name, not panel index, so a colour survives untick/retick and
@@ -424,9 +379,16 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   );
 
   // The third dimension: one column shading every panel. Not a second axis —
-  // the panels keep the two they had — so it defaults to off and is written only
-  // when the user turns it on.
-  const colorParam = searchParams.get("pz");
+  // the panels keep the two they had — so it is off unless the type's plan
+  // shades by default (a section's EOVs); turning a default off writes the
+  // sentinel.
+  const colorDefaults = useMemo(
+    () => (plan && plan.colorDefaults) || [],
+    [plan],
+  );
+  const colorParam = searchParams.has("pz")
+    ? searchParams.get("pz")
+    : colorDefaults.join(",");
   // A link may name a column this dataset does not have, or one a ramp cannot
   // order. OFF rather than substituted — unlike paxis, which falls back to the
   // plan's own axis: "colour by something else instead" is a decision nobody
@@ -451,7 +413,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   );
   const colorAxis = colorAxes[0] ?? null;
 
-  // Every colour column's scale, in either layout, keyed by column like
+  // Every colour column's scale, keyed by column like
   // `pcolors`. A link from before per-column scales carries one `pzscale`,
   // which meant the first colour column's.
   const legacyScale = normalizeColorScale(searchParams.get("pzscale"));
@@ -478,14 +440,16 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   const setColorAxes = useCallback(
     (columnNames) =>
       setParams({
-        pz: columnNames.length ? columnNames.join(",") : null,
+        pz: sameList(columnNames, colorDefaults)
+          ? null
+          : listToParam(columnNames),
         pzscales: formatScalesParam(variableScales),
         pzscale: null,
       }),
-    [setParams, variableScales],
+    [setParams, variableScales, colorDefaults],
   );
   // Off: each colour column in its own scale. On: all in the first one's.
-  const colorColumns = isColorLayout ? panels : colorAxes;
+  const colorColumns = colorAxes;
   const sharedColorScale = searchParams.get("pzshare") === "1";
   const setSharedColorScale = useCallback(
     (shared) => setParams({ pzshare: shared ? "1" : null }),
@@ -506,36 +470,42 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     (columnName) => setColorAxes(columnName ? [columnName] : []),
     [setColorAxes],
   );
-  // Like setSharedAxis: moving X or Y onto a colour variable drops it from the
-  // panels in the SAME write, so the URL never keeps a panel that is not drawn.
-  const setColorPlotAxes = useCallback(
-    (param, columnNames, defaultName) => {
-      const remaining = panels.filter((name) => !columnNames.includes(name));
-      const panelsAreDefault = plan && sameList(remaining, plan.panelDefaults);
+
+  // Only one of the panels, the shared axes and the colour columns may hold
+  // several, so the facets always run one way: ACROSS or DOWN. Colour repeats
+  // turn on their own; panels and shared axes turn by swapping the plot's
+  // axes, since a shared axis has to stay shared.
+  const facetCount = stacked
+    ? 1
+    : Math.max(panels.length, sharedAxes.length, colorAxes.length);
+  const facetsByColor = !stacked && colorAxes.length > 1;
+  const facetDirection = useMemo(() => {
+    if (!plan) return null;
+    if (facetsByColor) return plan.colorRows ? DOWN : ACROSS;
+    const panelsAcross = plan.orientation === COLUMNS;
+    return panels.length > 1 === panelsAcross ? ACROSS : DOWN;
+  }, [plan, facetsByColor, panels.length]);
+  const setFacetDirection = useCallback(
+    (direction) => {
+      if (!typePlan || direction === facetDirection) return;
+      if (facetsByColor) {
+        const colorRows = direction === DOWN;
+        setParams({
+          pzrows:
+            colorRows === Boolean(typePlan.colorRows)
+              ? null
+              : colorRows
+                ? "1"
+                : "0",
+        });
+        return;
+      }
+      const orientation = plan.orientation === COLUMNS ? ROWS : COLUMNS;
       setParams({
-        [param]: sameList(columnNames, [defaultName])
-          ? null
-          : columnNames.join(","),
-        pvars: panelsAreDefault ? null : listToParam(remaining),
+        porient: orientation === typePlan.orientation ? null : orientation,
       });
     },
-    [setParams, plan, panels],
-  );
-  const setColorXs = useCallback(
-    (columnNames) => setColorPlotAxes("pcx", columnNames, colorAxesDefault.x),
-    [setColorPlotAxes, colorAxesDefault],
-  );
-  const setColorYs = useCallback(
-    (columnNames) => setColorPlotAxes("pcy", columnNames, colorAxesDefault.y),
-    [setColorPlotAxes, colorAxesDefault],
-  );
-  const setColorX = useCallback(
-    (columnName) => setColorXs([columnName]),
-    [setColorXs],
-  );
-  const setColorY = useCallback(
-    (columnName) => setColorYs([columnName]),
-    [setColorYs],
+    [setParams, typePlan, plan, facetDirection, facetsByColor],
   );
 
   // Each variable on a Y axis is drawn downwards by default when it is a depth
@@ -543,13 +513,10 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // like `pcolors`, so a flip survives the variable leaving Y and coming back.
   const yAxisColumns = useMemo(
     () =>
-      (isColorLayout
-        ? colorYs
-        : plan && plan.orientation === COLUMNS
-          ? sharedAxes
-          : panels
-      ).filter(Boolean),
-    [isColorLayout, colorYs, plan, sharedAxes, panels],
+      (plan && plan.orientation === COLUMNS ? sharedAxes : panels).filter(
+        Boolean,
+      ),
+    [plan, sharedAxes, panels],
   );
   const reversedByDefault = useCallback(
     (columnName) => isDownwardVertical(variablesByName.get(columnName)),
@@ -579,8 +546,33 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams, flippedColumns, reversedByDefault],
   );
 
+  // A contour only reads as a section: casts across, depth down, shaded.
+  const xAxisColumns = useMemo(
+    () => (plan && plan.orientation === COLUMNS ? panels : sharedAxes),
+    [plan, panels, sharedAxes],
+  );
+  const contourAvailable =
+    colorAxes.length > 0 &&
+    xAxisColumns.length > 0 &&
+    yAxisColumns.length > 0 &&
+    xAxisColumns.every(
+      (columnName) =>
+        TRACK_COLUMNS.has(columnName) ||
+        isTimeLike(variablesByName.get(columnName)),
+    ) &&
+    yAxisColumns.every(reversedByDefault);
+  const plotModes = useMemo(
+    () =>
+      contourAvailable
+        ? PLOT_MODES
+        : PLOT_MODES.filter((mode) => mode.value !== CONTOUR_MODE),
+    [contourAvailable],
+  );
+
+  // A contour the link asks for where none can be drawn is the default, but
+  // stays in the link for when the axes come back.
   const modeParam = searchParams.get("pmode");
-  const plotType = PLOT_MODES.some((mode) => mode.value === modeParam)
+  const plotType = plotModes.some((mode) => mode.value === modeParam)
     ? modeParam
     : DEFAULT_MODE;
   const setPlotType = useCallback(
@@ -614,9 +606,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // Changes with the axis set, so Plotly does not restore a zoom onto an axis
   // that no longer exists. A flipped Y counts too: a kept zoom would hold the
   // old direction's range.
-  const axisSet = isColorLayout
-    ? `color|${colorXs.join(",")}|${colorYs.join(",")}|${panels.join(",")}`
-    : `${stacked ? "stack|" : ""}${sharedAxes.join(",")}|${panels.join(",")}|${colorAxes.join(",")}`;
+  const axisSet = `${stacked ? "stack|" : ""}${plan?.orientation}|${plan?.colorRows ? "zrows|" : ""}${sharedAxes.join(",")}|${panels.join(",")}|${colorAxes.join(",")}`;
   const uirevision = `${axisSet}|${[...reversedYAxes].join(",")}`;
 
   // The whole search string: panning the map changes the link too.
@@ -657,19 +647,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setColorAxis,
       colorAxes,
       setColorAxes,
-      plotLayout,
-      setPlotLayout,
-      colorPlotAvailable,
       stacked,
       setStacked,
-      colorX,
-      setColorX,
-      colorY,
-      setColorY,
-      colorXs,
-      setColorXs,
-      colorYs,
-      setColorYs,
+      facetCount,
+      facetDirection,
+      setFacetDirection,
       variableScales,
       setVariableScale,
       colorColumns,
@@ -679,6 +661,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       yAxisColumns,
       reversedYAxes,
       setYAxisReversed,
+      plotModes,
       plotType,
       setPlotType,
       step,
@@ -714,19 +697,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setColorAxis,
       colorAxes,
       setColorAxes,
-      plotLayout,
-      setPlotLayout,
-      colorPlotAvailable,
       stacked,
       setStacked,
-      colorX,
-      setColorX,
-      colorY,
-      setColorY,
-      colorXs,
-      setColorXs,
-      colorYs,
-      setColorYs,
+      facetCount,
+      facetDirection,
+      setFacetDirection,
       variableScales,
       setVariableScale,
       colorColumns,
@@ -736,6 +711,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       yAxisColumns,
       reversedYAxes,
       setYAxisReversed,
+      plotModes,
       plotType,
       setPlotType,
       step,

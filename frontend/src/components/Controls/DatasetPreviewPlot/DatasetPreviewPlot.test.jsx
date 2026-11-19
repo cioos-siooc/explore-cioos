@@ -67,7 +67,7 @@ const DATASET = {
   first_eov_column: "temperature",
 };
 
-// The colour plot is offered only for a record holding many profiles.
+// A record holding many profiles.
 const STATION = { ...DATASET, cdm_data_type: "TimeSeriesProfile" };
 
 function open(url = "/", dataset = DATASET, table = TABLE, sample) {
@@ -163,91 +163,6 @@ describe("DatasetPreviewPlot", () => {
     expect(rowCaptioned("Y axis")).toHaveTextContent("temperature");
   });
 
-  it("swaps to the colour plot's controls when its layout is picked", async () => {
-    const user = open("/?playout=panels", STATION);
-    await plotted();
-    const layout = screen.getByTestId("preview-layout-toggle");
-    expect(screen.getByRole("button", { name: "Panels" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await user.click(screen.getByRole("button", { name: "Color plot" }));
-    expect(layout).toContainElement(
-      screen.getByRole("button", { name: "Color plot", pressed: true }),
-    );
-
-    await waitFor(() =>
-      expect(screen.getByTestId("plotly")).toHaveAttribute(
-        "data-hovermode",
-        "closest",
-      ),
-    );
-    expect(rowCaptioned("X axis")).toHaveTextContent("time");
-    expect(rowCaptioned("Y axis")).toHaveTextContent("depth");
-    // The same searchable pickers as the panel layout's axes.
-    expect(variableSearch("X axis")).toBeInTheDocument();
-    expect(variableSearch("Y axis")).toBeInTheDocument();
-    // Color by is the multi-pick now, and the single colour dimension's scale
-    // row is not offered.
-    expect(rowCaptioned("Color by")).toHaveTextContent("temperature");
-    expect(screen.queryByText("Color scale")).not.toBeInTheDocument();
-    // A filled colour plot has no markers or line to choose between.
-    expect(screen.queryByText("Plot type")).not.toBeInTheDocument();
-  });
-
-  it("caps the colour plot at five variables, a link's extras dropped", async () => {
-    const measurements = ["m1", "m2", "m3", "m4", "m5", "m6", "m7"];
-    const wideTable = {
-      columnNames: ["depth", "time", ...measurements],
-      columnTypes: ["float", "String", ...measurements.map(() => "float")],
-      columnUnits: ["m", "UTC", ...measurements.map(() => null)],
-      rows: [
-        [0, "2024-01-01T00:00:00Z", ...measurements.map(() => 1)],
-        [5, "2024-01-01T00:05:00Z", ...measurements.map(() => 2)],
-      ],
-    };
-    const user = open(
-      "/?playout=color&pvars=m1,m2,m3,m4,m5,m6",
-      { ...STATION, first_eov_column: "m1" },
-      wideTable,
-    );
-    await plotted();
-    expect(rowCaptioned("Color by")).toHaveTextContent("m5");
-    expect(rowCaptioned("Color by")).not.toHaveTextContent("m6");
-
-    await user.click(variableSearch("Color by"));
-    expect(screen.getByText("Up to 5 variables")).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "m6" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-  });
-
-  it("grids the colour plot across several X, unpinned", async () => {
-    const user = open("/?playout=color", STATION);
-    await plotted();
-    expect(document.querySelector(".pinnedAxis")).not.toBeNull();
-
-    await user.click(variableSearch("X axis"));
-    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
-
-    await waitFor(() => expect(traceCount()).toBe(2));
-    expect(rowCaptioned("X axis")).toHaveTextContent("time");
-    expect(rowCaptioned("X axis")).toHaveTextContent("salinity");
-    expect(document.querySelector(".pinnedAxis")).toBeNull();
-  });
-
-  it("offers a scale per colour variable in More options, not a colour", async () => {
-    const user = open("/?playout=color", STATION);
-    await plotted();
-    await user.click(screen.getByRole("button", { name: "More options" }));
-    const row = document
-      .querySelector('label[for="rename-temperature"]')
-      .closest(".labelEditorRow");
-    expect(row.querySelector(".colorScaleChip")).not.toBeNull();
-    expect(row.querySelector(".dropdownButtonSwatch")).toBeNull();
-  });
-
   it("inverts a lone Y axis from the row that picks it, pressed for a depth", async () => {
     const user = open();
     const plot = await plotted();
@@ -336,14 +251,7 @@ describe("DatasetPreviewPlot", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers no layout for a record of one profile, its link's included", async () => {
-    open("/?playout=color");
-    const plot = await plotted();
-    expect(screen.queryByText("Layout")).not.toBeInTheDocument();
-    expect(plot).toHaveAttribute("data-hovermode", "y unified"); // still panels
-  });
-
-  it("draws every profile in the colour plot, so it has no cast slider", async () => {
+  it("opens a record of many casts as a section, with a cast slider", async () => {
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -356,30 +264,16 @@ describe("DatasetPreviewPlot", () => {
           }),
       }),
     );
-    const user = open("/?playout=panels", STATION);
-    await plotted();
+    open("/", STATION);
+    const plot = await plotted();
+    expect(plot).toHaveAttribute("data-hovermode", "x");
+    expect(rowCaptioned("X axis")).toHaveTextContent("time");
+    expect(rowCaptioned("Y axis")).toHaveTextContent("depth");
+    expect(rowCaptioned("Color by")).toHaveTextContent("temperature");
     expect(
       await screen.findByRole("button", { name: "Previous profile" }),
     ).toBeInTheDocument();
-
-    const layout = screen.getByTestId("preview-layout-toggle");
-    expect(screen.getByRole("button", { name: "Panels" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await user.click(screen.getByRole("button", { name: "Color plot" }));
-    expect(layout).toContainElement(
-      screen.getByRole("button", { name: "Color plot", pressed: true }),
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "Previous profile" }),
-      ).not.toBeInTheDocument(),
-    );
-    expect(
-      screen.getByRole("heading", { name: "Profile: record-1" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Layout")).not.toBeInTheDocument();
   });
 
   it("draws no header row for a record holding a single cast", async () => {
@@ -526,6 +420,29 @@ describe("DatasetPreviewPlot", () => {
       expect(row.querySelectorAll(".colorScaleItem")).toHaveLength(0),
     );
     expect(row.querySelectorAll(".colorScaleChip").length).toBeGreaterThan(0);
+  });
+
+  it("offers the panels' direction only once there are several", async () => {
+    const user = open();
+    await plotted();
+    expect(screen.queryByText("Panels")).not.toBeInTheDocument();
+
+    await user.click(variableSearch("X axis"));
+    await user.click(screen.getByRole("option", { name: "salinity (PSU)" }));
+    const row = await waitFor(() => rowCaptioned("Panels"));
+    expect(
+      within(row).getByRole("button", { name: "Side by side" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(row).getByRole("button", { name: "Stacked" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("plotly")).toHaveAttribute(
+        "data-hovermode",
+        "x",
+      ),
+    );
+    expect(rowCaptioned("Y axis")).toHaveTextContent("temperature");
+    expect(rowCaptioned("X axis")).toHaveTextContent("depth");
   });
 
   it("moves the panels to the other axis when it takes a second variable", async () => {

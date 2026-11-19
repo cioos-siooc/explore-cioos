@@ -13,8 +13,7 @@ import { COLUMNS } from "./previewFacetPlan.js";
 import { pinnedAxisSizeFor } from "./previewFacetSizing.js";
 import { PLOT_FONT, TICK_FONT_PX } from "./previewLabelText.js";
 
-// A profile shares its vertical axis, a stack (and the colour plot) its
-// horizontal one.
+// A profile shares its vertical axis, a stack its horizontal one.
 export const PINNED_AXIS_LETTER = { [COLUMNS]: "y" };
 const pinnedLetterFor = (orientation) => PINNED_AXIS_LETTER[orientation] || "x";
 export const pinnedAxisKeyFor = (orientation) =>

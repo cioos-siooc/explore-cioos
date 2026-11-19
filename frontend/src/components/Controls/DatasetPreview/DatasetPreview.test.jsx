@@ -328,26 +328,11 @@ describe("DatasetPreview", () => {
       open({
         table: STATION_TABLE,
         dataset: STATION,
-        url: "/?playout=panels",
+        url: "/",
         sample: { rowCount: 3, totalRowCount: 26131 },
       });
       expect(
         await screen.findByText("Sample: 2 of 335 profiles · 3 of 26,131 rows"),
-      ).toBeInTheDocument();
-    });
-
-    it("says the colour plot draws every profile in the window", async () => {
-      listsProfiles();
-      open({
-        table: STATION_TABLE,
-        dataset: STATION,
-        url: "/?playout=color",
-        sample: { rowCount: 3, totalRowCount: 26131 },
-      });
-      expect(
-        await screen.findByText(
-          "Sample: every profile in the latest 3 of 26,131 rows (2 of 335 profiles)",
-        ),
       ).toBeInTheDocument();
     });
 
@@ -356,7 +341,7 @@ describe("DatasetPreview", () => {
       open({
         table: STATION_TABLE,
         dataset: STATION,
-        url: "/?pstep=cast-1&playout=panels",
+        url: "/?pstep=cast-1",
         sample: { rowCount: 3, totalRowCount: 1500 },
       });
       await waitFor(() => expect(global.fetch).toHaveBeenCalled());

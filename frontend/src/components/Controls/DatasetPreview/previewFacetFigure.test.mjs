@@ -9,7 +9,6 @@ import {
   trackIndexFor,
 } from "./previewTrackIndex.js";
 import {
-  buildColorFigure,
   buildFigure,
   TICK_SPACING_PX,
   buildGridFigure,
@@ -35,7 +34,6 @@ import {
   plotHeightFor,
   plotWidthFor,
   titleRoomFor,
-  COLORBAR_ROOM_PX,
   COLUMN_GAP,
   MIN_PANEL_PX,
   TOOLBAR_ROOM_PX,
@@ -110,14 +108,14 @@ const figure = (type, panels, extra) => figureFrom(VIKING, type, panels, extra);
 // --- profile layout (COLUMNS) ------------------------------------------------
 
 test("a profile gets one shared y axis and one x axis per panel", () => {
-  const { data, layout } = figure("TimeSeriesProfile", ALL_SIX);
+  const { data, layout } = figure("Profile", ALL_SIX);
   assert.equal(data.length, 6);
   assert.equal(Object.keys(layout).filter((k) => /^yaxis/.test(k)).length, 1);
   assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 6);
 });
 
 test("the shared depth axis is reversed, and titled along itself", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX);
+  const { layout } = figure("Profile", ALL_SIX);
   assert.equal(layout.yaxis.autorange, "reversed");
   assert.equal(layout.yaxis.title.text, "depth of observation (m)");
   assert.equal(layout.yaxis.automargin, true);
@@ -130,7 +128,7 @@ const withDepths = (from, to) =>
     depth: from + ((to - from) * i) / (DATA.length - 1),
   }));
 const depthRange = (data) =>
-  figure("TimeSeriesProfile", ALL_SIX, { data }).layout.yaxis.autorangeoptions;
+  figure("Profile", ALL_SIX, { data }).layout.yaxis.autorangeoptions;
 
 test("a profile starting near 0 stops its depth axis at 0", () => {
   assert.deepEqual(depthRange(withDepths(2, 100)), {
@@ -172,7 +170,7 @@ test("a timeseries' shared time axis is left to Plotly", () => {
 });
 
 test("the user can draw the shared depth axis upwards", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
+  const { layout } = figure("Profile", ALL_SIX, {
     reversedYAxes: new Set(),
   });
   assert.equal(layout.yaxis.autorange, undefined);
@@ -188,7 +186,7 @@ test("a stack reverses only the panels it is asked to", () => {
 });
 
 test("profile panel titles sit on top, one per variable", () => {
-  const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
+  const { layout } = figure("Profile", ["TE90_01", "PSAL_01"]);
   assert.equal(layout.xaxis.side, "top");
   assert.equal(layout.xaxis.title.text, "Temperature (1990 scale) (degree_C)");
   assert.equal(layout.xaxis2.side, "top");
@@ -196,7 +194,7 @@ test("profile panel titles sit on top, one per variable", () => {
 });
 
 test("every profile trace shares y and takes its own x", () => {
-  const { data } = figure("TimeSeriesProfile", ALL_SIX);
+  const { data } = figure("Profile", ALL_SIX);
   assert.deepEqual(
     data.map((t) => t.yaxis),
     Array(6).fill("y"),
@@ -208,7 +206,7 @@ test("every profile trace shares y and takes its own x", () => {
 });
 
 test("a profile puts the variable across and depth down", () => {
-  const { data } = figure("TimeSeriesProfile", ["TE90_01"]);
+  const { data } = figure("Profile", ["TE90_01"]);
   assert.deepEqual(
     data[0].x,
     DATA.map((r) => r.TE90_01),
@@ -263,18 +261,18 @@ test("a timeseries puts time across and the variable up", () => {
 // --- shared behaviour -------------------------------------------------------
 
 test("one variable is a single panel filling the area, not a special case", () => {
-  const { data, layout } = figure("TimeSeriesProfile", ["TE90_01"]);
+  const { data, layout } = figure("Profile", ["TE90_01"]);
   assert.equal(data.length, 1);
   assert.deepEqual(layout.xaxis.domain, [0, 1]);
   assert.equal(layout.yaxis.domain[0], 0);
 });
 
 test("the legend is off — each panel is already titled", () => {
-  assert.equal(figure("TimeSeriesProfile", ALL_SIX).layout.showlegend, false);
+  assert.equal(figure("Profile", ALL_SIX).layout.showlegend, false);
 });
 
 test("explicit width and height are passed through, replacing autosize", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
+  const { layout } = figure("Profile", ALL_SIX, {
     size: { width: 900, height: 640 },
   });
   assert.equal(layout.width, 900);
@@ -284,21 +282,21 @@ test("explicit width and height are passed through, replacing autosize", () => {
 
 test("uirevision is carried so a changed axis set does not restore a stale zoom", () => {
   assert.equal(
-    figure("TimeSeriesProfile", ALL_SIX, { uirevision: "rec|depth|a,b" }).layout
+    figure("Profile", ALL_SIX, { uirevision: "rec|depth|a,b" }).layout
       .uirevision,
     "rec|depth|a,b",
   );
 });
 
 test("a custom label replaces the name but keeps the unit", () => {
-  const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
+  const { layout } = figure("Profile", ["TE90_01"], {
     labels: { TE90_01: "Temp" },
   });
   assert.equal(layout.xaxis.title.text, "Temp (degree_C)");
 });
 
 test("no rows yet still produces the full axis skeleton", () => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
   const variables = variablesFrom(VIKING, dataset);
   const plan = facetPlanFor(dataset, variables, undefined);
   const { data, layout } = buildFigure({
@@ -362,14 +360,14 @@ test("a stack keeps its shared axis title", () => {
 });
 
 test("a profile titles its panels on top and its shared axis beside them", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX);
+  const { layout } = figure("Profile", ALL_SIX);
   assert.equal(layout.xaxis.side, "top");
   assert.ok(layout.xaxis.title.text);
   assert.ok(layout.yaxis.title.text);
 });
 
 test("labels head their ticks and the title heads the labels, at the size the wrap estimate assumes", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX);
+  const { layout } = figure("Profile", ALL_SIX);
   assert.equal(layout.font.size, TICK_FONT_PX);
   assert.ok(TICK_FONT_PX < LABEL_FONT_PX && LABEL_FONT_PX < TITLE_FONT_PX);
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
@@ -385,7 +383,7 @@ test("the hover box keeps a readable size rather than the ticks' size", () => {
 // --- wrapping ----------------------------------------------------------------
 
 test("panel titles wrap to their own panel once the width is known", () => {
-  const wide = figure("TimeSeriesProfile", ALL_SIX, {
+  const wide = figure("Profile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   const titles = ALL_SIX.map(
@@ -408,12 +406,12 @@ test("panel titles wrap to their own panel once the width is known", () => {
     titles.filter((text) => text.includes("<br>")).length >= 5,
     titles.join(" | "),
   );
-  const unsized = figure("TimeSeriesProfile", ALL_SIX);
+  const unsized = figure("Profile", ALL_SIX);
   assert.ok(!unsized.layout.xaxis.title.text.includes("<br>"));
 });
 
 test("a profile's top margin holds its tallest panel title", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
+  const { layout } = figure("Profile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   const tallest = Math.max(
@@ -432,14 +430,14 @@ test("a profile's top margin holds its tallest panel title", () => {
 });
 
 test("one panel is wide enough not to wrap", () => {
-  const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
+  const { layout } = figure("Profile", ["TE90_01"], {
     size: { width: 1140, height: 620 },
   });
   assert.ok(!layout.xaxis.title.text.includes("<br>"));
 });
 
 test("the hover names the column by its capped long_name", () => {
-  const { data } = figure("TimeSeriesProfile", ALL_SIX, {
+  const { data } = figure("Profile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   assert.ok(data[0].layout === undefined);
@@ -472,7 +470,7 @@ test("a column with no unit leaves no trailing space", () => {
       VIKING.columnNames[index] === "TE90_01" ? null : unit,
     ),
   };
-  const { data } = figureFrom(noUnit, "TimeSeriesProfile", ["TE90_01"]);
+  const { data } = figureFrom(noUnit, "Profile", ["TE90_01"]);
   assert.equal(
     data[0].hovertemplate,
     "Temperature (1990 sca…: %{x}<extra></extra>",
@@ -480,14 +478,14 @@ test("a column with no unit leaves no trailing space", () => {
 });
 
 test("a renamed variable is renamed in the hover too", () => {
-  const { data } = figure("TimeSeriesProfile", ["TE90_01"], {
+  const { data } = figure("Profile", ["TE90_01"], {
     labels: { TE90_01: "  Temp  " },
   });
   assert.ok(data[0].hovertemplate.startsWith("Temp: %{x} degree_C"));
 });
 
 test("one hover answers on every panel that shares the axis", () => {
-  const columns = figure("TimeSeriesProfile", ALL_SIX);
+  const columns = figure("Profile", ALL_SIX);
   const rows = figure("TimeSeries", ALL_SIX);
   // The shared axis in each layout: depth down the side, time along the bottom.
   // Unified for the profile, because plain "y" is the one Plotly draws at 60°.
@@ -500,7 +498,7 @@ test("one hover answers on every panel that shares the axis", () => {
 });
 
 test("a unified box is titled with the axis its rows share", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX);
+  const { layout } = figure("Profile", ALL_SIX);
   // Left alone, Plotly titles it with the bare number.
   assert.equal(
     layout.yaxis.unifiedhovertitle.text,
@@ -514,7 +512,7 @@ test("a unified box is titled with the axis its rows share", () => {
 });
 
 test("the spike runs across the panels, on the shared axis alone", () => {
-  const columns = figure("TimeSeriesProfile", ALL_SIX).layout;
+  const columns = figure("Profile", ALL_SIX).layout;
   assert.equal(columns.yaxis.showspikes, true);
   assert.equal(columns.yaxis.spikemode, "across");
   // Still reversed: the spike is spread in beside the depth direction, not over
@@ -538,7 +536,7 @@ test("the spike runs across the panels, on the shared axis alone", () => {
 // --- one colour per variable -------------------------------------------------
 
 test("a variable with no declared palette takes the next colour along", () => {
-  const { data } = figure("TimeSeriesProfile", ALL_SIX);
+  const { data } = figure("Profile", ALL_SIX);
   const colors = data.map((t) => t.marker.color);
   assert.equal(new Set(colors).size, 6);
   colors.forEach((color, index) => {
@@ -549,7 +547,7 @@ test("a variable with no declared palette takes the next colour along", () => {
 });
 
 test("a declared colorBarPalette decides the variable's colour", () => {
-  const { data } = figureFrom(VIKING_PALETTES, "TimeSeriesProfile", [
+  const { data } = figureFrom(VIKING_PALETTES, "Profile", [
     "TE90_01",
     "PSAL_01",
     "DOXY_01",
@@ -561,7 +559,7 @@ test("a declared colorBarPalette decides the variable's colour", () => {
 });
 
 test("the user's colour beats both, on the line as well as the markers", () => {
-  const { data } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"], {
+  const { data } = figure("Profile", ["TE90_01", "PSAL_01"], {
     colors: { PSAL_01: "#123456" },
   });
   assert.equal(data[1].marker.color, "#123456");
@@ -570,7 +568,7 @@ test("the user's colour beats both, on the line as well as the markers", () => {
 });
 
 test("no colour column means no colourbar, and no width kept for one", () => {
-  const { data, layout } = figure("TimeSeriesProfile", ALL_SIX);
+  const { data, layout } = figure("Profile", ALL_SIX);
   data.forEach((trace) => {
     assert.ok(!trace.marker.colorbar);
     assert.ok(!("showscale" in trace.marker));
@@ -584,7 +582,7 @@ test("no colour column means no colourbar, and no width kept for one", () => {
 test("lines-only stays lines while no colour column is set", () => {
   // Markers are forced only when colouring is on, because a per-point colour
   // has nothing to render on without one. See the colour dimension below.
-  const { data } = figure("TimeSeriesProfile", ["TE90_01"], { mode: "lines" });
+  const { data } = figure("Profile", ["TE90_01"], { mode: "lines" });
   assert.equal(data[0].mode, "lines");
 });
 
@@ -639,10 +637,11 @@ test("a cf_role column with nothing in it is skipped, not printed empty", () => 
 });
 
 test("a box without the title gives its lines back to the panels", () => {
-  const variables = variablesFrom(VIKING, VIKING_DATASET);
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  const variables = variablesFrom(VIKING, dataset);
   const box = (withTitle) =>
     plotBoxFor({
-      plan: facetPlanFor(VIKING_DATASET, variables, DATA),
+      plan: facetPlanFor(dataset, variables, DATA),
       variablesByName: byColumnName(variables),
       data: DATA,
       panelCount: 6,
@@ -672,7 +671,7 @@ const panelTitleLines = (layout) =>
   layout.xaxis.title.text.split("<br>").length;
 
 test("the title is drawn where Plotly draws a title, and not by automargin", () => {
-  const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
+  const { layout } = figure("Profile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   assert.equal(layout.title.text, TITLE);
@@ -689,10 +688,10 @@ test("the title is drawn where Plotly draws a title, and not by automargin", () 
 test("the title costs the top margin only the lines it actually used", () => {
   assert.equal(titleLinesFor(TITLE, 1140), 1);
   assert.equal(titleLinesFor(TITLE, 340), 2);
-  const wide = figure("TimeSeriesProfile", ["TE90_01"], {
+  const wide = figure("Profile", ["TE90_01"], {
     size: { width: 1140, height: 620 },
   });
-  const narrow = figure("TimeSeriesProfile", ["TE90_01"], {
+  const narrow = figure("Profile", ["TE90_01"], {
     size: { width: 340, height: 620 },
   });
   assert.equal(
@@ -708,7 +707,7 @@ test("the title costs the top margin only the lines it actually used", () => {
 });
 
 test("no title means no title and no room reserved for one", () => {
-  const { layout } = figure("TimeSeriesProfile", ["TE90_01"], { title: "" });
+  const { layout } = figure("Profile", ["TE90_01"], { title: "" });
   assert.ok(!layout.title);
   assert.equal(
     layout.margin.t,
@@ -726,7 +725,7 @@ test("a profile spends the whole budget it is given", () => {
 // --- the colour dimension ----------------------------------------------------
 
 const colored = (panels, extra = {}) =>
-  figureFrom(VIKING_PALETTES, "TimeSeriesProfile", panels, {
+  figureFrom(VIKING_PALETTES, "Profile", panels, {
     colorAxis: "depth",
     ...extra,
   });
@@ -770,14 +769,9 @@ test("the range is the record's own, not the catalogue's", () => {
 });
 
 test("the colour column's own palette is what the bar opens in", () => {
-  const { layout } = figureFrom(
-    VIKING_PALETTES,
-    "TimeSeriesProfile",
-    ["FLOR_01"],
-    {
-      colorAxis: "PSAL_01",
-    },
-  );
+  const { layout } = figureFrom(VIKING_PALETTES, "Profile", ["FLOR_01"], {
+    colorAxis: "PSAL_01",
+  });
   assert.deepEqual(layout.coloraxis.colorscale, paletteFor("KT_haline"));
 });
 
@@ -788,12 +782,12 @@ test("a rainbow colour column is drawn in viridis, and a pick beats both", () =>
       meta.name === "PSAL_01" ? { ...meta, colorBarPalette: "Rainbow" } : meta,
     ),
   };
-  const auto = figureFrom(rainbow, "TimeSeriesProfile", ["FLOR_01"], {
+  const auto = figureFrom(rainbow, "Profile", ["FLOR_01"], {
     colorAxis: "PSAL_01",
   });
   assert.deepEqual(auto.layout.coloraxis.colorscale, colorScaleFor("Viridis"));
 
-  const picked = figureFrom(rainbow, "TimeSeriesProfile", ["FLOR_01"], {
+  const picked = figureFrom(rainbow, "Profile", ["FLOR_01"], {
     colorAxis: "PSAL_01",
     colorScale: "KT_algae",
   });
@@ -853,7 +847,7 @@ test("markers alone, or no colour column, add no line traces", () => {
     colored(["TE90_01", "PSAL_01"], { mode: "markers" }).data.length,
     2,
   );
-  const plain = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"], {
+  const plain = figure("Profile", ["TE90_01", "PSAL_01"], {
     mode: "markers+lines",
   });
   assert.equal(plain.data.length, 2);
@@ -869,7 +863,7 @@ test("a colour column costs the panels no width at all", () => {
   const panels = (width - margin.l - margin.r) / panelPitch(6, COLUMN_GAP);
   assert.ok(panels >= MIN_PANEL_PX, `${panels}px panels`);
   assert.deepEqual(colored(ALL_SIX).layout.margin, {
-    ...figure("TimeSeriesProfile", ALL_SIX).layout.margin,
+    ...figure("Profile", ALL_SIX).layout.margin,
   });
 });
 
@@ -893,7 +887,7 @@ test("the legend carries the label, the stops and the ticks", () => {
 });
 
 test("no colour column, no legend", () => {
-  assert.equal(figure("TimeSeriesProfile", ALL_SIX).colorLegend, null);
+  assert.equal(figure("Profile", ALL_SIX).colorLegend, null);
 });
 
 test("hover gains the colour value, off customdata", () => {
@@ -918,12 +912,9 @@ test("hover gains the colour value, off customdata", () => {
 test("a unified box prints the colour value once, on the first panel", () => {
   // Every row of it comes from the same data row, so one line per panel would
   // be the same number N times.
-  const { data } = figureFrom(
-    VIKING,
-    "TimeSeriesProfile",
-    ["TE90_01", "DOXY_01"],
-    { colorAxis: "PSAL_01" },
-  );
+  const { data } = figureFrom(VIKING, "Profile", ["TE90_01", "DOXY_01"], {
+    colorAxis: "PSAL_01",
+  });
   assert.ok(
     data[0].hovertemplate.endsWith(
       "<br>Practical Salinity: %{customdata} PSU<extra></extra>",
@@ -933,17 +924,14 @@ test("a unified box prints the colour value once, on the first panel", () => {
 });
 
 test("a unified box adds no colour line when a panel or the shared axis prints it", () => {
-  const byPanel = figureFrom(
-    VIKING,
-    "TimeSeriesProfile",
-    ["TE90_01", "PSAL_01"],
-    { colorAxis: "PSAL_01" },
-  );
+  const byPanel = figureFrom(VIKING, "Profile", ["TE90_01", "PSAL_01"], {
+    colorAxis: "PSAL_01",
+  });
   byPanel.data.forEach((trace) =>
     assert.ok(!trace.hovertemplate.includes("%{customdata}")),
   );
 
-  const bySharedAxis = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+  const bySharedAxis = figureFrom(VIKING, "Profile", ["TE90_01"], {
     colorAxis: "depth",
   });
   assert.ok(!bySharedAxis.data[0].hovertemplate.includes("%{customdata}"));
@@ -965,14 +953,9 @@ test("colouring by a column the panel already prints adds no second copy", () =>
 });
 
 test("a time colour column is ramped over epoch ms and ticked in timestamps", () => {
-  const { data, colorLegend } = figureFrom(
-    VIKING,
-    "TimeSeriesProfile",
-    ["TE90_01"],
-    {
-      colorAxis: "time",
-    },
-  );
+  const { data, colorLegend } = figureFrom(VIKING, "Profile", ["TE90_01"], {
+    colorAxis: "time",
+  });
   assert.equal(data[0].marker.color[0], Date.parse(DATA[0].time));
   // The hover still reads the timestamp the record published.
   assert.equal(data[0].customdata[0], DATA[0].time);
@@ -985,8 +968,8 @@ test("a time colour column is ramped over epoch ms and ticked in timestamps", ()
 });
 
 test("a colour column this record cannot order leaves the figure as it was", () => {
-  const plain = figure("TimeSeriesProfile", ["TE90_01"]);
-  const unorderable = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+  const plain = figure("Profile", ["TE90_01"]);
+  const unorderable = figureFrom(VIKING, "Profile", ["TE90_01"], {
     colorAxis: "station_id",
   });
   assert.ok(!unorderable.layout.coloraxis);
@@ -1122,205 +1105,6 @@ test("a profile never takes position text — its box is unified", () => {
   });
 });
 
-// --- colour plot -------------------------------------------------------------
-
-function colorFigure(panels, extra = {}) {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
-  const variables = variablesFrom(VIKING_PALETTES, dataset);
-  return buildColorFigure({
-    variablesByName: byColumnName(variables),
-    panels,
-    xAxis: "time",
-    yAxis: "depth",
-    data: DATA,
-    uirevision: "test",
-    ...extra,
-  });
-}
-
-// Three casts, four depths each: a section, the colour plot's usual shape.
-const CAST_TIMES = [
-  "2025-09-16T00:00:00.000Z",
-  "2025-09-17T00:00:00.000Z",
-  "2025-09-18T00:00:00.000Z",
-];
-const SECTION = CAST_TIMES.flatMap((time, cast) =>
-  [1, 2, 3, 4].map((depth) => ({
-    station_id: "PMZA-RIKI",
-    time,
-    depth,
-    TE90_01: cast * 10 + depth,
-    PSAL_01: 30 + depth,
-  })),
-);
-
-test("a colour plot stacks one panel per colour variable, all drawing Y on X", () => {
-  const { data, layout } = colorFigure(["TE90_01", "PSAL_01"], {
-    data: SECTION,
-  });
-  assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 1);
-  assert.equal(Object.keys(layout).filter((k) => /^yaxis/.test(k)).length, 2);
-  assert.deepEqual(
-    data.map((trace) => trace.yaxis),
-    ["y", "y2"],
-  );
-  data.forEach((trace) => {
-    assert.equal(trace.xaxis, "x");
-    assert.deepEqual(trace.x, CAST_TIMES); // one column per cast
-    assert.deepEqual(trace.y, [1, 2, 3, 4]);
-  });
-  assert.deepEqual(data[0].z, [
-    [1, 11, 21],
-    [2, 12, 22],
-    [3, 13, 23],
-    [4, 14, 24],
-  ]);
-});
-
-test("a colour panel is a smooth heatmap on its own colour axis", () => {
-  const { data } = colorFigure(["TE90_01", "PSAL_01"], { data: SECTION });
-  assert.equal(data.length, 2); // no line traces: there is no plot type
-  data.forEach((trace, index) => {
-    assert.equal(trace.type, "heatmap");
-    assert.equal(trace.zsmooth, "best");
-    assert.equal(trace.connectgaps, false);
-    assert.equal(trace.coloraxis, index === 0 ? "coloraxis" : "coloraxis2");
-  });
-});
-
-test("a single cast has nothing to blend: its panel falls back to markers", () => {
-  const oneCast = SECTION.filter((row) => row.time === CAST_TIMES[0]);
-  const [trace] = colorFigure(["TE90_01"], { data: oneCast }).data;
-  assert.equal(trace.type, "scatter");
-  assert.equal(trace.mode, "markers");
-  assert.equal(trace.marker.coloraxis, "coloraxis");
-});
-
-test("every colour panel titles its Y, reverses depth and zooms with the first", () => {
-  const { layout } = colorFigure(["TE90_01", "PSAL_01"]);
-  assert.equal(layout.yaxis.autorange, "reversed");
-  assert.equal(layout.yaxis2.autorange, "reversed");
-  assert.equal(layout.yaxis.title.text, "depth of observation (m)");
-  assert.equal(layout.yaxis2.title.text, "depth of observation (m)");
-  assert.equal(layout.yaxis.matches, undefined);
-  assert.equal(layout.yaxis2.matches, "y");
-});
-
-test("the user can draw a colour plot's depth upwards", () => {
-  const { layout } = colorFigure(["TE90_01", "PSAL_01"], { yReversed: false });
-  assert.equal(layout.yaxis.autorange, undefined);
-  assert.equal(layout.yaxis2.autorange, undefined);
-});
-
-test("each panel's colourbar spans exactly its panel and names its variable", () => {
-  const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
-  [
-    ["coloraxis", layout.yaxis, "Temperature (1990 scale) (degree_C)"],
-    ["coloraxis2", layout.yaxis2, "Practical Salinity (PSU)"],
-  ].forEach(([name, axis, label], index) => {
-    const { colorbar } = layout[name];
-    const [start, end] = axis.domain;
-    assert.equal(colorbar.y, (start + end) / 2, name);
-    assert.equal(colorbar.len, end - start, name);
-    assert.equal(colorbar.lenmode, "fraction", name);
-    assert.equal(colorbar.yanchor, "middle", name);
-    assert.equal(colorbar.title.text, label, name);
-    assert.equal(data[index].coloraxis, name);
-  });
-});
-
-test("each colourbar title wraps to its own panel's height", () => {
-  const { layout } = colorFigure(["TE90_01", "PSAL_01", "DOXY_01"], {
-    size: { width: 1000, height: 500 },
-  });
-  const plottingHeight = 500 - layout.margin.t - layout.margin.b;
-  ["coloraxis", "coloraxis2", "coloraxis3"].forEach((name, index) => {
-    const [start, end] =
-      layout[index === 0 ? "yaxis" : `yaxis${index + 1}`].domain;
-    const fits = maxCharsFor(plottingHeight * (end - start));
-    const lines = layout[name].colorbar.title.text.split("<br>");
-    assert.ok(lines.length > 1, name);
-    lines
-      .filter((line) => !/^\(.*\)$/.test(line)) // a unit is never cut
-      .forEach((line) => assert.ok(line.length <= fits, `${name}: "${line}"`));
-  });
-});
-
-test("each colour panel draws in its own variable's scale, or the user's", () => {
-  const { layout } = colorFigure(["TE90_01", "PSAL_01"], {
-    scales: { PSAL_01: "Cividis" },
-  });
-  assert.deepEqual(layout.coloraxis.colorscale, paletteFor("KT_thermal"));
-  assert.deepEqual(layout.coloraxis2.colorscale, colorScaleFor("Cividis"));
-  assert.equal(layout.coloraxis.cmin, 0);
-  assert.equal(layout.coloraxis.cmax, 19);
-});
-
-test("the colour plot's right margin holds the colourbars", () => {
-  const { layout } = colorFigure(["TE90_01"]);
-  assert.equal(layout.margin.r, marginFor(ROWS, 0).r + COLORBAR_ROOM_PX);
-  assert.equal(layout.hovermode, "closest");
-});
-
-test("a time colour variable labels its bar with dates, not epoch milliseconds", () => {
-  const { layout } = colorFigure(["time"], { xAxis: "TE90_01" });
-  assert.equal(layout.coloraxis.colorbar.tickmode, "array");
-  assert.ok(
-    layout.coloraxis.colorbar.ticktext.every((text) => !/^\d{10,}$/.test(text)),
-  );
-});
-
-test("a time colour variable reads as a date in the hover", () => {
-  const [trace] = colorFigure(["time"], {
-    xAxis: "TE90_01",
-    data: SECTION,
-  }).data;
-  assert.equal(trace.type, "heatmap");
-  assert.match(trace.hovertemplate, /%\{text\}/);
-  assert.ok(trace.text.flat().some((text) => text.startsWith("2025-09-1")));
-});
-
-test("a cast's missing depth is filled between its neighbours, never below its last", () => {
-  const data = SECTION.map((row) =>
-    row.time === CAST_TIMES[1] && row.depth >= 2
-      ? { ...row, TE90_01: row.depth === 3 ? 13 : null }
-      : row,
-  );
-  const [trace] = colorFigure(["TE90_01"], { data }).data;
-  assert.equal(trace.z[1][1], 12); // between 1 m and 3 m
-  assert.equal(trace.z[3][1], null); // below the cast's last sample
-});
-
-test("a colour variable with no value at all draws solid and gets no bar", () => {
-  const data = DATA.map((row) => ({ ...row, TE90_01: null }));
-  const { data: traces, layout } = colorFigure(["TE90_01"], { data });
-  assert.equal(layout.coloraxis, undefined);
-  assert.equal(typeof traces[0].marker.color, "string");
-});
-
-test("the colour plot's hover names X, Y and the colour value", () => {
-  const [trace] = colorFigure(["TE90_01"], { data: SECTION }).data;
-  assert.match(trace.hovertemplate, /depth/i);
-  assert.match(trace.hovertemplate, /%\{z\} degree_C/);
-  assert.match(trace.hovertemplate, /%\{x\}/);
-});
-
-test("plotBoxFor sizes a colour plot as a stack, whatever the record's type", () => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
-  const variables = variablesFrom(VIKING, dataset);
-  const box = plotBoxFor({
-    plan: facetPlanFor(dataset, variables, DATA),
-    variablesByName: byColumnName(variables),
-    data: DATA,
-    panelCount: 6,
-    availableHeight: 400,
-    measured: { width: 800, height: 400 },
-    orientation: ROWS,
-  });
-  assert.equal(box.width, 799);
-  assert.ok(box.height > 400);
-});
-
 // --- the pinned shared axis --------------------------------------------------
 
 const LONG_NAME =
@@ -1328,21 +1112,12 @@ const LONG_NAME =
 const lineCount = (text) => text.split("<br>").length;
 
 test("a profile's shared title fits its pinned strip: two lines, unit kept", () => {
-  const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
+  const { layout } = figure("Profile", ["TE90_01"], {
     labels: { depth: LONG_NAME },
     size: { width: 600, height: 400 },
   });
   assert.equal(lineCount(layout.yaxis.title.text), 2);
   assert.ok(layout.yaxis.title.text.endsWith("<br>(m)"));
-});
-
-test("a colour plot's X title fits its pinned strip: two lines, unit kept", () => {
-  const { layout } = colorFigure(["TE90_01"], {
-    labels: { time: LONG_NAME },
-    size: { width: 400, height: 400 },
-  });
-  assert.equal(lineCount(layout.xaxis.title.text), 2);
-  assert.ok(layout.xaxis.title.text.endsWith("<br>(UTC)"));
 });
 
 // --- grids -------------------------------------------------------------------
@@ -1503,30 +1278,6 @@ test("a grid gives every panel at least its minimum size, and scrolls the rest",
   assert.ok(box.height >= MIN_PANEL_PX * 4);
 });
 
-test("a colour plot with one X stays the pinnable stack", () => {
-  const { pinnable } = colorFigure(["TE90_01"]);
-  assert.equal(pinnable, true);
-});
-
-test("a colour plot grids several X across and several Y down each colour", () => {
-  const { data, layout, pinnable } = colorFigure(["TE90_01", "PSAL_01"], {
-    xAxes: ["time", "PRES_01"],
-    yAxes: ["depth", "DOXY_01"],
-    data: SECTION,
-  });
-  assert.equal(pinnable, false);
-  // 2 colour x 2 Y rows, 2 X columns.
-  assert.equal(data.length, 8);
-  assert.ok(layout.yaxis4);
-  assert.ok(layout.xaxis2);
-  // A Y repeated for the second colour zooms with its first row.
-  assert.equal(layout.yaxis3.matches, "y");
-  assert.equal(layout.yaxis4.matches, "y2");
-  // Each colour's bar spans both of its rows.
-  const bar = layout.coloraxis.colorbar;
-  assert.equal(bar.len, layout.yaxis.domain[1] - layout.yaxis2.domain[0]);
-});
-
 // --- one plot, an axis per variable (pstack) -------------------------------
 
 function overlayFrom(type, panels, extra = {}) {
@@ -1647,7 +1398,7 @@ test("a single stacked variable keeps the full plot height", () => {
 
 test("x tick labels stay level, thinned to the panel's width", () => {
   const size = { width: 390, height: 600 };
-  const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"], {
+  const { layout } = figure("Profile", ["TE90_01", "PSAL_01"], {
     size,
   });
   const xAxes = Object.keys(layout).filter((key) => /^xaxis\d*$/.test(key));
@@ -1666,8 +1417,8 @@ test("x tick labels stay level, thinned to the panel's width", () => {
 
 test("an unpinned figure keeps its shared axis, starting from a small margin", () => {
   const size = { width: 390, height: 600 };
-  const pinned = figure("TimeSeriesProfile", ["TE90_01"], { size });
-  const kept = figure("TimeSeriesProfile", ["TE90_01"], {
+  const pinned = figure("Profile", ["TE90_01"], { size });
+  const kept = figure("Profile", ["TE90_01"], {
     size,
     pinned: false,
   });
@@ -1698,4 +1449,95 @@ test("rank ticks thin to what lies flat across an X axis, keeping both ends", ()
   assert.equal(rankTicksFor(ticks, "x", 0).tickvals.length, 7);
   assert.equal(rankTicksFor(ticks, "y", 240).tickvals.length, 7);
   assert.deepEqual(rankTicksFor(null, "x", 240), {});
+});
+
+// Two casts down the same depths: a section a contour can fill.
+const SECTION_TABLE = {
+  columnNames: ["time", "depth", "temperature", "salinity"],
+  columnTypes: ["String", "float", "float", "float"],
+  columnUnits: ["UTC", "m", "degree_C", "PSU"],
+};
+const SECTION_DATA = ["2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"].flatMap(
+  (time, cast) =>
+    [0, 10, 20].map((depth) => ({
+      time,
+      depth,
+      temperature: 10 - depth / 10 + cast,
+      salinity: 30 + depth / 10,
+    })),
+);
+const SECTION_DATASET = { cdm_data_type: "TimeSeriesProfile" };
+const sectionVariables = byColumnName(
+  variablesFrom(SECTION_TABLE, SECTION_DATASET),
+);
+const sectionFigure = (mode, data = SECTION_DATA) =>
+  buildFigure({
+    plan: { orientation: ROWS },
+    variablesByName: sectionVariables,
+    panels: ["depth"],
+    sharedAxis: "time",
+    data,
+    mode,
+    colorAxis: "temperature",
+    size: { width: 600, height: 400 },
+  });
+
+test("a contour fills the section under markers kept only for the hover", () => {
+  const { data } = sectionFigure("contour");
+  const [fill, samples] = data;
+  assert.equal(fill.type, "contour");
+  assert.equal(fill.coloraxis, "coloraxis");
+  assert.equal(fill.hoverinfo, "skip");
+  assert.deepEqual(fill.y, [0, 10, 20]);
+  assert.equal(fill.x.length, 2);
+  assert.equal(samples.type, "scatter");
+  assert.equal(samples.mode, "markers");
+  assert.equal(samples.marker.opacity, 0);
+});
+
+test("a contour with nothing to spread over draws its samples as markers", () => {
+  const oneCast = SECTION_DATA.filter(
+    (row) => row.time === SECTION_DATA[0].time,
+  );
+  const { data } = sectionFigure("contour", oneCast);
+  assert.equal(data.length, 1);
+  assert.equal(data[0].mode, "markers");
+  assert.equal(data[0].marker.opacity, undefined);
+});
+
+test("no contour is drawn without a colour column", () => {
+  const { data } = buildFigure({
+    plan: { orientation: ROWS },
+    variablesByName: sectionVariables,
+    panels: ["depth"],
+    sharedAxis: "time",
+    data: SECTION_DATA,
+    mode: "contour",
+  });
+  assert.deepEqual(
+    data.map((trace) => trace.type),
+    ["scatter"],
+  );
+});
+
+test("a grid fills each colour repeat against its own colour axis", () => {
+  const { data } = buildGridFigure({
+    variablesByName: sectionVariables,
+    xAxes: ["time"],
+    yAxes: ["depth"],
+    panelAxis: "y",
+    colorAxes: ["temperature", "salinity"],
+    colorRows: true,
+    data: SECTION_DATA,
+    mode: "contour",
+    size: { width: 600, height: 400 },
+  });
+  const fills = data.filter((trace) => trace.type === "contour");
+  assert.deepEqual(
+    fills.map((trace) => [trace.coloraxis, trace.xaxis, trace.yaxis]),
+    [
+      ["coloraxis", "x", "y"],
+      ["coloraxis2", "x", "y2"],
+    ],
+  );
 });

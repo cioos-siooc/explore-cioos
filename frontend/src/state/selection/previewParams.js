@@ -10,12 +10,6 @@ export const RECORD_PARAM = "preview";
 // is drawn — see the /preview `at` parameter.
 export const STEP_PARAM = "pstep";
 
-// Read by SelectionProvider too: the colour plot fetches every profile in the
-// window instead of the stepped one — see the /preview `allProfiles` parameter.
-export const LAYOUT_PARAM = "playout";
-export const COLOR_LAYOUT = "color";
-export const PANELS_LAYOUT = "panels";
-
 // How many rows /preview draws (see its `limit`), and the instant its window
 // ends at instead of the record's newest row (its `before`). Read by
 // SelectionProvider, because they change what is fetched.
@@ -70,26 +64,20 @@ export function parsePeriod(value) {
 //                                  one was doing)
 //   pzscale  retired single scale, read as the first `pz` column's
 //            `pzscales` entry until the next scale or colour write
-//   playout  panels | color        `panels`: one panel per variable against a
-//                                  shared axis; `color`: the same X and Y in
-//                                  every panel, one panel per `pvars`
-//                                  variable, each shaded by that variable
-//                                  (default: color for TimeSeriesProfile and
-//                                  TrajectoryProfile, panels otherwise)
-//   pcx      the colour plot's X, comma-separated; several make a grid
-//                                  (default: time, else the track)
-//   pcy      the colour plot's Y, comma-separated
-//                                  (default: depth, else a measurement)
-//   pzscales the scale per colour variable, in either layout,
+//   pzscales the scale per colour variable,
 //            `column~Scale` comma-separated
 //                                  (default: its own colorBarPalette, else
 //                                  Viridis — and never a rainbow)
+//   pzrows   1 | 0: several colour variables repeat the panels as rows
+//            (1) or as columns (0)
+//                                  (default: rows for TimeSeriesProfile
+//                                  and TrajectoryProfile, columns otherwise)
 //   pzshare  1: every colour variable in the first one's scale
 //                                  (default: each in its own)
 //   pstack   1: the panel variables on ONE plot, each on its own axis in its
-//            line's colour     (default: one panel per variable; ignored by
-//                                  the colour plot, and drops `pz` and every
-//                                  shared axis but the first while set)
+//            line's colour     (default: one panel per variable; drops `pz`
+//                                  and every shared axis but the first while
+//                                  set)
 //   pyflip   the columns whose Y axis is drawn opposite to its default,
 //            comma-separated       (default: none; a depth or pressure on Y
 //                                  is drawn downwards)
@@ -111,10 +99,8 @@ export const PLOT_PARAMS = [
   "pcolors",
   "pz",
   "pzscale",
-  LAYOUT_PARAM,
-  "pcx",
-  "pcy",
   "pzscales",
+  "pzrows",
   "pzshare",
   "pstack",
   "pyflip",

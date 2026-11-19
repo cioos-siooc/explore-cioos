@@ -3,9 +3,7 @@ import { describe, it, expect } from "vitest";
 import { act } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
-import usePreviewPlotParams, {
-  MAX_COLOR_PANELS,
-} from "./usePreviewPlotParams.js";
+import usePreviewPlotParams from "./usePreviewPlotParams.js";
 
 // The hook is the sole owner of URL <-> plot state, and two of its rules are
 // invisible from the outside: a param is written ONLY when it differs from the
@@ -37,14 +35,6 @@ function Probe({ dataset = DATASET, table = TABLE, data = DATA }) {
 
 function open(search = "") {
   return renderWithProviders(<Probe />, {
-    url: search ? `/?${search}` : "/",
-  });
-}
-
-// The colour plot is offered only for a record holding many profiles.
-const STATION_DATASET = { ...DATASET, cdm_data_type: "TimeSeriesProfile" };
-function openStation(search = "") {
-  return renderWithProviders(<Probe dataset={STATION_DATASET} />, {
     url: search ? `/?${search}` : "/",
   });
 }
@@ -160,7 +150,10 @@ describe("usePreviewPlotParams", () => {
     });
 
     it("does not reverse a non-vertical Y unless asked", async () => {
-      openStation("playout=color&pcy=salinity");
+      renderWithProviders(
+        <Probe dataset={{ ...DATASET, cdm_data_type: "TimeSeries" }} />,
+        { url: "/?pvars=salinity" },
+      );
       expect(api.yAxisColumns).toEqual(["salinity"]);
       expect(api.reversedYAxes.has("salinity")).toBe(false);
 
@@ -211,11 +204,15 @@ describe("usePreviewPlotParams", () => {
     });
 
     it("keeps a variable's flip while it leaves Y and comes back", async () => {
-      openStation("playout=color&pcy=salinity&pyflip=salinity");
-      await run(() => api.setColorY("depth"));
-      expect(api.reversedYAxes.has("depth")).toBe(true);
+      renderWithProviders(
+        <Probe dataset={{ ...DATASET, cdm_data_type: "TimeSeries" }} />,
+        { url: "/?pvars=salinity&pyflip=salinity" },
+      );
+      expect(api.reversedYAxes.has("salinity")).toBe(true);
+      await run(() => api.setPanels(["temperature"]));
+      expect(api.reversedYAxes.has("salinity")).toBe(false);
 
-      await run(() => api.setColorY("salinity"));
+      await run(() => api.setPanels(["salinity"]));
       expect(api.reversedYAxes.has("salinity")).toBe(true);
     });
 
@@ -247,6 +244,13 @@ describe("usePreviewPlotParams", () => {
       open("pz=salinity&pzscale=Jet&pzscales=temperature~Jet");
       expect(api.colorAxis).toBe("salinity");
       expect(api.variableScales).toEqual({});
+    });
+
+    it("draws a contour the profile cannot fill as the default, keeping the link", () => {
+      open("pmode=contour&pz=salinity");
+      expect(api.plotModes.map((mode) => mode.value)).not.toContain("contour");
+      expect(api.plotType).toBe("markers+lines");
+      expect(param("pmode")).toBe("contour");
     });
 
     it("ignores an unknown plot mode", () => {
@@ -295,11 +299,6 @@ describe("usePreviewPlotParams", () => {
       expect(api.sharedAxes).toEqual(["depth"]);
       expect(api.panels).toEqual(["temperature"]);
       expect(api.colorAxes).toEqual([]);
-    });
-
-    it("is ignored by the colour plot", () => {
-      openStation("pstack=1&playout=color");
-      expect(api.stacked).toBe(false);
     });
 
     it("changes uirevision, so a zoom is not restored onto the other figure", async () => {
@@ -377,29 +376,57 @@ describe("usePreviewPlotParams", () => {
       expect(param("pzscales")).toBe("salinity~Viridis");
       expect(api.variableScales).toEqual({ salinity: "Viridis" });
     });
+  });
 
-    it("gives the colour plot several X and Y, never one on both", () => {
-      openStation("playout=color&pcx=time,salinity&pcy=depth,salinity");
-      expect(api.colorXs).toEqual(["time", "salinity"]);
-      expect(api.colorYs).toEqual(["depth"]);
-      expect(api.panels).not.toContain("salinity");
+  describe("facet direction", () => {
+    it("offers no direction for a single panel", () => {
+      open();
+      expect(api.facetCount).toBe(1);
     });
 
-    it("lets only X, Y or colour hold several in the colour plot", () => {
-      openStation(
-        "playout=color&pcx=time,salinity&pcy=depth,temperature&pvars=temperature,salinity",
+    it("turns side-by-side panels into stacked ones by swapping the axes", async () => {
+      open("pvars=temperature,salinity");
+      expect(api.facetDirection).toBe("across");
+      const before = api.uirevision;
+
+      await run(() => api.setFacetDirection("down"));
+      expect(param("porient")).toBe("rows");
+      expect(api.facetDirection).toBe("down");
+      expect(api.panels).toEqual(["temperature", "salinity"]);
+      expect(api.sharedAxis).toBe("depth");
+      expect(api.uirevision).not.toBe(before);
+
+      await run(() => api.setFacetDirection("across"));
+      expect(param("porient")).toBeNull();
+    });
+
+    it("reads several shared axes as running the other way", () => {
+      open("paxis=depth,time");
+      expect(api.facetDirection).toBe("down");
+    });
+
+    it("lays colour repeats across or down without moving the axes", async () => {
+      open("pz=salinity,temperature");
+      expect(api.facetDirection).toBe("across");
+
+      await run(() => api.setFacetDirection("down"));
+      expect(param("pzrows")).toBe("1");
+      expect(param("porient")).toBeNull();
+      expect(api.plan.colorRows).toBe(true);
+
+      await run(() => api.setFacetDirection("across"));
+      expect(param("pzrows")).toBeNull();
+    });
+
+    it("writes the way back from a type that stacks its colour repeats", async () => {
+      renderWithProviders(
+        <Probe dataset={{ ...DATASET, cdm_data_type: "TimeSeriesProfile" }} />,
+        { url: "/?pz=salinity,temperature" },
       );
-      expect(api.colorXs).toEqual(["time", "salinity"]);
-      expect(api.colorYs).toEqual(["depth"]);
-      expect(api.panels.length).toBeLessThanOrEqual(1);
-    });
-
-    it("writes the colour plot's X list, dropping it from the panels", async () => {
-      openStation("playout=color&pvars=temperature,salinity");
-      await run(() => api.setColorXs(["time", "salinity"]));
-      expect(param("pcx")).toBe("time,salinity");
-      expect(param("pvars")).toBeNull();
-      expect(api.panels).toEqual(["temperature"]);
+      expect(api.facetDirection).toBe("down");
+      await run(() => api.setFacetDirection("across"));
+      expect(param("pzrows")).toBe("0");
+      expect(api.plan.colorRows).toBe(false);
     });
   });
 
@@ -501,119 +528,55 @@ describe("usePreviewPlotParams", () => {
     const openGlider = (search) =>
       renderWithProviders(
         <Probe
-          dataset={{ ...STATION_DATASET, cdm_data_type: "TrajectoryProfile" }}
+          dataset={{ ...DATASET, cdm_data_type: "TrajectoryProfile" }}
           table={GLIDER_TABLE}
           data={GLIDER_DATA}
         />,
         { url: `/?${search}` },
       );
 
-    it("draws the CTD against the pressure that shares its rows", () => {
-      openGlider("playout=color&pvars=temperature");
-      expect(api.colorY).toBe("pressure");
-      expect(param("pcy")).toBeNull();
-    });
-
-    it("shares that pressure in the panel layout too", () => {
-      openGlider("playout=panels&pvars=temperature");
-      expect(api.sharedAxis).toBe("pressure");
-    });
-
-    it("keeps a depth the link names", () => {
-      openGlider("playout=color&pvars=temperature&pcy=depth");
-      expect(api.colorY).toBe("depth");
-    });
-  });
-
-  describe("the colour plot", () => {
-    it("is what a record of many profiles opens on, adding nothing to the link", () => {
-      openStation();
-      expect(api.plotLayout).toBe("color");
-      expect(api.colorX).toBe("time");
-      expect(api.colorY).toBe("depth");
-      ["playout", "pcx", "pcy", "pzscales"].forEach((name) =>
+    it("opens a section of the CTD down the pressure that shares its rows", () => {
+      openGlider("");
+      expect(api.sharedAxis).toBe("time");
+      expect(api.panels).toEqual(["pressure"]);
+      expect(api.colorAxes).toEqual(["temperature"]);
+      expect(api.reversedYAxes.has("pressure")).toBe(true);
+      ["paxis", "pvars", "pz"].forEach((name) =>
         expect(param(name)).toBeNull(),
       );
     });
 
-    it("is not offered for a record of one profile, whatever the link says", () => {
-      open("playout=color");
-      expect(api.colorPlotAvailable).toBe(false);
-      expect(api.plotLayout).toBe("panels");
+    it("keeps a depth the link names", () => {
+      openGlider("pvars=depth");
+      expect(api.panels).toEqual(["depth"]);
     });
 
-    it("runs time across depth, keeping the variables already picked", async () => {
-      openStation("playout=panels&pvars=temperature,salinity");
-      await run(() => api.setPlotLayout("color"));
-      expect(param("playout")).toBeNull();
-      expect(api.colorX).toBe("time");
-      expect(api.colorY).toBe("depth");
-      expect(api.panels).toEqual(["temperature", "salinity"]);
-
-      await run(() => api.setPlotLayout("panels"));
-      expect(param("playout")).toBe("panels");
+    it("offers a contour on the section, and draws it from the link", () => {
+      openGlider("pmode=contour");
+      expect(api.plotModes.map((mode) => mode.value)).toContain("contour");
+      expect(api.plotType).toBe("contour");
     });
 
-    it("never shades a panel by its own X or Y", () => {
-      openStation("playout=color&pvars=temperature,depth,time,salinity");
-      expect(api.panels).toEqual(["temperature", "salinity"]);
+    it("writes turning the default shading off, and forgets it on the way back", async () => {
+      openGlider("");
+      await run(() => api.setColorAxes([]));
+      expect(param("pz")).toBe("-");
+      expect(api.colorAxes).toEqual([]);
+
+      await run(() => api.setColorAxes(["temperature"]));
+      expect(param("pz")).toBeNull();
     });
+  });
 
-    it("keeps the first five colour variables of a link, and only there", () => {
-      const measurements = ["m1", "m2", "m3", "m4", "m5", "m6"];
-      const wideTable = {
-        columnNames: ["depth", "time", ...measurements],
-        columnTypes: ["float", "String", ...measurements.map(() => "float")],
-        columnUnits: ["m", "UTC", ...measurements.map(() => null)],
-      };
-      const pvars = `pvars=${measurements.join(",")}`;
-      const openWide = (search) =>
-        renderWithProviders(
-          <Probe dataset={STATION_DATASET} table={wideTable} data={[]} />,
-          {
-            url: `/?${search}`,
-          },
-        );
-
-      openWide(`playout=color&${pvars}`);
-      expect(api.panels).toEqual(measurements.slice(0, MAX_COLOR_PANELS));
-
-      openWide(`playout=panels&${pvars}`);
-      expect(api.panels).toEqual(measurements); // the panels layout is not capped
-    });
-
-    it("drops a colour variable moved onto an axis in the same write", async () => {
-      openStation("playout=color&pvars=temperature,salinity");
-      await run(() => api.setColorX("salinity"));
-      expect(param("pcx")).toBe("salinity");
-      expect(param("pvars")).toBeNull(); // back to the default [temperature]
-      expect(api.panels).toEqual(["temperature"]);
-
-      await run(() => api.setColorX("time"));
-      expect(param("pcx")).toBeNull();
-    });
-
-    it("falls back to the default axes for columns this dataset lacks", () => {
-      openStation("playout=color&pcx=nope&pcy=gone");
-      expect(api.colorX).toBe("time");
-      expect(api.colorY).toBe("depth");
-    });
-
+  describe("colour scales", () => {
     it("stores a per-variable scale and deletes it on the way back", async () => {
-      openStation("playout=color");
+      open("pz=temperature");
       await run(() => api.setVariableScale("temperature", "Cividis"));
       expect(param("pzscales")).toBe("temperature~Cividis");
       expect(api.variableScales).toEqual({ temperature: "Cividis" });
 
       await run(() => api.setVariableScale("temperature", null));
       expect(param("pzscales")).toBeNull();
-    });
-
-    it("changes uirevision when the colour plot's axes change", async () => {
-      openStation("playout=color");
-      const before = api.uirevision;
-      await run(() => api.setColorY("salinity"));
-      expect(api.uirevision).not.toBe(before);
     });
   });
 });

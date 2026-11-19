@@ -6,7 +6,6 @@ import {
   axisDirectionsFor,
   colocatedVerticalFor,
   colorCandidatesFor,
-  colorPlotAxesFor,
   facetPlanFor,
   panelCandidatesFor,
   plotBlockerFor,
@@ -14,9 +13,6 @@ import {
   sharedCandidatesFor,
   resolvePanels,
   defaultVisFor,
-  hasColorPlotFor,
-  defaultPlotLayoutFor,
-  plotLayoutFor,
   COLUMNS,
   ROWS,
 } from "./previewFacetPlan.js";
@@ -45,12 +41,22 @@ const planFor = (type, table = VIKING, data) =>
     data,
   );
 
-test("profile types face across, sharing a reversed depth axis", () => {
-  for (const type of ["Profile", "TimeSeriesProfile", "TrajectoryProfile"]) {
+test("a profile faces across, sharing a reversed depth axis", () => {
+  const plan = planFor("Profile");
+  assert.equal(plan.orientation, COLUMNS);
+  assert.equal(plan.sharedAxis, "depth");
+  assert.equal(plan.sharedReversed, true);
+  assert.deepEqual(plan.colorDefaults, []);
+});
+
+test("a record of many profiles opens as a section: time across, depth down, shaded by its EOVs", () => {
+  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
     const plan = planFor(type);
-    assert.equal(plan.orientation, COLUMNS, type);
-    assert.equal(plan.sharedAxis, "depth", type);
-    assert.equal(plan.sharedReversed, true, type);
+    assert.equal(plan.orientation, ROWS, type);
+    assert.equal(plan.sharedAxis, "time", type);
+    assert.deepEqual(plan.panelDefaults, ["depth"], type);
+    assert.deepEqual(plan.colorDefaults, ["TE90_01"], type);
+    assert.equal(plan.colorRows, true, type);
   }
 });
 
@@ -229,13 +235,13 @@ test("no variables means no plan", () => {
 });
 
 test("the default panel is the dataset first_eov_column when it is plottable", () => {
-  assert.deepEqual(planFor("TimeSeriesProfile").panelDefaults, ["TE90_01"]);
+  assert.deepEqual(planFor("Profile").panelDefaults, ["TE90_01"]);
 });
 
 test("an unplottable first_eov_column falls back to the first measurement", () => {
   const dataset = {
     ...VIKING_DATASET,
-    cdm_data_type: "TimeSeriesProfile",
+    cdm_data_type: "Profile",
     first_eov_column: "station_id", // a cf_role id, never a panel
   };
   const plan = facetPlanFor(dataset, variablesFrom(VIKING, dataset));
@@ -243,7 +249,7 @@ test("an unplottable first_eov_column falls back to the first measurement", () =
 });
 
 test("a plan exists before any harvest has filled columnMeta", () => {
-  const plan = planFor("TimeSeriesProfile", VIKING_NO_META);
+  const plan = planFor("Profile", VIKING_NO_META);
   assert.equal(plan.sharedAxis, "depth");
   assert.equal(plan.sharedReversed, true); // CF convention, no `positive` needed
   assert.deepEqual(plan.panelDefaults, ["TE90_01"]);
@@ -333,16 +339,17 @@ test("a track lists its index and both distances first on the X axis", () => {
   }
 });
 
-test("a trajectory profile still opens on depth, its index one pick away", () => {
+test("a trajectory profile opens on time, its index one pick away", () => {
   const dataset = { ...VIKING_DATASET, cdm_data_type: "TrajectoryProfile" };
   const plan = facetPlanFor(
     dataset,
     trackVariablesFor(dataset),
     TRACK_PROFILE_ROWS,
   );
-  assert.equal(plan.sharedAxis, "depth");
+  assert.equal(plan.sharedAxis, "time");
   assert.equal(plan.sharedCandidates[0], POSITION_INDEX_COLUMN);
-  assert.deepEqual(plan.panelDefaults, ["TE90_01"]);
+  assert.deepEqual(plan.panelDefaults, ["depth"]);
+  assert.deepEqual(plan.colorDefaults, ["TE90_01"]);
 });
 
 test("the Y axis offers the same columns as X, less the shared axis", () => {
@@ -402,16 +409,6 @@ test("vis default comes from the type alone, never the payload", () => {
   assert.equal(defaultVisFor({ cdm_data_type: "Grid" }), "table");
   assert.equal(defaultVisFor({ cdm_data_type: "Other" }), "table");
   assert.equal(defaultVisFor(undefined), "table");
-});
-
-test("only a record of many profiles offers the colour plot", () => {
-  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
-    assert.equal(hasColorPlotFor({ cdm_data_type: type }), true, type);
-  }
-  for (const type of ["Profile", "TimeSeries", "Trajectory", "Point", "Grid"]) {
-    assert.equal(hasColorPlotFor({ cdm_data_type: type }), false, type);
-  }
-  assert.equal(hasColorPlotFor(undefined), false);
 });
 
 test("the plan names the cf_role columns, which is what titles the figure", () => {
@@ -632,12 +629,12 @@ test("a bathymetric transect is drawn rather than refused", () => {
   const variables = variablesFrom(BATHYMETRY, BATHYMETRY_DATASET);
   const plan = facetPlanFor(BATHYMETRY_DATASET, variables, []);
   assert.ok(plan, "the transect used to be blocked as noMeasurements");
-  // Depth down the shared axis, distance across it: a cross-section. Not
-  // reversed — the dataset's depths are already negative.
-  assert.equal(plan.orientation, COLUMNS);
-  assert.equal(plan.sharedAxis, "sea_floor_depth");
-  assert.equal(plan.sharedReversed, false);
-  assert.deepEqual(plan.panelDefaults, ["distance"]);
+  // A section like any track of profiles: the bottom's depth against time,
+  // shaded by the distance run.
+  assert.equal(plan.orientation, ROWS);
+  assert.equal(plan.sharedAxis, "time");
+  assert.deepEqual(plan.panelDefaults, ["sea_floor_depth"]);
+  assert.deepEqual(plan.colorDefaults, ["distance"]);
 });
 
 test("panelCandidatesFor offers the measurements first, then every other column", () => {
@@ -683,81 +680,6 @@ test("a record with no measurement left still offers every other column", () => 
   );
 });
 
-// --- the colour plot's X and Y ------------------------------------------------
-
-const colorAxesFor = (type, variables, data) => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: type };
-  const columns = variables || variablesFrom(VIKING, dataset);
-  return colorPlotAxesFor(
-    dataset,
-    columns,
-    facetPlanFor(dataset, columns, data),
-  );
-};
-
-test("a profile's colour plot runs time across its depth", () => {
-  for (const type of ["Profile", "TimeSeriesProfile"]) {
-    assert.deepEqual(colorAxesFor(type), { x: "time", y: "depth" }, type);
-  }
-});
-
-test("a trajectory profile's colour plot runs time across its depth", () => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TrajectoryProfile" };
-  const variables = variablesFrom(VIKING, dataset);
-  const data = [
-    { time: "2021-05-24T20:38:00Z", latitude: 47.57, longitude: -69.85 },
-    { time: "2021-05-24T17:06:00Z", latitude: 47.61, longitude: -69.92 },
-  ];
-  const trackIndex = trackIndexFor(dataset, variables, data, "Position");
-  assert.deepEqual(
-    colorAxesFor(
-      "TrajectoryProfile",
-      [...variables, trackIndex.variable],
-      data,
-    ),
-    { x: "time", y: "depth" },
-  );
-});
-
-test("a record of many profiles opens on the colour plot, any link may ask for panels", () => {
-  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
-    const dataset = { cdm_data_type: type };
-    assert.equal(defaultPlotLayoutFor(dataset), "color", type);
-    assert.equal(plotLayoutFor(dataset, "panels"), "panels", type);
-    assert.equal(plotLayoutFor(dataset, "bogus"), "color", type);
-  }
-  for (const type of ["Profile", "TimeSeries", "Trajectory", "Point"]) {
-    const dataset = { cdm_data_type: type };
-    assert.equal(defaultPlotLayoutFor(dataset), "panels", type);
-    assert.equal(plotLayoutFor(dataset, "color"), "panels", type);
-  }
-});
-
-test("a timeseries' colour plot keeps time across and puts depth down", () => {
-  assert.deepEqual(colorAxesFor("TimeSeries"), { x: "time", y: "depth" });
-});
-
-test("with no depth, the colour plot's Y is a measurement no panel opens on", () => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeries" };
-  const variables = variablesFrom(VIKING, dataset).filter(
-    (variable) => variable.columnName !== "depth",
-  );
-  const axes = colorAxesFor("TimeSeries", variables);
-  assert.equal(axes.x, "time");
-  assert.ok(axes.y && axes.y !== "TE90_01" && axes.y !== "time");
-});
-
-test("a point's colour plot draws its measurement against depth", () => {
-  assert.deepEqual(colorAxesFor("Point"), { x: "TE90_01", y: "depth" });
-});
-
-test("no plan means no colour plot axes", () => {
-  assert.deepEqual(colorPlotAxesFor({ cdm_data_type: "Grid" }, [], null), {
-    x: null,
-    y: null,
-  });
-});
-
 // VIKING's rows with every value but the named columns' blanked out.
 const vikingWithDataIn = (dataset, columnNames) =>
   withDataPresence(variablesFrom(VIKING, dataset), [
@@ -770,7 +692,7 @@ const vikingWithDataIn = (dataset, columnNames) =>
   ]);
 
 test("an empty first_eov_column gives way to a measurement that has data", () => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
   const variables = vikingWithDataIn(dataset, ["depth", "PSAL_01"]);
   assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["PSAL_01"]);
 });
@@ -778,7 +700,7 @@ test("an empty first_eov_column gives way to a measurement that has data", () =>
 test("without a usable first_eov_column, a column mapped to an EOV opens first", () => {
   const dataset = {
     ...VIKING_DATASET,
-    cdm_data_type: "TimeSeriesProfile",
+    cdm_data_type: "Profile",
     first_eov_column: null,
   };
   const table = {
@@ -796,7 +718,7 @@ test("without a usable first_eov_column, a column mapped to an EOV opens first",
 });
 
 test("a record with no data anywhere opens on the usual default", () => {
-  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
   const variables = vikingWithDataIn(dataset, []);
   assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["TE90_01"]);
 });
@@ -832,7 +754,8 @@ const defaultsFor = (cdm_data_type, columns) => {
   const dataset = { ...VIKING_DATASET, cdm_data_type };
   const rows = vikingRows(columns);
   const variables = withDataPresence(variablesFrom(VIKING, dataset), rows);
-  return facetPlanFor(dataset, variables, rows).panelDefaults;
+  const plan = facetPlanFor(dataset, variables, rows);
+  return plan.colorDefaults.length ? plan.colorDefaults : plan.panelDefaults;
 };
 
 test("profiles and timeseries open on up to three varying measurements, the EOV first", () => {

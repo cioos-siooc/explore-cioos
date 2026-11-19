@@ -45,10 +45,8 @@ import {
   panelCandidatesFor,
   sharedCandidatesFor,
   COLUMNS,
-  ROWS,
 } from "../DatasetPreview/previewFacetPlan.js";
 import {
-  buildColorFigure,
   buildFigure,
   buildGridFigure,
   buildOverlayFigure,
@@ -81,8 +79,8 @@ import { autoScaleNameFor } from "../DatasetPreview/previewColorScales.js";
 import { POSITION_INDEX_COLUMN } from "../DatasetPreview/previewTrackIndex.js";
 import {
   MAX_COLOR_PANELS,
-  PLOT_LAYOUTS,
-  PLOT_MODES,
+  ACROSS,
+  DOWN,
 } from "../DatasetPreview/usePreviewPlotParams.js";
 import { usePreviewPlot } from "../DatasetPreview/PreviewPlotProvider.jsx";
 import { ROW_LIMITS } from "../../../state/selection/previewParams.js";
@@ -131,15 +129,11 @@ export default function DatasetPreviewPlot() {
     colorCandidates,
     colorAxes,
     setColorAxes,
-    plotLayout,
-    setPlotLayout,
-    colorPlotAvailable,
     stacked,
     setStacked,
-    colorXs,
-    setColorXs,
-    colorYs,
-    setColorYs,
+    facetCount,
+    facetDirection,
+    setFacetDirection,
     variableScales,
     setVariableScale,
     colorColumns,
@@ -149,6 +143,7 @@ export default function DatasetPreviewPlot() {
     yAxisColumns,
     reversedYAxes,
     setYAxisReversed,
+    plotModes,
     plotType,
     setPlotType,
     plotCustomized,
@@ -219,29 +214,20 @@ export default function DatasetPreviewPlot() {
   // Compact, the figure is often wider than its scroller, and a title centred
   // over it would be cut off; the header row the settings gear needs holds it.
   const titleInHeader = hasProfileHeader || settingsInDialog;
-  const isColorLayout = plotLayout === "color";
-  // The colour plot draws every profile at once.
-  const showSlice = hasProfileHeader && !isColorLayout;
+  const showSlice = hasProfileHeader;
   const axisCaptionFor = (direction) =>
     direction === "horizontal"
       ? t("datasetPreviewPlotXAxis")
       : t("datasetPreviewPlotYAxis");
 
   // Several variables on both axes, or several colour columns: every
-  // combination is a panel of its own, laid out as a grid. A colour plot
-  // grids only once it has several X; more Y just stack more rows.
+  // combination is a panel of its own, laid out as a grid.
   const panelXAxes = plan.orientation === COLUMNS ? panels : sharedAxes;
   const panelYAxes = plan.orientation === COLUMNS ? sharedAxes : panels;
-  const isGrid = isColorLayout
-    ? colorXs.length > 1
-    : sharedAxes.length > 1 || colorAxes.length > 1;
+  const isGrid = sharedAxes.length > 1 || colorAxes.length > 1;
   const colorRepeats = Math.max(colorAxes.length, 1);
-  const gridColumns = isColorLayout
-    ? colorXs.length
-    : panelXAxes.length * (plan.colorRows ? 1 : colorRepeats);
-  const gridRows = isColorLayout
-    ? panels.length * colorYs.length
-    : panelYAxes.length * (plan.colorRows ? colorRepeats : 1);
+  const gridColumns = panelXAxes.length * (plan.colorRows ? 1 : colorRepeats);
+  const gridRows = panelYAxes.length * (plan.colorRows ? colorRepeats : 1);
 
   // The figure's box and the title that shapes it. One call because the three
   // have to be derived in that order — see plotBoxFor.
@@ -261,14 +247,13 @@ export default function DatasetPreviewPlot() {
         ...shared,
         columns: gridColumns,
         rows: gridRows,
-        header: !isColorLayout && !plan.colorRows && colorAxes.length > 1,
-        colorbars: isColorLayout || Boolean(plan.colorRows),
+        header: !plan.colorRows && colorAxes.length > 1,
+        colorbars: Boolean(plan.colorRows),
       });
     }
     return plotBoxFor({
       ...shared,
-      panelCount: isColorLayout ? gridRows : panels.length,
-      orientation: isColorLayout ? ROWS : plan.orientation,
+      panelCount: panels.length,
     });
   }, [
     plan,
@@ -280,7 +265,6 @@ export default function DatasetPreviewPlot() {
     titleInHeader,
     touch,
     labelFont,
-    isColorLayout,
     isGrid,
     gridColumns,
     gridRows,
@@ -290,8 +274,7 @@ export default function DatasetPreviewPlot() {
   // The ticks and the position labels belong to the index and to nothing else:
   // switch the axis back to longitude and they would label the wrong numbers.
   const onPositionAxis = Boolean(
-    trackIndex &&
-    (isColorLayout ? colorXs[0] : sharedAxis) === POSITION_INDEX_COLUMN,
+    trackIndex && sharedAxis === POSITION_INDEX_COLUMN,
   );
   const position = useMemo(
     () =>
@@ -308,28 +291,6 @@ export default function DatasetPreviewPlot() {
   const figure = useMemo(() => {
     if (!panels.length || !plotData) return null;
     const revision = `${inspectRecordID}|${uirevision}`;
-    if (isColorLayout) {
-      return colorXs.length && colorYs.length
-        ? buildColorFigure({
-            variablesByName,
-            panels,
-            xAxes: colorXs,
-            yAxes: colorYs,
-            data: plotData,
-            labels: customLabels,
-            scales: scalesInUse,
-            title,
-            sharedTicks: onPositionAxis ? trackIndex.ticks : null,
-            sharedText: onPositionAxis ? trackIndex.labels : null,
-            position,
-            size: { width, height },
-            labelFont,
-            pinned: !touch,
-            uirevision: revision,
-            reversedYAxes,
-          })
-        : null;
-    }
     if (stacked) {
       return buildOverlayFigure({
         plan,
@@ -393,14 +354,11 @@ export default function DatasetPreviewPlot() {
       reversedYAxes,
     });
   }, [
-    isColorLayout,
     labelFont,
     labelLines,
     touch,
     stacked,
     isGrid,
-    colorXs,
-    colorYs,
     panelXAxes,
     panelYAxes,
     scalesInUse,
@@ -429,7 +387,7 @@ export default function DatasetPreviewPlot() {
 
   // The shared axis leaves the scroller for a strip beside it, so its scale and
   // title stay in view while the panels scroll — see previewPinnedAxis.js.
-  const pinnedOrientation = isColorLayout ? ROWS : plan.orientation;
+  const pinnedOrientation = plan.orientation;
   // A grid has no one shared axis to pin: each column and row keeps its own.
   // Nor does a touch screen's (`pinned` false): it fits its box and never
   // scrolls, so it keeps its axis and Plotly's automargin sizes the edge to it.
@@ -556,9 +514,7 @@ export default function DatasetPreviewPlot() {
     variables: panels
       .map((columnName) => shortLabelFor(variablesByName.get(columnName)))
       .join(", "),
-    axis: shortLabelFor(
-      variablesByName.get(isColorLayout ? colorXs[0] : sharedAxis),
-    ),
+    axis: shortLabelFor(variablesByName.get(sharedAxis)),
     count: plotData?.length ?? 0,
   });
   const pinnedThickness = pinnedAxisSizeFor(pinnedOrientation, labelFont);
@@ -583,22 +539,6 @@ export default function DatasetPreviewPlot() {
   );
   const reverseAxisCheckbox = singleYAxis && reverseCheckbox(singleYAxis);
 
-  // The colour plot's axes: several make a grid. `excluded` keeps X and Y
-  // apart.
-  const axisPicker = (label, selected, onSelect, excluded, isMulti) => (
-    <VariablePicker
-      label={label}
-      isMulti={isMulti}
-      choices={sharedCandidates.filter(
-        (variable) => !excluded.includes(variable.columnName),
-      )}
-      value={selected}
-      variablesByName={variablesByName}
-      required
-      onChange={(picked) => picked.length && onSelect(picked)}
-    />
-  );
-
   const scalePicker = (columnName) => (
     <ColorScalePicker
       value={variableScales[columnName] || null}
@@ -607,11 +547,7 @@ export default function DatasetPreviewPlot() {
     />
   );
   const sharingScale = sharedColorScale && colorColumns.length > 1;
-  // The colour plot keeps each panel's own picker under More options, so
-  // here it only needs the row to share one.
-  const colorScaleRow = (isColorLayout
-    ? colorColumns.length > 1
-    : colorColumns.length > 0) && (
+  const colorScaleRow = colorColumns.length > 0 && (
     <ControlRow caption={t("datasetPreviewPlotColorScale")}>
       <span className="colorScaleStack">
         {colorColumns.length > 1 && (
@@ -631,8 +567,7 @@ export default function DatasetPreviewPlot() {
         )}
         {sharingScale || colorColumns.length === 1
           ? scalePicker(colorColumns[0])
-          : !isColorLayout &&
-            colorColumns.map((columnName) => (
+          : colorColumns.map((columnName) => (
               <span className="colorScaleItem" key={columnName}>
                 <span className="colorScaleItemName">
                   {labelOf(columnName)}
@@ -655,14 +590,7 @@ export default function DatasetPreviewPlot() {
     <div className="labelEditorRow" key={columnName}>
       <label htmlFor={`rename-${columnName}`}>{labelOf(columnName)}</label>
       <div className="labelEditorControls">
-        {index !== null && isColorLayout && !sharingScale && (
-          <ColorScalePicker
-            value={variableScales[columnName] || null}
-            autoName={autoScaleNameFor(variablesByName.get(columnName))}
-            onPick={(name) => setVariableScale(columnName, name)}
-          />
-        )}
-        {index !== null && !isColorLayout && (
+        {index !== null && (
           <VariableColorPicker
             color={variableColors[columnName] || null}
             defaultColor={
@@ -756,110 +684,62 @@ export default function DatasetPreviewPlot() {
 
   const paneControls = (
     <>
-      {/* A filled colour plot has no plot type. */}
-      {!isColorLayout && (
-        <ControlRow caption={t("plotType")}>
-          <SegmentedToggle
-            label={t("plotType")}
-            data-testid="preview-mode-toggle"
-            options={PLOT_MODES.map(({ value, labelKey }) => ({
-              value,
-              label: t(labelKey),
-            }))}
-            value={plotType}
-            onChange={setPlotType}
-          />
-        </ControlRow>
-      )}
+      <ControlRow caption={t("plotType")}>
+        <SegmentedToggle
+          label={t("plotType")}
+          data-testid="preview-mode-toggle"
+          options={plotModes.map(({ value, labelKey }) => ({
+            value,
+            label: t(labelKey),
+          }))}
+          value={plotType}
+          onChange={setPlotType}
+        />
+      </ControlRow>
 
-      {/* Before the axes: it decides what every one of them means. */}
-      {colorPlotAvailable && (
-        <ControlRow caption={t("datasetPreviewPlotLayout")}>
-          <SegmentedToggle
-            label={t("datasetPreviewPlotLayout")}
-            data-testid="preview-layout-toggle"
-            options={PLOT_LAYOUTS.map(({ value, labelKey }) => ({
-              value,
-              label: t(labelKey),
-            }))}
-            value={plotLayout}
-            onChange={setPlotLayout}
-          />
-        </ControlRow>
-      )}
-
-      {isColorLayout ? (
+      {sharedIsX ? (
         <>
-          <ControlRow caption={t("datasetPreviewPlotXAxis")}>
-            {axisPicker(
-              t("datasetPreviewPlotXAxis"),
-              colorXs,
-              setColorXs,
-              colorYs,
-              colorYs.length <= 1 && panels.length <= 1,
-            )}
-          </ControlRow>
-          <ControlRow
-            caption={t("datasetPreviewPlotYAxis")}
-            action={reverseAxisCheckbox}
-          >
-            {axisPicker(
-              t("datasetPreviewPlotYAxis"),
-              colorYs,
-              setColorYs,
-              colorXs,
-              colorXs.length <= 1 && panels.length <= 1,
-            )}
-          </ControlRow>
-          <ControlRow caption={t("datasetPreviewPlotColorBy")} startsGroup>
-            <VariablePicker
-              label={t("datasetPreviewPlotColorBy")}
-              choices={colorCandidates.filter(
-                (variable) =>
-                  !colorXs.includes(variable.columnName) &&
-                  !colorYs.includes(variable.columnName),
-              )}
-              value={panels}
-              variablesByName={variablesByName}
-              onChange={setPanels}
-              isMulti={colorXs.length <= 1 && colorYs.length <= 1}
-              maxSelected={MAX_COLOR_PANELS}
-            />
-          </ControlRow>
-          {colorScaleRow}
+          {sharedAxisRow}
+          {panelsRow}
         </>
       ) : (
         <>
-          {sharedIsX ? (
-            <>
-              {sharedAxisRow}
-              {panelsRow}
-            </>
-          ) : (
-            <>
-              {panelsRow}
-              {sharedAxisRow}
-            </>
-          )}
-
-          {/* On one plot, colour already says which axis a curve reads on. */}
-          {!stacked && (
-            <ControlRow caption={t("datasetPreviewPlotColorBy")} startsGroup>
-              <VariablePicker
-                label={t("datasetPreviewPlotColorBy")}
-                choices={colorCandidates}
-                value={colorAxes}
-                variablesByName={variablesByName}
-                placeholder={t("datasetPreviewPlotColorNone")}
-                onChange={setColorAxes}
-                isMulti={panels.length <= 1 && sharedAxes.length <= 1}
-                maxSelected={MAX_COLOR_PANELS}
-              />
-            </ControlRow>
-          )}
-
-          {colorScaleRow}
+          {panelsRow}
+          {sharedAxisRow}
         </>
+      )}
+
+      {/* On one plot, colour already says which axis a curve reads on. */}
+      {!stacked && (
+        <ControlRow caption={t("datasetPreviewPlotColorBy")} startsGroup>
+          <VariablePicker
+            label={t("datasetPreviewPlotColorBy")}
+            choices={colorCandidates}
+            value={colorAxes}
+            variablesByName={variablesByName}
+            placeholder={t("datasetPreviewPlotColorNone")}
+            onChange={setColorAxes}
+            isMulti={panels.length <= 1 && sharedAxes.length <= 1}
+            maxSelected={MAX_COLOR_PANELS}
+          />
+        </ControlRow>
+      )}
+
+      {colorScaleRow}
+
+      {facetCount > 1 && (
+        <ControlRow caption={t("datasetPreviewPlotFacets")}>
+          <SegmentedToggle
+            label={t("datasetPreviewPlotFacets")}
+            data-testid="preview-facet-toggle"
+            options={[
+              { value: ACROSS, label: t("datasetPreviewPlotFacetsAcross") },
+              { value: DOWN, label: t("datasetPreviewPlotFacetsDown") },
+            ]}
+            value={facetDirection}
+            onChange={setFacetDirection}
+          />
+        </ControlRow>
       )}
 
       {previewWindow.offersRows && (
@@ -892,31 +772,25 @@ export default function DatasetPreviewPlot() {
       </button>
       {showLabels && (
         <div className="labelEditor">
-          {!isColorLayout && (
-            <ControlRow caption={t("datasetPreviewPlotCurves")}>
-              <SegmentedToggle
-                label={t("datasetPreviewPlotCurves")}
-                data-testid="preview-stack-toggle"
-                options={[
-                  {
-                    value: "panels",
-                    label: t("datasetPreviewPlotCurvesPanels"),
-                  },
-                  {
-                    value: "stacked",
-                    label: t("datasetPreviewPlotCurvesStacked"),
-                  },
-                ]}
-                value={stacked ? "stacked" : "panels"}
-                onChange={(value) => setStacked(value === "stacked")}
-              />
-            </ControlRow>
-          )}
-          {isColorLayout
-            ? [...colorXs, ...colorYs].map((columnName) =>
-                customizeRow(columnName, null),
-              )
-            : sharedAxes.map((columnName) => customizeRow(columnName, null))}
+          <ControlRow caption={t("datasetPreviewPlotCurves")}>
+            <SegmentedToggle
+              label={t("datasetPreviewPlotCurves")}
+              data-testid="preview-stack-toggle"
+              options={[
+                {
+                  value: "panels",
+                  label: t("datasetPreviewPlotCurvesPanels"),
+                },
+                {
+                  value: "stacked",
+                  label: t("datasetPreviewPlotCurvesStacked"),
+                },
+              ]}
+              value={stacked ? "stacked" : "panels"}
+              onChange={(value) => setStacked(value === "stacked")}
+            />
+          </ControlRow>
+          {sharedAxes.map((columnName) => customizeRow(columnName, null))}
           {panels.map((columnName, index) => customizeRow(columnName, index))}
         </div>
       )}

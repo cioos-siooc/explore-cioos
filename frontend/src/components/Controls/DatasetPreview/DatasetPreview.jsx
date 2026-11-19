@@ -21,10 +21,7 @@ import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import usePreviewProfiles from "./usePreviewProfiles.js";
 import { previewSampleFor, previewWindowFor } from "./previewSample.js";
 import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
-import {
-  COLOR_LAYOUT,
-  DEFAULT_ROW_LIMIT,
-} from "../../../state/selection/previewParams.js";
+import { DEFAULT_ROW_LIMIT } from "../../../state/selection/previewParams.js";
 import "./styles.css";
 
 const NO_CUSTOM_LABELS = {};
@@ -67,15 +64,8 @@ export default function DatasetPreview({
     datasetPreview?.table,
     rows,
   );
-  const {
-    selectedVis,
-    setSelectedVis,
-    linkKey,
-    plotLayout,
-    step,
-    before,
-    rowLimit,
-  } = plotParams;
+  const { selectedVis, setSelectedVis, linkKey, step, before, rowLimit } =
+    plotParams;
 
   // Fetched separately from the rows and independent of them: a record whose
   // list fails simply gets no slider.
@@ -84,9 +74,8 @@ export default function DatasetPreview({
     inspectRecordID,
   );
 
-  const drawsOneProfile =
-    plotLayout !== COLOR_LAYOUT && Boolean(step || profiles.current);
-  // Said beside the title, so the table and both plot layouts all say it.
+  const drawsOneProfile = Boolean(step || profiles.current);
+  // Said beside the title, so the table and the plot both say it.
   const sample = useMemo(
     () =>
       previewSampleFor({
@@ -266,9 +255,7 @@ export default function DatasetPreview({
                   {t(
                     sample.profileCount === null
                       ? "datasetPreviewSampleRows"
-                      : plotLayout === COLOR_LAYOUT
-                        ? "datasetPreviewSampleAllProfiles" // the colour plot draws every profile it loaded
-                        : "datasetPreviewSampleProfiles",
+                      : "datasetPreviewSampleProfiles",
                     {
                       rows: formatCount(sample.rowCount),
                       totalRows: formatCount(sample.totalRowCount),

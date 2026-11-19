@@ -81,7 +81,7 @@ const ROWS_MARGIN = {
   b: PINNED_EDGE_PX,
 };
 
-// Right of a colour plot's panels: each one's own colourbar, its tick labels and
+// Right of a colour row's panels: each one's own colourbar, its tick labels and
 // its sideways title.
 export const COLORBAR_ROOM_PX = 96;
 
