@@ -442,7 +442,7 @@ describe("FilterSearch", () => {
   });
 
   it("lists places after the other suggestions, and the text search last", async () => {
-    answerRegions("Pacific");
+    answerRegions("Pacific Ocean");
     const { user, box } = await renderPalette();
 
     await user.type(box, "pacific");
@@ -460,6 +460,21 @@ describe("FilterSearch", () => {
       firstText,
     );
     expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
+  });
+
+  it("leads with a place named exactly what was typed", async () => {
+    answerRegions("Pacific");
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "pacific");
+    await screen.findByText("Fundian Channel");
+
+    const labels = screen
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(labels.findIndex((l) => l.startsWith("Pacific"))).toBeLessThan(
+      labels.findIndex((l) => l.includes("CIOOS Pacific")),
+    );
   });
 
   it("shows four of a group, and the rest when asked", async () => {

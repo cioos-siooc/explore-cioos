@@ -33,6 +33,7 @@ import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
 import {
   closestOption,
+  exactNameFirst,
   matchFilterOptions,
   parseFilterQuery,
   parsePartialRangeQuery,
@@ -355,8 +356,14 @@ export default function FilterSearch({
   const tail = ["region", "text"];
   shown = [
     ...pinned,
-    ...shown.filter((g) => !tail.includes(g.key)),
-    ...tail.flatMap((key) => shown.filter((g) => g.key === key)),
+    ...exactNameFirst(
+      [
+        ...shown.filter((g) => !tail.includes(g.key)),
+        ...tail.flatMap((key) => shown.filter((g) => g.key === key)),
+      ],
+      term,
+      "region",
+    ),
   ];
   // The rest of a group is an option too, so the arrow keys reach it; with an
   // empty box a group lists what's applied, which is never cut.

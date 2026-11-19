@@ -160,6 +160,30 @@ export function matchFilterOptions(
 // For a term nothing matched: the option most of whose words of three
 // letters or more turn up, typos allowed, in its text or aliasText, if at
 // least half of them do. Ties go to the one whose label names them.
+const plainName = (text) =>
+  deburr(String(text)).trim().toLowerCase().replace(/\s+/g, " ");
+
+// Puts the group first when one of its options is named exactly what was
+// typed and no other filter value is: "Gulf of St. Lawrence" means the place,
+// not the coalition named after it.
+export function exactNameFirst(groups, term, key) {
+  const wanted = plainName(term.replace(OPERATORS, " "));
+  const lead = groups.find((group) => group.key === key);
+  const names = (group) =>
+    group.options.some((option) => plainName(option.label) === wanted);
+  if (
+    !wanted ||
+    !lead ||
+    !names(lead) ||
+    groups.some(
+      (group) => group !== lead && group.key !== "text" && names(group),
+    )
+  ) {
+    return groups;
+  }
+  return [lead, ...groups.filter((group) => group !== lead)];
+}
+
 export function closestOption(options, term) {
   const words = deburr(term.replace(OPERATORS, " "))
     .toLowerCase()

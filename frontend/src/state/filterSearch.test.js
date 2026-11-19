@@ -4,6 +4,7 @@ import eovs from "../eovs.json";
 import {
   closestOption,
   eovAliasText,
+  exactNameFirst,
   matchFilterOptions,
   parseFilterQuery,
   parsePartialRangeQuery,
@@ -410,4 +411,38 @@ describe("parsePartialRangeQuery", () => {
       expect(parse(term)).toBeUndefined();
     },
   );
+});
+
+describe("exactNameFirst", () => {
+  const orgs = {
+    key: "orgs",
+    options: [{ label: "Southern Gulf of St. Lawrence Coalition" }],
+  };
+  const places = {
+    key: "region",
+    options: [{ label: "Gulf of St. Lawrence" }],
+  };
+  const text = { key: "text", options: [{ label: "Gulf of St. Lawrence" }] };
+
+  it("leads with the place named exactly what was typed", () => {
+    expect(
+      exactNameFirst([orgs, places, text], "gulf of st. lawrence ", "region"),
+    ).toEqual([places, orgs, text]);
+  });
+
+  it("keeps the order when the place only resembles the term", () => {
+    const groups = [orgs, places, text];
+    expect(exactNameFirst(groups, "gulf", "region")).toBe(groups);
+  });
+
+  it("keeps the order when a filter value is named the same", () => {
+    const sameOrg = {
+      key: "orgs",
+      options: [{ label: "Gulf of St. Lawrence" }],
+    };
+    const groups = [sameOrg, places];
+    expect(exactNameFirst(groups, "Gulf of St. Lawrence", "region")).toBe(
+      groups,
+    );
+  });
 });
