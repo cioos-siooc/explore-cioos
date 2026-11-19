@@ -1,5 +1,6 @@
 from cde_harvester.core.errors import (
     DEPTH_AND_ALTITUDE,
+    FILE_LISTING,
     INGEST_FLAG_FALSE,
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
@@ -12,6 +13,10 @@ from cde_harvester.utils import (
     is_cf_standard_name,
     supported_standard_names,
 )
+
+# The fixed columns of an EDDTableFromFileNames dataset, which lists files
+# rather than serving their data (often declared Grid or Other).
+FILE_LISTING_VARIABLES = {"url", "name", "lastModified", "size"}
 
 
 class CDEComplianceChecker:
@@ -116,6 +121,17 @@ class CDEComplianceChecker:
             return False
         return True
 
+    def check_not_file_listing(self):
+        if FILE_LISTING_VARIABLES.issubset(self.dataset.variables_list or ()):
+            self.logger.info("Skipping dataset: ERDDAP file listing")
+            self.failure_reason_code = FILE_LISTING
+            self.failure_details = (
+                "ERDDAP file listing (url, name, lastModified, size): it lists "
+                "files rather than serving their data, so there is nothing to map"
+            )
+            return False
+        return True
+
     def check_only_one_depth(self):
         if (
             "depth" in self.dataset.variables_list
@@ -128,6 +144,7 @@ class CDEComplianceChecker:
     def passes_all_checks(self):
         return (
             self.cde_ingest_flag()
+            and self.check_not_file_listing()
             and self.check_required_variables()
             and self.check_supported_cf_name()
             and self.check_only_one_depth()

@@ -234,6 +234,27 @@
   height: 14px;
 }
 
+/* react-select lays an empty picker out as a grid that stacks the placeholder
+   and input in one cell; flex keeps the add pill on their line. */
+.variableSelect .variableSelect__value-container {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.variableSelectAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px;
+  padding: 1px 8px;
+  border: 1px dashed var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-primary-800);
+  white-space: nowrap;
+}
+
 .variableSelect .variableSelect__placeholder {
   color: var(--cioos-ink-80);
 }

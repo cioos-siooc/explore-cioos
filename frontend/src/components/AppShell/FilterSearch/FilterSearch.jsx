@@ -576,6 +576,17 @@ export default function FilterSearch({
               </span>
             </div>
           )}
+          {places.failed && (
+            <div role="status" className="filterSearchPending">
+              <span className="filterSearchGroupLabel">
+                <GroupIcon groupKey="region" />
+                {t("regionSearchGroup")}
+              </span>
+              <span className="filterSearchPendingText">
+                {t("regionSearchFailed")}
+              </span>
+            </div>
+          )}
         </div>
       </Autocomplete>
       <footer className="filterSearchKeys" aria-hidden="true">
