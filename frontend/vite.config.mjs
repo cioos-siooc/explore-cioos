@@ -33,6 +33,9 @@ export default defineConfig(({ mode }) => {
     // Absolute, or on deep routes the SPA fallback serves index.html for the
     // misresolved bundle and the app never boots on reload.
     base: env.BASE_URL || "/",
+    // e2e/in-container.sh shares node_modules; a shared cache would serve the
+    // container's /work paths to the host's dev server.
+    cacheDir: env.VITE_CACHE_DIR || "node_modules/.vite",
     plugins: [
       react(),
       dropPlotlyMaplibreCss,

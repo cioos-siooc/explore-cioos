@@ -15,6 +15,7 @@ exec docker run --rm \
   -e HOME=/tmp \
   -e CI=true \
   -e A11Y_BASELINE="${A11Y_BASELINE:-}" \
+  -e VITE_CACHE_DIR=node_modules/.vite-container \
   -v "$(pwd):/work" \
   -w /work \
   "mcr.microsoft.com/playwright:v${version}-noble" \
