@@ -218,15 +218,13 @@
   border-left: 1px solid rgb(82 167 155 / 32%);
 }
 
+/* The end segments match the row's corners so their inset outlines follow
+   the curve. */
 .topBarActions > .topBarButton:first-child {
   border-left: none;
-
-  /* .active promotes the button to its own compositing layer, whose paint
-     doesn't reliably clip to the ancestor's rounded corner. */
   border-bottom-left-radius: var(--cioos-radius-lg);
 }
 
-/* Same cross-layer clipping reason as above. */
 .topBarActions > .topBarButton:last-child {
   border-bottom-right-radius: var(--cioos-radius-lg);
 }
@@ -250,27 +248,24 @@
   color: var(--cioos-primary-800);
 }
 
-/* Two adjacent active segments would read as one block, so each gets a ring
-   on the shared 3D shadow, raised above the row so neither a neighbour nor
-   the row's overflow:hidden cuts it. */
 .topBar .topBarActions .topBarButton.active {
-  position: relative;
-  z-index: 1;
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
-  transform: var(--cioos-perspective);
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 55%),
-    var(--cioos-shadow-3d-sm);
+
+  /* Inset so the row's overflow:hidden can't clip it; also keeps two adjacent
+     active segments from reading as one block. */
+  box-shadow: inset 0 0 0 3px var(--cioos-primary-800);
 }
 
 .topBarButton.active svg {
   color: var(--cioos-on-primary);
 }
 
+/* Inset, as in the filter search options: the row's overflow:hidden clips an
+   outer ring. */
 .topBar .topBarActions .topBarButton:focus-visible {
   outline: none;
-  box-shadow: var(--cioos-focus);
+  box-shadow: inset 0 0 0 3px var(--cioos-primary);
 }
 
 /* Container plus two real buttons, since browsers refuse a button nested in
@@ -312,6 +307,7 @@
   flex: 0 0 auto;
   padding: 4px 10px 4px 6px;
   border-left: 1px solid rgb(82 167 155 / 32%);
+  border-bottom-right-radius: var(--cioos-radius-lg);
 }
 
 .topBarButton.active .topBarFiltersToggle {
@@ -321,8 +317,7 @@
 .topBarFiltersOpen:focus-visible,
 .topBarFiltersToggle:focus-visible {
   outline: none;
-  box-shadow: var(--cioos-focus);
-  border-radius: var(--cioos-radius-sm);
+  box-shadow: inset 0 0 0 3px var(--cioos-primary);
 }
 
 /* Tally: "123/150 datasets" between the brand lockup and the tab strip. */
@@ -425,7 +420,8 @@
 
   .topBarActions,
   .topBarActions > .topBarButton:first-child,
-  .topBarActions > .topBarButton:last-child {
+  .topBarActions > .topBarButton:last-child,
+  .topBarFiltersToggle {
     border-radius: 0;
   }
 

@@ -40,16 +40,15 @@
   background-color: var(--cioos-surface-2);
 }
 
-/* Same raised treatment as .topBarButton.active. Icons draw with currentColor,
+/* Same fill and outline as .topBarButton.active. Icons draw with currentColor,
    so the fill alone recolors them. */
 .quickFilterButton.applied {
   border-color: transparent;
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
-  transform: var(--cioos-perspective);
   box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 55%),
-    var(--cioos-shadow-3d-sm);
+    inset 0 0 0 3px var(--cioos-primary-800),
+    var(--cioos-shadow-float);
 }
 
 .quickFilterButton.applied:hover {
@@ -59,7 +58,9 @@
 
 .quickFilterButton:focus-visible {
   outline: none;
-  box-shadow: var(--cioos-focus);
+  box-shadow:
+    inset 0 0 0 3px var(--cioos-primary),
+    var(--cioos-shadow-float);
 }
 
 /* Never lights up; its hover takes the destructive colour since it drops every
@@ -172,7 +173,7 @@
 }
 
 .quickFilterAreaItem[data-focus-visible] {
-  box-shadow: inset var(--cioos-focus);
+  box-shadow: inset 0 0 0 3px var(--cioos-primary);
 }
 
 /* Mobile: one row of pills, caption beside the icon, to cost one button's

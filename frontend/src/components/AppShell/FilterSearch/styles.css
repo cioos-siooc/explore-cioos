@@ -235,13 +235,13 @@
 /* An outline, not a fill, so it stays visible over an applied row's colour. */
 .filterSearchOption:is([data-focused], [data-hovered]) {
   background-color: var(--cioos-surface-2);
-  box-shadow: inset 0 0 0 1px var(--cioos-primary-800);
+  box-shadow: inset 0 0 0 3px var(--cioos-primary-800);
 }
 
 .filterSearchPage.excluding
   .filterSearchOption:is([data-focused], [data-hovered]) {
   background-color: var(--cioos-error-bg);
-  box-shadow: inset 0 0 0 1px var(--cioos-error-700);
+  box-shadow: inset 0 0 0 3px var(--cioos-error-700);
 }
 
 .filterSearchPage.excluding
