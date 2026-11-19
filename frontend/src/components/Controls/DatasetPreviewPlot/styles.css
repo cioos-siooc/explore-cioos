@@ -581,6 +581,7 @@
 
 /* Collapsible "Labels & colours" panel: one block per drawn variable, holding
    its colour and its display name. */
+
 /* The toggle and its panel stay items of the pane's own column. */
 .labelEditorDisclosure {
   display: contents;
