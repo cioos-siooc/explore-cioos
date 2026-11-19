@@ -413,6 +413,28 @@ describe("FilterSearch", () => {
     expect(box).toHaveAttribute("aria-busy", "false");
   });
 
+  it("says so when NRCan fails, and stops looking busy", async () => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) =>
+        String(input).startsWith("https://geogratis.gc.ca/")
+          ? new Response("", { status: 503 })
+          : fallback(input, init),
+      ),
+    );
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+
+    expect(
+      await within(screen.getByTestId("filter-search")).findByText(
+        "Place search (NRCan) is unavailable right now. Try again later.",
+      ),
+    ).toBeInTheDocument();
+    expect(box).toHaveAttribute("aria-busy", "false");
+  });
+
   it("lists places after the other suggestions, and the text search last", async () => {
     answerRegions("Pacific");
     const { user, box } = await renderPalette();

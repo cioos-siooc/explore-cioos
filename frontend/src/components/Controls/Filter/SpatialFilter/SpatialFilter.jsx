@@ -40,7 +40,7 @@ function PlaceSearch({ children }) {
   const { setShowFiltersModal } = useUI();
   const goTo = useGoToRegion();
   const [term, setTerm] = useState("");
-  const { places, loading } = useRegionMatches(term.trim());
+  const { places, loading, failed } = useRegionMatches(term.trim());
 
   const pick = (place, shape) => {
     setShowFiltersModal(false);
@@ -128,6 +128,11 @@ function PlaceSearch({ children }) {
         <div role="status" className="spatialFilterPlacesLoading">
           <Spinner size="sm" role={null} />
           {t("regionSearchLoading")}
+        </div>
+      )}
+      {failed && (
+        <div role="status" className="spatialFilterPlacesLoading">
+          {t("regionSearchFailed")}
         </div>
       )}
       <p className="spatialFilterPlacesSource">
