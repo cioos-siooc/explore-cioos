@@ -1,19 +1,22 @@
-// Must match the edge lengths in create_hexes() (database/4_create_hexes.sql);
-// changing either means changing both and re-tiling.
+// H3 resolutions; must match create_hexes() / trajectory_build_hexes()
+// (database/4_create_hexes.sql), and FINE must match OBIS_H3_RES in the OBIS
+// harvester. Changing any means changing all and re-tiling.
 
-// ST_HexagonGrid takes the EDGE length, so a cell's diameter is 2x this.
+// edgeMetres is the resolution's average GROUND edge; a cell is ~2x across.
 const TIERS = [
   {
     tier: 0,
     hexesTable: "cde.hexes_zoom_0",
     pointColumn: "hex_0_pk",
-    edgeMetres: 100000,
+    h3Resolution: 3,
+    edgeMetres: 68980,
   },
   {
     tier: 1,
     hexesTable: "cde.hexes_zoom_1",
     pointColumn: "hex_1_pk",
-    edgeMetres: 10000,
+    h3Resolution: 6,
+    edgeMetres: 3725,
   },
 ];
 
@@ -22,8 +25,9 @@ const TIERS = [
 const FINE = TIERS[1];
 
 // The coverage layer never becomes points, so the fine grid is reused
-// uncapped past the zoom where the main layer switches to dots.
-const FINE_TIER_MIN_ZOOM = 4;
+// uncapped past the zoom where the main layer switches to dots. Below 5 a
+// fine cell is ~2 px wide at mid-Canadian latitudes.
+const FINE_TIER_MIN_ZOOM = 5;
 
 function tierForZoom(z) {
   return Number(z) < FINE_TIER_MIN_ZOOM ? TIERS[0] : TIERS[1];

@@ -14,6 +14,7 @@ test("each tier names the same grid consistently across the schema", () => {
 test("the fine tier is the smaller grid", () => {
   assert.equal(FINE, TIERS[1]);
   assert.ok(FINE.edgeMetres < TIERS[0].edgeMetres);
+  assert.ok(FINE.h3Resolution > TIERS[0].h3Resolution);
 });
 
 test("the zoom cutoff picks the coarse grid below it and the fine one above", () => {

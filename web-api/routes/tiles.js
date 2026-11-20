@@ -39,11 +39,19 @@ const TRACKS_MAX_PER_TILE = 2500;
 // one hex diameter so no cell of a hex straddling the tile edge is dropped.
 // Below PREFILTER_MIN_ZOOM the GiST scan loses to a seq scan (~3x slower at z2).
 const PREFILTER_MIN_ZOOM = 3;
-function tileCellPrefilter(z) {
+function tileCellPrefilter(z, y) {
   const zi = Number(z);
   if (zi < PREFILTER_MIN_ZOOM) return null;
+  // Equal-area cells stretch by 1/cos(lat) in EPSG:3857, so size them at the
+  // tile's most poleward edge (capped short of the pole).
+  const edgeLat = (row) =>
+    Math.abs(Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / 2 ** zi))));
+  const lat = Math.min(
+    Math.max(edgeLat(Number(y)), edgeLat(Number(y) + 1)),
+    (85 * Math.PI) / 180,
+  );
   // 2.5x the cell edge, more than its 2x diameter: err wide.
-  const hexDiameterM = tierForZoom(zi).edgeMetres * 2.5;
+  const hexDiameterM = (tierForZoom(zi).edgeMetres * 2.5) / Math.cos(lat);
   const tileWidthM = 40075016.686 / 2 ** zi;
   const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
@@ -248,7 +256,7 @@ router.get(
       hexesTable,
       pointColumn: zoomPKColumn,
     } = tierForZoom(z);
-    const cellPrefilter = tileCellPrefilter(z);
+    const cellPrefilter = tileCellPrefilter(z, y);
 
     // The same metric must reach /legend, or the ramp domain won't match.
     const metric = parseMetric(req.query.metric);
@@ -385,7 +393,7 @@ router.get(
       hexesTable,
       pointColumn: zoomPKColumn,
     } = tierForZoom(z);
-    const cellPrefilter = tileCellPrefilter(z);
+    const cellPrefilter = tileCellPrefilter(z, y);
 
     const metric = parseMetric(req.query.metric);
 
