@@ -15,7 +15,9 @@ export const STEP_PARAM = "pstep";
 // SelectionProvider, because they change what is fetched.
 export const ROWS_PARAM = "prows";
 export const DEFAULT_ROW_LIMIT = 5000;
-export const ROW_LIMITS = [DEFAULT_ROW_LIMIT, 20000, 50000];
+// No higher: Plotly draws each row as an SVG point per panel, and 50000 rows
+// held the main thread for ~8 s.
+export const ROW_LIMITS = [DEFAULT_ROW_LIMIT, 20000];
 export const BEFORE_PARAM = "pbefore";
 
 // `YYYY-MM-DD~YYYY-MM-DD` (inclusive UTC days), set when a trajectory pass is
