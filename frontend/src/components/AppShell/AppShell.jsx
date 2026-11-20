@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useChanged } from "../../utilities.jsx";
@@ -10,6 +10,7 @@ import ClearMapSelection from "../Map/ClearMapSelection/ClearMapSelection.jsx";
 import ApiErrorBanner from "./ApiErrorBanner.jsx";
 import ActivityIndicator from "./ActivityIndicator.jsx";
 import NoticeToast from "./NoticeToast.jsx";
+import { preloadDateField } from "../ui/DateField.jsx";
 import Sidebar from "./Sidebar/Sidebar.jsx";
 import TopControls from "./TopControls/TopControls.jsx";
 import FiltersModal from "./Modals/FiltersModal.jsx";
@@ -70,6 +71,11 @@ function CameraLegend(props) {
 
 export default function AppShell() {
   const { t } = useTranslation();
+  // Off the first paint, but loaded before anyone opens a date.
+  useEffect(() => {
+    const whenIdle = window.requestIdleCallback ?? setTimeout;
+    whenIdle(preloadDateField);
+  }, []);
   const {
     legendLoading,
     griddapCoverageVisible,

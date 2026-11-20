@@ -40,7 +40,7 @@
   font-variant-numeric: tabular-nums;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
@@ -48,19 +48,19 @@
     border-color var(--cioos-transition-fast);
 }
 
-.pagerStep:hover:not(:disabled),
-.pagerPage:hover:not(.active) {
+.pagerStep[data-hovered],
+.pagerPage[data-hovered]:not(.active) {
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink);
 }
 
-.pagerStep:focus-visible,
-.pagerPage:focus-visible {
+.pagerStep[data-focus-visible],
+.pagerPage[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
 
-.pagerStep:disabled {
+.pagerStep[data-disabled] {
   opacity: 0.35;
   cursor: default;
 }

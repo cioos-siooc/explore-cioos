@@ -40,16 +40,15 @@
   background-color: var(--cioos-surface-2);
 }
 
-/* Same raised treatment as .topBarButton.active. Icons draw with currentColor,
+/* Same fill and outline as .topBarButton.active. Icons draw with currentColor,
    so the fill alone recolors them. */
 .quickFilterButton.applied {
   border-color: transparent;
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
-  transform: var(--cioos-perspective);
   box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 55%),
-    var(--cioos-shadow-3d-sm);
+    inset 0 0 0 3px var(--cioos-primary-800),
+    var(--cioos-shadow-float);
 }
 
 .quickFilterButton.applied:hover {
@@ -59,7 +58,9 @@
 
 .quickFilterButton:focus-visible {
   outline: none;
-  box-shadow: var(--cioos-focus);
+  box-shadow:
+    inset 0 0 0 3px var(--cioos-primary),
+    var(--cioos-shadow-float);
 }
 
 /* Never lights up; its hover takes the destructive colour since it drops every
@@ -92,7 +93,7 @@
 }
 
 .quickFilterCount {
-  font-size: var(--cioos-font-size-3xs);
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -118,12 +119,18 @@
   pointer-events: none;
 }
 
-/* A searched place names the area it applied; capped so a long name doesn't
-   push the row apart. */
+/* A searched place names the area it applied. It is the filter's only label,
+   so a long name wraps to a second line rather than losing its end; capped in
+   width so it doesn't run under the neighbouring captions. */
 .quickFilterCaptionPlace {
-  max-width: 10em;
+  display: -webkit-box;
+  max-width: 9em;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.15;
+  white-space: normal;
+  text-wrap: balance;
 }
 
 /* Area control: the caption steps aside while its menu (hung where the
@@ -137,14 +144,8 @@
   display: none;
 }
 
+/* Positioned by react-aria, portalled into document.body. */
 .quickFilterAreaMenu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
   padding: 6px 0;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
@@ -165,19 +166,20 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+  outline: none;
 }
 
-.quickFilterAreaItem:hover {
+.quickFilterAreaItem[data-hovered],
+.quickFilterAreaItem[data-focused] {
   background-color: var(--cioos-surface-2);
 }
 
-.quickFilterAreaItem.selected {
+.quickFilterAreaItem[data-selected] {
   background-color: var(--cioos-teal-light);
 }
 
-.quickFilterAreaItem:focus-visible {
-  outline: none;
-  box-shadow: inset var(--cioos-focus);
+.quickFilterAreaItem[data-focus-visible] {
+  box-shadow: inset 0 0 0 3px var(--cioos-primary);
 }
 
 /* Mobile: one row of pills, caption beside the icon, to cost one button's
@@ -227,6 +229,15 @@
     padding: 0;
     background: none;
     color: inherit;
+  }
+
+  /* One row of pills has no room for a second line: cut, full name in the
+     button's label. */
+  .quickFilterCaptionPlace {
+    display: inline-block;
+    max-width: 8em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   /* Near the screen edge: centred, the menu ran off the left. */

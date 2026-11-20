@@ -46,7 +46,7 @@ test.describe("the datasets sidebar", () => {
     const cards = panel.getByTestId("dataset-card");
     const datasetPk = await cards.first().getAttribute("data-dataset-pk");
     const card = panel.locator(`[data-dataset-pk="${datasetPk}"]`);
-    await card.getByRole("checkbox", { name: "Add to selection" }).click();
+    await card.locator(".datasetCardSelect").click();
     await expect(card).toHaveAttribute("data-selected", "true");
 
     await page.getByTestId("sidebar-collapse").click();
@@ -67,7 +67,7 @@ test.describe("the datasets sidebar", () => {
     // same control is what un-selects it.
     if (await card.isVisible()) {
       await expect(card).toHaveAttribute("data-selected", "true");
-      await card.getByRole("checkbox", { name: "Add to selection" }).click();
+      await card.locator(".datasetCardSelect").click();
       await expect(card).toHaveAttribute("data-selected", "false");
     }
   });
@@ -115,6 +115,24 @@ test.describe("the datasets sidebar", () => {
     await expect(page).not.toHaveURL(/[?&]wide=/);
     await expect(page.getByRole("tablist")).toBeVisible();
     await expect(page.getByTestId("sidebar-scrim")).toHaveCount(0);
+  });
+
+  test("shows only the selected tab's panel on a dataset page", async ({
+    page,
+  }) => {
+    await openApp(page, "dataset=HakaiBIOOSBuoy1hour");
+    const panel = page.getByTestId("sidebar-datasets");
+    if ((await panel.getAttribute("data-expanded")) !== "true") {
+      await page.getByTestId("topbar-datasets-button").click();
+    }
+    const metadata = page.locator(".datasetPanel-metadata");
+    const data = page.locator(".datasetPanel-data");
+    await expect(metadata).toBeVisible();
+    await expect(data).toBeHidden();
+
+    await page.getByRole("tab", { name: "Data", exact: true }).click();
+    await expect(data).toBeVisible();
+    await expect(metadata).toBeHidden();
   });
 
   test("widens the datasets list into a grid of cards", async ({

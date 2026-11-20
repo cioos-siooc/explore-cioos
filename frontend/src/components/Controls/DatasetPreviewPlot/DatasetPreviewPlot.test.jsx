@@ -167,13 +167,10 @@ describe("DatasetPreviewPlot", () => {
     const user = open("/?playout=panels", STATION);
     await plotted();
     const layout = screen.getByTestId("preview-layout-toggle");
-    expect(screen.getByRole("button", { name: "Panels" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await user.click(screen.getByRole("button", { name: "Color plot" }));
+    expect(screen.getByRole("radio", { name: "Panels" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Color plot" }));
     expect(layout).toContainElement(
-      screen.getByRole("button", { name: "Color plot", pressed: true }),
+      screen.getByRole("radio", { name: "Color plot", checked: true }),
     );
 
     await waitFor(() =>
@@ -363,13 +360,10 @@ describe("DatasetPreviewPlot", () => {
     ).toBeInTheDocument();
 
     const layout = screen.getByTestId("preview-layout-toggle");
-    expect(screen.getByRole("button", { name: "Panels" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await user.click(screen.getByRole("button", { name: "Color plot" }));
+    expect(screen.getByRole("radio", { name: "Panels" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Color plot" }));
     expect(layout).toContainElement(
-      screen.getByRole("button", { name: "Color plot", pressed: true }),
+      screen.getByRole("radio", { name: "Color plot", checked: true }),
     );
 
     await waitFor(() =>
@@ -410,7 +404,7 @@ describe("DatasetPreviewPlot", () => {
         screen.queryByRole("dialog", { name: "Plot settings" }),
       ).toBeNull(),
     );
-    expect(gear).toHaveFocus();
+    await waitFor(() => expect(gear).toHaveFocus());
   });
 
   it("lets a finger pan the plot, with the pan tool kept to return to", async () => {
@@ -521,7 +515,7 @@ describe("DatasetPreviewPlot", () => {
     const row = rowCaptioned("Color scale");
     expect(row.querySelectorAll(".colorScaleItem")).toHaveLength(2);
 
-    await user.click(within(row).getByRole("button", { name: "Shared" }));
+    await user.click(within(row).getByRole("radio", { name: "Shared" }));
     await waitFor(() =>
       expect(row.querySelectorAll(".colorScaleItem")).toHaveLength(0),
     );
@@ -656,17 +650,12 @@ describe("DatasetPreviewPlot", () => {
   it("switches the mode every panel is drawn in with one click", async () => {
     const user = open();
     await plotted();
+    expect(screen.getByRole("radio", { name: "Markers + Line" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Markers" }));
+    expect(screen.getByRole("radio", { name: "Markers" })).toBeChecked();
     expect(
-      screen.getByRole("button", { name: "Markers + Line" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await user.click(screen.getByRole("button", { name: "Markers" }));
-    expect(screen.getByRole("button", { name: "Markers" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(
-      screen.getByRole("button", { name: "Markers + Line" }),
-    ).toHaveAttribute("aria-pressed", "false");
+      screen.getByRole("radio", { name: "Markers + Line" }),
+    ).not.toBeChecked();
   });
 
   it("resets every plot setting and rename, disabled until there is one", async () => {
@@ -680,9 +669,7 @@ describe("DatasetPreviewPlot", () => {
     await waitFor(() =>
       expect(screen.queryByText("Color scale")).not.toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole("button", { name: "Markers + Line" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "Markers + Line" })).toBeChecked();
     expect(screen.getByLabelText("temperature (degree_C)")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Reset plot" })).toBeDisabled();
   });
@@ -736,8 +723,8 @@ describe("DatasetPreviewPlot", () => {
     await user.click(screen.getByRole("button", { name: "More options" }));
     await user.type(screen.getByLabelText("temperature (degree_C)"), "Temp");
 
-    await user.click(screen.getByRole("button", { name: "Table" }));
-    await user.click(screen.getByRole("button", { name: "Plot" }));
+    await user.click(screen.getByRole("radio", { name: "Table" }));
+    await user.click(screen.getByRole("radio", { name: "Plot" }));
     await plotted();
     await user.click(screen.getByRole("button", { name: "More options" }));
 
@@ -773,8 +760,8 @@ describe("DatasetPreviewPlot", () => {
       screen.getByRole("button", { name: "Hide the plot settings panel" }),
     );
 
-    await user.click(screen.getByRole("button", { name: "Table" }));
-    await user.click(screen.getByRole("button", { name: "Plot" }));
+    await user.click(screen.getByRole("radio", { name: "Table" }));
+    await user.click(screen.getByRole("radio", { name: "Plot" }));
     await plotted();
 
     expect(
@@ -807,9 +794,9 @@ describe("a window of the record", () => {
     const user = open("/", TIMESERIES, TABLE, PARTIAL);
     await plotted();
     const rows = within(screen.getByTestId("preview-row-limit"));
-    await user.click(rows.getByRole("button", { name: "20,000" }));
+    await user.click(rows.getByRole("radio", { name: "20,000" }));
     expect(search().get("prows")).toBe("20000");
-    await user.click(rows.getByRole("button", { name: "5,000" }));
+    await user.click(rows.getByRole("radio", { name: "5,000" }));
     expect(search().get("prows")).toBeNull();
   });
 

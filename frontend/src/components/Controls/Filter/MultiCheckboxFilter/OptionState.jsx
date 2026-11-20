@@ -8,6 +8,9 @@ import {
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
+import { ToggleButton } from "../../../ui/Button.jsx";
+import Checkbox from "../../../ui/Checkbox.jsx";
+
 export const optionStateClass = ({ isSelected, isExcluded }) =>
   `optionButton ${isSelected ? "selected" : ""} ${isExcluded ? "excluded" : ""}`;
 
@@ -16,7 +19,7 @@ export function OptionStateIcon({ isSelected, isExcluded }) {
   return isExcluded ? <XSquare /> : <Square />;
 }
 
-// aria-checked can only say "included"; "mixed" would mean partially, so
+// A checkbox can only say "included"; "mixed" would mean partially, so
 // exclusion is announced as text instead.
 export function ExcludedLabel({ isExcluded }) {
   const { t } = useTranslation();
@@ -26,16 +29,18 @@ export function ExcludedLabel({ isExcluded }) {
   );
 }
 
-// Extra props (data-*) go on the checkbox; its click bubbles to the row.
+// Extra props (data-*) go on the checkbox's label. `tooltip` describes it.
 export function FilterOption({
   label,
   isSelected,
   isExcluded,
+  isIndeterminate,
   onInclude,
   onExclude,
   excludeTipHighlight,
   className,
   title,
+  tooltip,
   icon,
   children,
   ...checkboxProps
@@ -47,21 +52,15 @@ export function FilterOption({
         optionStateClass({ isSelected, isExcluded }),
         className,
       )}
-      title={title}
-      onClick={onInclude}
     >
-      <div
+      <Checkbox
         className="optionToggle"
-        role="checkbox"
-        aria-checked={Boolean(isSelected)}
-        tabIndex={0}
-        onKeyDown={(event) => {
-          if (event.key === " " || event.key === "Enter") {
-            // Space would otherwise scroll the pane out from under the row.
-            event.preventDefault();
-            onInclude();
-          }
-        }}
+        isSelected={Boolean(isSelected)}
+        isIndeterminate={Boolean(isIndeterminate)}
+        onChange={() => onInclude()}
+        title={title}
+        tooltip={tooltip}
+        tooltipDelay={150}
         {...checkboxProps}
       >
         {icon || (
@@ -69,26 +68,22 @@ export function FilterOption({
         )}
         {children}
         <ExcludedLabel isExcluded={isExcluded} />
-      </div>
+      </Checkbox>
       {onExclude && (
-        <button
-          type="button"
+        <ToggleButton
           className="optionExclude"
           data-tip-highlight={excludeTipHighlight}
-          aria-pressed={Boolean(isExcluded)}
+          isSelected={Boolean(isExcluded)}
           aria-label={`${t("filterOptionExcludeAction")}: ${label}`}
           title={t(
             isExcluded
               ? "filterOptionUnexcludeTitle"
               : "filterOptionExcludeTitle",
           )}
-          onClick={(event) => {
-            event.stopPropagation();
-            onExclude();
-          }}
+          onChange={() => onExclude()}
         >
           <SlashCircle aria-hidden="true" />
-        </button>
+        </ToggleButton>
       )}
     </div>
   );

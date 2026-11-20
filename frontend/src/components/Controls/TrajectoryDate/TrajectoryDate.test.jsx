@@ -81,7 +81,9 @@ describe("TrajectoryDate", () => {
       /^Arrows: platform positions on Jun 1, 2020\./,
     );
     await user.click(toggle());
-    expect(screen.getByDisplayValue("2020-06-01")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Trajectory date" }),
+    ).toHaveTextContent("2020-06-01");
   });
 
   it("states a linked track window in the summary while staying folded", async () => {

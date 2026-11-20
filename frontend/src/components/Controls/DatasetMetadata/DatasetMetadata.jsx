@@ -17,6 +17,7 @@ import {
 import { formatDepthRange, formatRange } from "../../../utilities.jsx";
 import { licenseLabel, licenseText } from "./license.js";
 import { renderMarkdown } from "../../../markdown.js";
+import ShowMoreButton from "../../ui/ShowMoreButton.jsx";
 import "./styles.css";
 
 // CKAN keyword lists run to dozens (every CF standard name and EOV); the
@@ -153,21 +154,12 @@ export function KeywordsCell({ metadata }) {
             {keywordLeaf(keyword)}
           </span>
         ))}
-        {(hidden > 0 || expanded) && (
-          <button
-            type="button"
-            className="listCardTagsMore"
-            onClick={toggle}
-            aria-expanded={expanded}
-            title={
-              expanded
-                ? t("listCardTagsFewerText")
-                : t("listCardTagsMoreTitle", { total: keywords.length })
-            }
-          >
-            {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
-          </button>
-        )}
+        <ShowMoreButton
+          expanded={expanded}
+          hidden={hidden}
+          total={keywords.length}
+          onToggle={toggle}
+        />
       </dd>
     </div>
   );

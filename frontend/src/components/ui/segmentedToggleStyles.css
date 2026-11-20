@@ -34,7 +34,7 @@
     color 0.15s ease-out;
 }
 
-.segmentedToggle .toggleButton:hover:not(.selected) {
+.segmentedToggle .toggleButton[data-hovered]:not(.selected) {
   background-color: rgb(82 167 155 / 18%);
 }
 
@@ -45,7 +45,7 @@
   cursor: default;
 }
 
-.segmentedToggle .toggleButton:focus-visible {
+.segmentedToggle .toggleButton[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }

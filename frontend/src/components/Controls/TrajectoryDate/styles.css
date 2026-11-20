@@ -10,7 +10,7 @@
   color: var(--cioos-track-700);
 }
 
-.trajectoryDateInput:focus-visible {
+.trajectoryDateInput[data-focus-within] {
   border-color: var(--cioos-track);
   box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
 }

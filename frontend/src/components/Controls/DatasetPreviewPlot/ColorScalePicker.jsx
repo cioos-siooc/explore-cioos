@@ -38,6 +38,9 @@ function ScaleChip({ name }) {
   );
 }
 
+// The menu key of "what the dataset says"; no scale is named this.
+const AUTO = "auto";
+
 export default function ColorScalePicker({ value, autoName, onPick }) {
   const { t } = useTranslation();
   const inUse = value || autoName;
@@ -46,6 +49,7 @@ export default function ColorScalePicker({ value, autoName, onPick }) {
     <DropdownButton
       className="dropdownButtonLeft"
       menuClassName="colorScaleMenu"
+      selectedKey={value ?? AUTO}
       title={
         <span className="dropdownToggleLabel colorScaleLabel">
           <ScaleChip name={inUse} />
@@ -53,18 +57,23 @@ export default function ColorScalePicker({ value, autoName, onPick }) {
         </span>
       }
     >
-      <Dropdown.Item active={!value} onClick={() => onPick(null)}>
+      <Dropdown.Item
+        id={AUTO}
+        textValue={t("datasetPreviewPlotColorDefault")}
+        onAction={() => onPick(null)}
+      >
         <span className="colorScaleLabel">
           <ScaleChip name={autoName} />
           {t("datasetPreviewPlotColorDefault")}
         </span>
       </Dropdown.Item>
-      <hr />
+      <Dropdown.Separator />
       {COLOR_SCALES.map((name) => (
         <Dropdown.Item
           key={name}
-          active={value === name}
-          onClick={() => onPick(name)}
+          id={name}
+          textValue={scaleLabel(name)}
+          onAction={() => onPick(name)}
         >
           <span className="colorScaleLabel">
             <ScaleChip name={name} />

@@ -182,11 +182,13 @@
   color: var(--cioos-ink);
 }
 
-.railValueInput:hover {
+.railValueInput:hover,
+.railValueInput[data-hovered] {
   background-color: var(--cioos-white);
 }
 
-.railValueInput:focus-visible {
+.railValueInput:focus-visible,
+.railValueInput[data-focus-within] {
   outline: none;
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);

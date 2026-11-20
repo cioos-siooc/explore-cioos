@@ -27,6 +27,7 @@
   font-size: var(--cioos-font-size-sm, 0.85em);
   font-style: italic;
   color: var(--cioos-ink-80);
+  text-wrap: pretty;
 }
 
 /* Clamped by height rather than line count: rendered markdown is several

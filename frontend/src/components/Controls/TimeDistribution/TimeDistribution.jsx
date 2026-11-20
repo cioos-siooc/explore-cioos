@@ -5,6 +5,7 @@ import Spinner from "../../ui/Spinner.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
+import { ToggleButton, ToggleButtonGroup } from "../../ui/Button.jsx";
 
 const CoverageHistogramPlot = lazy(
   () => import("../CoverageHistogramPlot/CoverageHistogramPlot.jsx"),
@@ -93,22 +94,20 @@ export default function TimeDistribution({ datasetPk, query }) {
           <strong>{t("timeDistributionTitle")}</strong>
           <span className="recordHint">{t("timeDistributionHint")}</span>
         </div>
-        <div
+        <ToggleButtonGroup
           className="viewToggle"
-          role="group"
           aria-label={t("coverageViewLabel")}
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={[view]}
+          onSelectionChange={(keys) => setView([...keys][0])}
         >
           {VIEWS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={view === option}
-              onClick={() => setView(option)}
-            >
+            <ToggleButton key={option} id={option}>
               {t(`coverageView_${option}`)}
-            </button>
+            </ToggleButton>
           ))}
-        </div>
+        </ToggleButtonGroup>
       </div>
       {body}
     </div>

@@ -11,9 +11,11 @@ import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 // Real map rendering is e2e territory; capturing Map's props lets these tests
 // drive MapContainer's own callbacks without a map.
 let latestMapProps;
+let mapThrows = false;
 vi.mock("./Map.jsx", () => ({
   default: (props) => {
     latestMapProps = props;
+    if (mapThrows) throw new Error("WebGL2 is required to display this map.");
     return <div data-testid="mock-map" />;
   },
 }));
@@ -52,6 +54,21 @@ async function renderReady() {
 describe("MapContainer", () => {
   beforeEach(() => {
     installMockFetch();
+    mapThrows = false;
+  });
+
+  it("keeps the app running when the map can't start, and ends the splash", async () => {
+    mapThrows = true;
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    await renderReady();
+    expect(screen.getByTestId("map-unavailable")).toHaveTextContent(
+      "The map can't be shown",
+    );
+    expect(screen.getByTestId("state")).toBeInTheDocument();
+    expect(latestMapState.firstPaintPending).toBe(false);
+    consoleError.mockRestore();
   });
 
   it("renders Map with the provider state wired into its props", async () => {

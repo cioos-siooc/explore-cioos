@@ -1,166 +1,198 @@
 import * as React from "react";
+import { useRef } from "react";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+  Button,
+  Dialog,
+  DialogTrigger,
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuTrigger as AriaMenuTrigger,
+  Popover,
+  Separator,
+  ToggleButton,
+} from "react-aria-components";
+import { useInteractOutside } from "react-aria";
+import classNames from "classnames";
 
 import "./dropdownStyles.css";
 
-const DropdownContext = createContext({ close: () => {} });
+export {
+  Button as MenuButton,
+  Menu,
+  MenuItem,
+  MenuSection,
+  Separator as MenuSeparator,
+};
 
-const VIEWPORT_MARGIN = 8;
+// For a menu whose trigger and list the caller styles itself.
+// `onOpenChange(false, "outside")` when a pointer or focus outside closed it,
+// so a dismissal can be told from a deliberate close. `nonModal` leaves the page
+// usable while open: the click that closes it still lands where it was aimed.
+export function MenuTrigger({
+  isOpen,
+  onOpenChange,
+  nonModal = false,
+  className,
+  placement = "bottom",
+  offset = 6,
+  children: [trigger, menu],
+}) {
+  const triggerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const outside = useRef(false);
 
-// Emits Bootstrap-compatible class names so existing overrides keep applying.
-// The menu portals into document.body because some call sites live inside a
-// scrolling, transformed ancestor that clips an in-place absolute menu.
-// `title` is the toggle's *content*; `tooltip` is the HTML title attribute.
-export function DropdownButton({
+  const change = (open) => {
+    const reason = !open && outside.current ? "outside" : undefined;
+    outside.current = false;
+    // A modal popover restores focus itself; a non-modal one leaves it on
+    // the item that was just removed.
+    if (nonModal && !open && !reason) triggerRef.current?.focus();
+    onOpenChange?.(open, reason);
+  };
+  // Also asked when focus leaves; the trigger toggles the menu itself.
+  const markOutside = (element) => {
+    if (triggerRef.current?.contains(element)) return false;
+    outside.current = true;
+    return true;
+  };
+  // Without an underlay react-aria closes a non-modal popover only when focus
+  // leaves it, and a click on something unfocusable moves no focus.
+  useInteractOutside({
+    ref: popoverRef,
+    isDisabled: !nonModal || !isOpen,
+    onInteractOutside: (event) => {
+      if (markOutside(event.target)) change(false);
+    },
+  });
+
+  return (
+    <AriaMenuTrigger isOpen={isOpen} onOpenChange={change}>
+      {React.cloneElement(trigger, { ref: triggerRef })}
+      <Popover
+        ref={popoverRef}
+        triggerRef={triggerRef}
+        isNonModal={nonModal}
+        shouldCloseOnInteractOutside={markOutside}
+        placement={placement}
+        offset={offset}
+        className={className}
+      >
+        {menu}
+      </Popover>
+    </AriaMenuTrigger>
+  );
+}
+
+const PLACEMENT = {
+  start: "bottom start",
+  center: "bottom",
+  end: "bottom end",
+};
+
+// The toggle-and-surface both pickers share, keeping the class names the call
+// sites' CSS was written against. The surface portals out of `className`, so
+// descendant selectors can't reach it: `menuClassName` styles it, and without
+// one it is at least the toggle's width. `title` is the toggle's content and
+// so its name; `tooltip` is the hover title, on the wrapper because
+// react-aria's Button drops `title`; an icon-only toggle passes `aria-label`.
+function DropdownShell({
+  Trigger,
+  onOpenChange,
   title,
   tooltip,
   className = "",
-  toggleClassName = "",
-  // The menu portals out of `className`, so descendant selectors can't reach it.
+  toggleClassName,
   menuClassName = "",
   size,
   variant,
   // 'start' aligns left edges, 'center' centres under a toggle much narrower
-  // than its menu (icon buttons), 'end' aligns right edges for a toggle at the
-  // right edge of its row.
+  // than its menu (icon buttons), 'end' aligns right edges.
   align = "start",
-  // For callers that style the toggle while its menu is up.
-  onOpenChange,
   disabled,
   children,
+  "aria-label": label,
   "data-testid": testId,
 }) {
-  const [open, setOpenState] = useState(false);
-  const setOpen = useCallback(
-    (value) => {
-      setOpenState(value);
-      onOpenChange?.(value);
-    },
-    [onOpenChange],
-  );
-  const [menuStyle, setMenuStyle] = useState(null);
-  const buttonRef = useRef(null);
-  const menuRef = useRef(null);
-
-  // Recomputed on resize: the toggle usually sits in a width-dependent layout.
-  useLayoutEffect(() => {
-    if (!open || !buttonRef.current) return;
-    function updateMenuStyle() {
-      const rect = buttonRef.current.getBoundingClientRect();
-      // Floor at the toggle's width, except with menuClassName: an inline
-      // style would beat the width that class sets.
-      const minWidth = menuClassName ? 0 : rect.width;
-      const width = Math.max(menuRef.current?.offsetWidth ?? 0, minWidth);
-      const left =
-        align === "center"
-          ? rect.left + rect.width / 2 - width / 2
-          : align === "end"
-            ? rect.right - width
-            : rect.left;
-      // Kept on screen: a menu wider than the room on its aligned side (a
-      // 300px menu ending at a phone's first column) would otherwise hang
-      // off the edge.
-      const maxLeft = window.innerWidth - VIEWPORT_MARGIN - width;
-      setMenuStyle({
-        position: "fixed",
-        top: rect.bottom + 2,
-        left: Math.max(VIEWPORT_MARGIN, Math.min(left, maxLeft)),
-        ...(menuClassName ? {} : { minWidth }),
-      });
-    }
-    updateMenuStyle();
-    window.addEventListener("resize", updateMenuStyle);
-    return () => window.removeEventListener("resize", updateMenuStyle);
-  }, [open, align, menuClassName]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    function handleClickOutside(event) {
-      if (
-        !buttonRef.current?.contains(event.target) &&
-        !menuRef.current?.contains(event.target)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open, setOpen]);
-
-  const buttonClasses = [
-    "btn",
-    "dropdown-toggle",
-    size && `btn-${size}`,
-    variant && `btn-${variant}`,
-    toggleClassName,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   return (
-    <div className={`dropdown ${className}`} data-testid={testId}>
-      <button
-        type="button"
-        ref={buttonRef}
-        data-testid={testId && `${testId}-toggle`}
-        className={buttonClasses}
-        title={tooltip}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => setOpen(!open)}
-      >
-        {title}
-      </button>
-      {open &&
-        createPortal(
-          <DropdownContext.Provider value={{ close: () => setOpen(false) }}>
-            <div
-              className={`dropdown-menu show ${menuClassName}`}
-              ref={menuRef}
-              // Fixed and hidden for the first layout pass, so it is measured
-              // at its own width rather than the body's.
-              style={
-                menuStyle ?? {
-                  position: "fixed",
-                  left: 0,
-                  visibility: "hidden",
-                }
-              }
-            >
-              {children}
-            </div>
-          </DropdownContext.Provider>,
-          document.body,
-        )}
+    <div
+      className={`dropdown ${className}`}
+      data-testid={testId}
+      title={tooltip}
+    >
+      <Trigger onOpenChange={onOpenChange}>
+        <Button
+          data-testid={testId && `${testId}-toggle`}
+          className={classNames(
+            "btn dropdown-toggle",
+            size && `btn-${size}`,
+            variant && `btn-${variant}`,
+            toggleClassName,
+          )}
+          aria-label={label}
+          isDisabled={disabled}
+        >
+          {title}
+        </Button>
+        <Popover
+          placement={PLACEMENT[align]}
+          offset={2}
+          className={`dropdown-menu ${menuClassName}`}
+          style={
+            menuClassName ? undefined : { minWidth: "var(--trigger-width)" }
+          }
+        >
+          {children}
+        </Popover>
+      </Trigger>
     </div>
   );
 }
 
-function DropdownItem({ onClick = () => {}, active, children, ...rest }) {
-  const { close } = useContext(DropdownContext);
+// A pick from a list: `selectedKey` matches the chosen item's `id`.
+export function DropdownButton({ selectedKey, children, ...props }) {
+  const selection =
+    selectedKey === undefined
+      ? {}
+      : { selectionMode: "single", selectedKeys: [selectedKey] };
   return (
-    <button
-      type="button"
-      className={`dropdown-item ${active ? "active" : ""}`}
-      onClick={(event) => {
-        onClick(event);
-        close();
-      }}
-      {...rest}
-    >
-      {children}
-    </button>
+    <DropdownShell Trigger={AriaMenuTrigger} {...props}>
+      <Menu className="dropdownMenuList" {...selection}>
+        {children}
+      </Menu>
+    </DropdownShell>
   );
 }
 
-// So `<Dropdown.Item>` call sites only need their import changed.
-export const Dropdown = { Item: DropdownItem };
+// The same look for content a menu can't hold (a grid, a field).
+// `children` may be `({ close }) => …`.
+export function PopoverButton({ children, ...props }) {
+  return (
+    <DropdownShell Trigger={DialogTrigger} {...props}>
+      <Dialog className="dropdownDialog">{children}</Dialog>
+    </DropdownShell>
+  );
+}
+
+// `textValue` is what typeahead reads when the children aren't plain text.
+function DropdownItem({ className, ...props }) {
+  return (
+    <MenuItem className={classNames("dropdown-item", className)} {...props} />
+  );
+}
+
+// A choice inside a PopoverButton, styled as a menu row.
+function DropdownOption({ className, ...props }) {
+  return (
+    <ToggleButton
+      className={classNames("dropdown-item", className)}
+      {...props}
+    />
+  );
+}
+
+export const Dropdown = {
+  Item: DropdownItem,
+  Separator,
+  Option: DropdownOption,
+};

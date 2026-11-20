@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import optimizeLocales from "@react-aria/optimize-locales-plugin";
 import { visualizer } from "rollup-plugin-visualizer";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { fileURLToPath } from "node:url";
@@ -32,9 +33,17 @@ export default defineConfig(({ mode }) => {
     // Absolute, or on deep routes the SPA fallback serves index.html for the
     // misresolved bundle and the app never boots on reload.
     base: env.BASE_URL || "/",
+    // e2e/in-container.sh shares node_modules; a shared cache would serve the
+    // container's /work paths to the host's dev server.
+    cacheDir: env.VITE_CACHE_DIR || "node_modules/.vite",
     plugins: [
       react(),
       dropPlotlyMaplibreCss,
+      // react-aria bundles UI strings for ~34 locales; the app speaks two.
+      {
+        ...optimizeLocales.vite({ locales: ["en", "fr"] }),
+        enforce: "pre",
+      },
       process.env.ANALYZE &&
         visualizer({ filename: "dist/stats.html", open: true, gzipSize: true }),
       env.SENTRY_AUTH_TOKEN &&

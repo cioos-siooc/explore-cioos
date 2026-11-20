@@ -5,6 +5,8 @@ import { AttributionControl, ScaleControl } from "maplibre-gl";
 import { InfoCircle } from "react-bootstrap-icons";
 
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import Button from "../../ui/Button.jsx";
+import { Disclosure, DisclosurePanel } from "../../ui/Disclosure.jsx";
 
 // Re-parents MapLibre's own scale and attribution controls into the legend card,
 // so they keep redrawing and aggregating sources added after mount.
@@ -37,22 +39,27 @@ export default function LegendFooter() {
   }, [mapInstance]);
 
   return (
-    <div className="legendFooter">
+    <Disclosure
+      className="legendFooter"
+      isExpanded={creditsOpen}
+      onExpandedChange={setCreditsOpen}
+    >
       <div className="legendFooterRow">
         <div className="legendScale" ref={scaleHost} />
-        <button
+        <Button
+          slot="trigger"
           className="legendCreditsButton"
-          onClick={() => setCreditsOpen(!creditsOpen)}
           title={t("legendCreditsTooltip")}
           aria-label={t("legendCreditsTooltip")}
-          aria-expanded={creditsOpen}
         >
           <InfoCircle size={13} aria-hidden="true" />
-        </button>
+        </Button>
       </div>
-      {/* Always mounted: a host that came and went would need re-adopting on every
-          press of the ⓘ. */}
-      <div className="legendCredits" ref={creditsHost} hidden={!creditsOpen} />
-    </div>
+      {/* Always mounted (the panel only hides): a host that came and went
+          would need re-adopting on every press of the ⓘ. */}
+      <DisclosurePanel className="legendCredits">
+        <div ref={creditsHost} />
+      </DisclosurePanel>
+    </Disclosure>
   );
 }

@@ -4,8 +4,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import TimeRail, {
-  DateField,
-  isCommittable,
   QUICK_PICKS,
   lastDaysRange,
   matchQuickPick,
@@ -14,67 +12,6 @@ import TimeRail, {
   useTimeAxis,
 } from "./TimeRail.jsx";
 import { createTimeAxis, todayIso } from "./timeAxis.js";
-
-describe("isCommittable", () => {
-  it("requires a full four-digit-year date, not a partial one being typed", () => {
-    expect(isCommittable("2015", "1900-01-01", "2025-01-01")).toBe(false);
-    expect(isCommittable("2015-0", "1900-01-01", "2025-01-01")).toBe(false);
-    expect(isCommittable("2015-06-15", "1900-01-01", "2025-01-01")).toBe(true);
-  });
-
-  it("rejects an unparseable date", () => {
-    expect(isCommittable("2015-13-40", undefined, undefined)).toBe(false);
-  });
-
-  it("rejects a date outside min/max", () => {
-    expect(isCommittable("1899-12-31", "1900-01-01", "2025-01-01")).toBe(false);
-    expect(isCommittable("2026-01-01", "1900-01-01", "2025-01-01")).toBe(false);
-  });
-
-  it("has no bound when min/max are absent", () => {
-    expect(isCommittable("1500-01-01", undefined, undefined)).toBe(true);
-  });
-});
-
-describe("DateField", () => {
-  it("commits as soon as a complete, in-range value is typed", () => {
-    const onCommit = vi.fn();
-    render(
-      <DateField
-        value="2015-01-01"
-        min="1900-01-01"
-        max="2025-01-01"
-        label="Start"
-        onCommit={onCommit}
-      />,
-    );
-    const input = screen.getByLabelText("Start");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "2015-06-15" } });
-    expect(onCommit).toHaveBeenCalledWith("2015-06-15");
-  });
-
-  it("does not commit an incomplete value, and restores the committed one on blur", () => {
-    const onCommit = vi.fn();
-    render(<DateField value="2015-01-01" label="Start" onCommit={onCommit} />);
-    const input = screen.getByLabelText("Start");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "2015" } });
-    expect(onCommit).not.toHaveBeenCalled();
-    fireEvent.blur(input);
-    expect(input.value).toBe("2015-01-01");
-  });
-
-  it("follows an externally-changed committed value while idle", () => {
-    const { rerender } = render(
-      <DateField value="2015-01-01" label="Start" onCommit={() => {}} />,
-    );
-    rerender(
-      <DateField value="2016-02-02" label="Start" onCommit={() => {}} />,
-    );
-    expect(screen.getByLabelText("Start").value).toBe("2016-02-02");
-  });
-});
 
 describe("QUICK_PICKS / lastDaysRange / matchQuickPick / slideRange", () => {
   it("lastDaysRange ends today and starts `days` earlier", () => {

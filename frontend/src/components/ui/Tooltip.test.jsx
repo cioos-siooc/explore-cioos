@@ -1,11 +1,26 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import Tooltip from "./Tooltip.jsx";
+import { hoverWithMouse } from "../../test/hoverWithMouse.js";
+import Tooltip, { TooltipTarget } from "./Tooltip.jsx";
 
 describe("Tooltip", () => {
+  // First: once any tooltip has shown, react-aria shows the next at once for a
+  // short cooldown, which would skip the delay.
+  it("waits out the delay before showing", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="Helpful text" delay={150}>
+        <button>hover me</button>
+      </Tooltip>,
+    );
+    await hoverWithMouse(user, screen.getByRole("button"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+  });
+
   it("renders the child unmodified, with no tooltip, when content is empty", () => {
     render(
       <Tooltip content={null}>
@@ -18,7 +33,7 @@ describe("Tooltip", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("shows the tooltip on hover, and hides it on mouse-leave", async () => {
+  it("shows on hover, described to the trigger, and hides on leave", async () => {
     const user = userEvent.setup();
     render(
       <Tooltip content="Helpful text">
@@ -26,14 +41,18 @@ describe("Tooltip", () => {
       </Tooltip>,
     );
     const trigger = screen.getByRole("button", { name: "hover me" });
-    await user.hover(trigger);
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Helpful text");
+    await hoverWithMouse(user, trigger);
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Helpful text");
+    expect(trigger).toHaveAccessibleDescription("Helpful text");
 
     await user.unhover(trigger);
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+    );
   });
 
-  it("shows on focus and hides on blur, for keyboard users", async () => {
+  it("shows on keyboard focus, and Escape dismisses it", async () => {
     const user = userEvent.setup();
     render(
       <Tooltip content="Helpful text">
@@ -41,49 +60,38 @@ describe("Tooltip", () => {
       </Tooltip>,
     );
     await user.tab();
-    expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    await user.tab();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-  });
-
-  it("delays showing by the given number of ms, and cancels if the pointer leaves first", () => {
-    vi.useFakeTimers();
-    try {
-      render(
-        <Tooltip content="Helpful text" delay={150}>
-          <button>hover me</button>
-        </Tooltip>,
-      );
-      const trigger = screen.getByRole("button", { name: "hover me" });
-
-      // Fires and cancels before the delay elapses: no tooltip.
-      act(() => {
-        fireEvent.mouseEnter(trigger);
-        fireEvent.mouseLeave(trigger);
-        vi.advanceTimersByTime(150);
-      });
-      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-      // This time it's left alone for the full delay.
-      act(() => {
-        fireEvent.mouseEnter(trigger);
-        vi.advanceTimersByTime(150);
-      });
-      expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+    );
   });
 
   it("still calls the child's own event handlers", async () => {
     const user = userEvent.setup();
-    const onMouseEnter = vi.fn();
+    const onFocus = vi.fn();
     render(
       <Tooltip content="Helpful text">
-        <button onMouseEnter={onMouseEnter}>hover me</button>
+        <button onFocus={onFocus}>hover me</button>
       </Tooltip>,
     );
-    await user.hover(screen.getByRole("button", { name: "hover me" }));
-    expect(onMouseEnter).toHaveBeenCalled();
+    await user.tab();
+    expect(onFocus).toHaveBeenCalled();
+  });
+
+  it("makes plain text a focusable target", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="What the count means">
+        <TooltipTarget className="count">40 datasets</TooltipTarget>
+      </Tooltip>,
+    );
+    await user.tab();
+    const target = screen.getByRole("button", { name: "40 datasets" });
+    expect(target).toHaveFocus();
+    expect(target).toHaveClass("tooltipTarget", "count");
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "What the count means",
+    );
   });
 });

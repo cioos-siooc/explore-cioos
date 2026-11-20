@@ -262,14 +262,16 @@ export default function CoverageModal() {
                 data-testid="coverage-view-dropdown"
                 title={t(`coverageView_${view}`)}
                 menuClassName="coverageOptionMenu"
+                selectedKey={view}
                 align="end"
               >
                 {VIEW_OPTIONS.map((option) => (
                   <Dropdown.Item
                     key={option}
                     data-testid="coverage-view-option"
-                    active={option === view}
-                    onClick={() => setView(option)}
+                    id={option}
+                    textValue={t(`coverageView_${option}`)}
+                    onAction={() => setView(option)}
                   >
                     <CoverageOption
                       label={t(`coverageView_${option}`)}
@@ -283,14 +285,16 @@ export default function CoverageModal() {
                 data-testid="coverage-count-dropdown"
                 title={t(`coverageMetric_${count}`)}
                 menuClassName="coverageOptionMenu"
+                selectedKey={count}
                 align="end"
               >
                 {COUNT_OPTIONS.map((option) => (
                   <Dropdown.Item
                     key={option}
                     data-testid="coverage-count-option"
-                    active={option === count}
-                    onClick={() => setCount(option)}
+                    id={option}
+                    textValue={t(`coverageMetric_${option}`)}
+                    onAction={() => setCount(option)}
                   >
                     <CoverageOption
                       label={t(`coverageMetric_${option}`)}
@@ -304,14 +308,16 @@ export default function CoverageModal() {
                 data-testid="coverage-group-dropdown"
                 title={t(`coverageGroup_${groupBy}`)}
                 menuClassName="coverageOptionMenu"
+                selectedKey={groupBy}
                 align="end"
               >
                 {GROUP_OPTIONS.map((option) => (
                   <Dropdown.Item
                     key={option}
                     data-testid="coverage-group-option"
-                    active={option === groupBy}
-                    onClick={() => setGroupBy(option)}
+                    id={option}
+                    textValue={t(`coverageGroup_${option}`)}
+                    onAction={() => setGroupBy(option)}
                   >
                     <CoverageOption
                       label={t(`coverageGroup_${option}`)}

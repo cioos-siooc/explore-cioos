@@ -28,6 +28,7 @@ const SECTIONS = [
 ];
 
 // The CIOOS privacy guidelines promise a link to each third party's policy.
+// eslint-disable-next-line jsx-a11y/anchor-has-content -- <Trans> fills the link text
 const link = (href) => <a href={href} target="_blank" rel="noreferrer" />;
 const LINKS = {
   guidelines: link("https://cioos.ca/privacy-guidelines/"),

@@ -94,6 +94,34 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-input")).toBeNull();
   });
 
+  it("leaves typeahead in a list, a list's trigger or a popup alone", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <button type="button" aria-haspopup="listbox">
+          Year
+        </button>
+        <div role="listbox" tabIndex={0} aria-label="Years" />
+        <div role="dialog" aria-label="Calendar">
+          <button type="button">Day</button>
+        </div>
+        <FiltersModal />
+      </>,
+      { providers: "app" },
+    );
+
+    for (const target of [
+      screen.getByRole("button", { name: "Year" }),
+      screen.getByRole("listbox"),
+      screen.getByRole("button", { name: "Day" }),
+    ]) {
+      target.focus();
+      await user.keyboard("19");
+    }
+
+    expect(screen.queryByTestId("filter-search-input")).toBeNull();
+  });
+
   it("leaves typing in a field inside a shadow root alone", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(<FiltersModal />, { providers: "app" });
@@ -123,7 +151,7 @@ describe("FilterSearch", () => {
     expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
     expect(box).toHaveValue("oxyg");
     expect(option("Oxygen")).toHaveAttribute("data-state", "include");
-    expect(option("Oxygen")).toHaveAttribute("aria-selected", "true");
+    expect(option("Oxygen")).toHaveAttribute("data-focused", "true");
 
     await user.keyboard("{Enter}");
     expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
@@ -436,7 +464,7 @@ describe("FilterSearch", () => {
   });
 
   it("lists places after the other suggestions, and the text search last", async () => {
-    answerRegions("Pacific");
+    answerRegions("Pacific Ocean");
     const { user, box } = await renderPalette();
 
     await user.type(box, "pacific");
@@ -454,6 +482,21 @@ describe("FilterSearch", () => {
       firstText,
     );
     expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
+  });
+
+  it("leads with a place named exactly what was typed", async () => {
+    answerRegions("Pacific");
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "pacific");
+    await screen.findByText("Fundian Channel");
+
+    const labels = screen
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(labels.findIndex((l) => l.startsWith("Pacific"))).toBeLessThan(
+      labels.findIndex((l) => l.includes("CIOOS Pacific")),
+    );
   });
 
   it("shows four of a group, and the rest when asked", async () => {
@@ -496,7 +539,7 @@ describe("FilterSearch", () => {
 
     await user.type(box, "fundy");
     await screen.findByText("Bay of Fundy");
-    while (!option("Bay of Fundy").matches("[aria-selected=true]"))
+    while (!option("Bay of Fundy").matches("[data-focused]"))
       await user.keyboard("{ArrowDown}");
     await user.keyboard("{Shift>}{Enter}{/Shift}");
 

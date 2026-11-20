@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
+import { Dropdown, PopoverButton } from "../../ui/Dropdown.jsx";
 import { SWATCHES } from "../DatasetPreview/previewColors.js";
 
 // `color` is the override (null when drawing in `defaultColor`).
 //
 // The custom field is debounced: onChange on <input type="color"> fires on every
 // pointer move in the OS dialog, and each would rewrite the URL and re-plot. It
-// is deliberately not a Dropdown.Item, which would close the menu on click.
+// stays open while dragged, so it is a field beside the options, not one.
 const COMMIT_DELAY_MS = 250;
 
 export default function VariableColorPicker({
@@ -38,10 +38,11 @@ export default function VariableColorPicker({
   };
 
   return (
-    <DropdownButton
+    <PopoverButton
       className="dropdownButtonSwatch"
       align="center"
       tooltip={label}
+      aria-label={label}
       title={
         <span
           className="colorSwatch"
@@ -50,40 +51,52 @@ export default function VariableColorPicker({
         />
       }
     >
-      <div className="colorSwatchGrid">
-        {SWATCHES.map((hex) => (
-          <Dropdown.Item
-            key={hex}
-            active={inUse === hex}
-            onClick={() => pick(hex)}
-            title={hex}
-            aria-label={hex}
+      {({ close }) => (
+        <>
+          <div className="colorSwatchGrid">
+            {SWATCHES.map((hex) => (
+              <Dropdown.Option
+                key={hex}
+                isSelected={inUse === hex}
+                onChange={() => {
+                  pick(hex);
+                  close();
+                }}
+                aria-label={hex}
+              >
+                <span
+                  className="colorSwatch"
+                  style={{ backgroundColor: hex }}
+                  aria-hidden="true"
+                />
+              </Dropdown.Option>
+            ))}
+          </div>
+          <hr />
+          <Dropdown.Option
+            isSelected={!color}
+            onChange={() => {
+              pick(null);
+              close();
+            }}
           >
             <span
               className="colorSwatch"
-              style={{ backgroundColor: hex }}
+              style={{ backgroundColor: defaultColor }}
               aria-hidden="true"
             />
-          </Dropdown.Item>
-        ))}
-      </div>
-      <hr />
-      <Dropdown.Item active={!color} onClick={() => pick(null)}>
-        <span
-          className="colorSwatch"
-          style={{ backgroundColor: defaultColor }}
-          aria-hidden="true"
-        />
-        {t("datasetPreviewPlotColorDefault")}
-      </Dropdown.Item>
-      <label className="colorSwatchCustom">
-        {t("datasetPreviewPlotColorCustom")}
-        <input
-          type="color"
-          value={inUse}
-          onChange={(event) => drag(event.target.value)}
-        />
-      </label>
-    </DropdownButton>
+            {t("datasetPreviewPlotColorDefault")}
+          </Dropdown.Option>
+          <label className="colorSwatchCustom">
+            {t("datasetPreviewPlotColorCustom")}
+            <input
+              type="color"
+              value={inUse}
+              onChange={(event) => drag(event.target.value)}
+            />
+          </label>
+        </>
+      )}
+    </PopoverButton>
   );
 }
