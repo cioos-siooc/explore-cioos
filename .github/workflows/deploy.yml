@@ -210,11 +210,14 @@ jobs:
           op_secret_files: .env.staging:.env
           # The tag doubles as the Sentry release, shared by web-api and the
           # frontend's sourcemap upload. Appended after the 1Password values,
-          # so DB_NAME here wins over the item's (beta keeps the item's).
+          # so DB_NAME here wins over the item's (beta keeps the item's). A
+          # rehearsal runs its own harvest (full_harvest); RUN_ON_DEPLOY would
+          # start a second one into a fresh, empty cde_staging.
           env_overrides: |
             SENTRY_RELEASE=${{ needs.release.outputs.tag }}
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
             ${{ needs.release.outputs.target == 'staging' && 'DB_NAME=cde_staging' || '' }}
+            ${{ needs.release.outputs.target == 'staging' && 'RUN_ON_DEPLOY=false' || '' }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
