@@ -143,6 +143,45 @@ describe("DatasetPreview", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("says how many of ERDDAP's rows are kept while it is queried", () => {
+      global.fetch = vi.fn(() => new Promise(() => {}));
+      open({
+        recordLoading: true,
+        previewQuery: "https://erddap.example.com/erddap/tabledap/d1.json",
+        url: "/?prows=20000",
+      });
+      expect(screen.getByTestId("preview-loading")).toHaveTextContent(
+        "CDE keeps up to 20,000 rows of ERDDAP's answer.",
+      );
+    });
+
+    it("blames ERDDAP for an oversized answer and offers fewer rows", async () => {
+      const { user } = open({
+        table: null,
+        previewError: { code: PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE },
+        url: "/?prows=20000",
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /data server \(ERDDAP\) sent more than 100 MB/,
+      );
+      await user.click(screen.getByRole("button", { name: "Load 5,000 rows" }));
+      await waitFor(() =>
+        expect(
+          new URLSearchParams(window.location.search).get("prows"),
+        ).toBeNull(),
+      );
+    });
+
+    it("has no fewer rows to offer below the default", () => {
+      open({
+        table: null,
+        previewError: { code: PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE },
+      });
+      expect(
+        screen.queryByRole("button", { name: /^Load|Retry/ }),
+      ).not.toBeInTheDocument();
+    });
+
     it("names why /preview came back with nothing", () => {
       open({ table: null, previewError: { code: PREVIEW_ERROR.NO_DATA } });
       expect(

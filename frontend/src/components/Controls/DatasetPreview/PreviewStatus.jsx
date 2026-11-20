@@ -23,17 +23,35 @@ function ErddapQuery({ url, labelKey = "previewErddapQueryLabel" }) {
 
 // The preview's answer to the app splash: one mark, the waits named beneath it,
 // or what went wrong in the same place.
-export function PreviewLoading({ labelKeys, query }) {
+// `rowLimit`: how many of ERDDAP's rows are kept, which its URL can't say —
+// the API trims the answer after it arrives.
+export function PreviewLoading({ labelKeys, query, rowLimit }) {
+  const { t, i18n } = useTranslation();
   return (
     <div className="previewStatus" role="status" data-testid="preview-loading">
       <Spinner size="lg" role="presentation" />
       <ActivityList labelKeys={labelKeys} className="previewStatusSteps" />
       <ErddapQuery url={query} labelKey="previewErddapQueryActiveLabel" />
+      {query && rowLimit && (
+        <p className="previewStatusDetail">
+          {t("previewErddapRowLimit", {
+            count: rowLimit,
+            rows: rowLimit.toLocaleString(i18n.language),
+          })}
+        </p>
+      )}
     </div>
   );
 }
 
-export function PreviewFailure({ message, detail, query, onRetry }) {
+// `retryLabel` names what the button does when it is not a plain retry.
+export function PreviewFailure({
+  message,
+  detail,
+  query,
+  onRetry,
+  retryLabel,
+}) {
   const { t } = useTranslation();
   return (
     <div
@@ -47,7 +65,7 @@ export function PreviewFailure({ message, detail, query, onRetry }) {
       {onRetry && (
         <button type="button" className="previewStatusRetry" onClick={onRetry}>
           <ArrowClockwise size={14} aria-hidden="true" />
-          {t("apiErrorRetryButton")}
+          {retryLabel || t("apiErrorRetryButton")}
         </button>
       )}
       <ErddapQuery url={query} />

@@ -64,7 +64,10 @@ const Sentry = require("@sentry/node");
  *       422:
  *         description: The dataset declares no CF role variable to constrain on.
  *       502:
- *         description: The upstream ERDDAP server failed or timed out.
+ *         description: >
+ *           The upstream ERDDAP server failed or timed out
+ *           (ERDDAP_UNAVAILABLE), or answered with more than the API holds
+ *           (ERDDAP_RESPONSE_TOO_LARGE).
  */
 
 const router = express.Router();
@@ -112,6 +115,11 @@ const steppedRecord = (recordColumn, stepColumn) =>
 // both handlers bind it into FEATURE_SQL, which sizes its time window against it.
 const PREVIEW_ROW_LIMIT = 5000;
 const MAX_PREVIEW_ROW_LIMIT = 50000;
+
+// How much of one ERDDAP answer the API will hold in memory. A response past it
+// is cut off, which axios reports by this message rather than by a code.
+const MAX_ERDDAP_RESPONSE_BYTES = 100 * 1024 * 1024;
+const isOversized = (error) => /maxContentLength/.test(error.message ?? "");
 
 // Every profile of a record, past this, is more than a slider can address and
 // more than is worth sending: mpoSgdoADCP's longest record has 48166 of them,
@@ -394,8 +402,8 @@ router.get(
       const { data } = await axios.get(erddapQuery, {
         // use_whole_profile records can be tens of MB.
         timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024,
+        maxContentLength: MAX_ERDDAP_RESPONSE_BYTES,
+        maxBodyLength: MAX_ERDDAP_RESPONSE_BYTES,
       });
       console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
       if (!data?.table?.rows?.length) {
@@ -448,6 +456,18 @@ router.get(
           error: "NO_DATA",
           dataset: dataset_id,
           profile: profile_id,
+          erddapQuery,
+        });
+      }
+
+      // ERDDAP answered, with more rows than the harvested counts that sized
+      // the window predicted: the dataset's doing, not an outage.
+      if (isOversized(error)) {
+        console.warn("Preview response too large", erddapQuery);
+        return res.status(502).send({
+          error: "ERDDAP_RESPONSE_TOO_LARGE",
+          dataset: dataset_id,
+          upstreamStatus: null,
           erddapQuery,
         });
       }
@@ -602,8 +622,8 @@ router.get(
     try {
       const { data } = await axios.get(erddapQuery, {
         timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024,
+        maxContentLength: MAX_ERDDAP_RESPONSE_BYTES,
+        maxBodyLength: MAX_ERDDAP_RESPONSE_BYTES,
       });
 
       const names = data?.table?.columnNames || [];

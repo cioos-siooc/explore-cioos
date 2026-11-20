@@ -212,6 +212,19 @@ test("502s ERDDAP_UNAVAILABLE for a genuine upstream failure", async () => {
   assert.equal(res.body.erddapQuery, axios.calls[0].url);
 });
 
+test("502s ERDDAP_RESPONSE_TOO_LARGE when ERDDAP sends past the size cap", async () => {
+  db.queueRaw([FEATURE_ROW]);
+  axios.queueError(new Error("maxContentLength size of 104857600 exceeded"));
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1" });
+
+  assert.equal(res.status, 502);
+  assert.equal(res.body.error, "ERDDAP_RESPONSE_TOO_LARGE");
+  assert.equal(res.body.erddapQuery, axios.calls[0].url);
+});
+
 test("/preview/query names the ERDDAP request /preview makes, without making it", async () => {
   db.queueRaw([FEATURE_ROW]);
   const planned = await agent
