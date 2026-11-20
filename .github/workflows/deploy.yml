@@ -26,11 +26,13 @@ on:
         description: "Staging: cde_staging from a production copy, kept as is, or fresh (empty; needs full_harvest)"
         type: choice
         options: [copy-prod, keep, fresh]
-        default: copy-prod
+        # fresh + full_harvest until production runs this stack; see the
+        # issue #471 (restore the rehearsal defaults).
+        default: fresh
       full_harvest:
-        description: "Staging: run a full harvest before the tests"
+        description: "Staging: start a full harvest; Verify staging tests once it finishes"
         type: boolean
-        default: false
+        default: true
       ship_database:
         description: "Production: ship cde_staging (off = code-only redeploy, for a rollback)"
         type: boolean
@@ -151,7 +153,9 @@ jobs:
       STAGING_URL: http://172.16.61.26:8098
       SHA: ${{ needs.release.outputs.sha }}
       REHEARSAL: ${{ needs.release.outputs.target == 'staging' }}
-      STAGING_DB: ${{ inputs.staging_db || 'copy-prod' }}
+      # A published release has no inputs: the same defaults as above.
+      STAGING_DB: ${{ inputs.staging_db || 'fresh' }}
+      FULL_HARVEST: ${{ github.event_name == 'release' || inputs.full_harvest }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -179,8 +183,6 @@ jobs:
       # The release's own schema, as on a new volume; the harvest fills it.
       - name: Create an empty cde_staging
         if: env.REHEARSAL == 'true' && env.STAGING_DB == 'fresh'
-        env:
-          FULL_HARVEST: ${{ inputs.full_harvest }}
         run: |
           test "$FULL_HARVEST" = true || { echo "staging_db=fresh needs full_harvest" >&2; exit 1; }
           psql() { .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh "$@"; }
@@ -193,8 +195,6 @@ jobs:
       # tells it which full harvest to wait for (0: none).
       - name: Mark cde_staging pending
         if: env.REHEARSAL == 'true'
-        env:
-          FULL_HARVEST: ${{ inputs.full_harvest }}
         run: |
           since=0
           if [ "$FULL_HARVEST" = true ]; then since=$(date +%s); fi
@@ -229,13 +229,13 @@ jobs:
       # Started, not awaited: it takes days. staging-verify.yml's schedule
       # tests and stamps cde_staging once it has finished.
       - name: Start a full harvest
-        if: env.REHEARSAL == 'true' && inputs.full_harvest
+        if: env.REHEARSAL == 'true' && env.FULL_HARVEST == 'true'
         run: .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/run-harvest.sh
 
   verify:
     name: Verify staging
     needs: [release, staging]
-    if: needs.release.outputs.target == 'staging' && !inputs.full_harvest
+    if: needs.release.outputs.target == 'staging' && !(github.event_name == 'release' || inputs.full_harvest)
     uses: ./.github/workflows/staging-verify.yml
     secrets: inherit
 

@@ -323,9 +323,13 @@ Dispatch inputs (a published release uses the defaults):
 
 | Input | Default | Effect |
 |---|---|---|
-| `staging_db` | `copy-prod` | staging: `copy-prod` refreshes `cde_staging` from production; `keep` reuses it; `fresh` starts it empty from the release's schema (needs `full_harvest`; skips the 90% check) |
-| `full_harvest` | false | staging: start a full harvest; Verify staging tests once it finishes |
+| `staging_db` | `fresh`* | staging: `copy-prod` refreshes `cde_staging` from production; `keep` reuses it; `fresh` starts it empty from the release's schema (needs `full_harvest`; skips the 90% check) |
+| `full_harvest` | true* | staging: start a full harvest; Verify staging tests once it finishes |
 | `ship_database` | true | production: ship `cde_staging`; false deploys code only |
+
+\* Temporary (#471), while production still runs the old stack: every rehearsal
+builds `cde_staging` from scratch and harvests it. The intended defaults are
+`copy-prod` and `false`.
 
 To roll back a promotion, on the production host stop the stack, rename the
 live database to `cde_failed` and `cde_previous` back to the live name, then
