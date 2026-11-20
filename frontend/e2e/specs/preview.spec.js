@@ -71,28 +71,28 @@ test.describe("record preview", () => {
   test("a changed setting rides the URL, and a default stays out of it", async ({
     page,
   }) => {
-    // A multi-profile record opens on the colour plot, which has no plot type.
-    await openPreview(page, "&playout=panels");
+    await openPreview(page);
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);
 
-    const mode = (name) =>
-      page
-        .getByTestId("preview-mode-toggle")
-        .getByRole("radio", { name, exact: true });
+    const mode = page.getByTestId("preview-mode-picker-toggle");
+    const pick = async (name) => {
+      await mode.click();
+      await page.getByRole("menuitemradio", { name, exact: true }).click();
+    };
 
-    await expect(mode("Markers + Line")).toBeChecked();
-    await mode("Markers").click();
+    await expect(mode).toHaveText("Markers + Line");
+    await pick("Markers");
 
-    await expect(mode("Markers")).toBeChecked();
+    await expect(mode).toHaveText("Markers");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBe("markers");
 
     // Back to the default and the param goes, rather than being pinned at it.
-    await mode("Markers + Line").click();
+    await pick("Markers + Line");
 
-    await expect(mode("Markers + Line")).toBeChecked();
+    await expect(mode).toHaveText("Markers + Line");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBeNull();
@@ -101,13 +101,11 @@ test.describe("record preview", () => {
   test("a setting survives the Table/Plot flip that unmounts the plot", async ({
     page,
   }) => {
-    await openPreview(page, "&playout=panels&pmode=lines");
+    await openPreview(page, "&pmode=lines");
     await expect(plot(page).first()).toBeVisible();
-    const lineMode = page
-      .getByTestId("preview-mode-toggle")
-      .getByRole("radio", { name: "Line", exact: true });
+    const mode = page.getByTestId("preview-mode-picker-toggle");
     await showSettings(page);
-    await expect(lineMode).toBeChecked();
+    await expect(mode).toHaveText("Line");
     await closeSettings(page);
 
     await page.getByRole("radio", { name: "Table" }).click();
@@ -116,7 +114,7 @@ test.describe("record preview", () => {
 
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);
-    await expect(lineMode).toBeChecked();
+    await expect(mode).toHaveText("Line");
   });
 
   test("closing clears the record and every plot param with it", async ({
@@ -180,8 +178,7 @@ const LONG_LABELS = {
 };
 
 // Only a Profile draws its record title inside the figure, above the panel
-// titles, and no recorded dataset is one. Only a TimeSeriesProfile or a
-// TrajectoryProfile is offered the colour plot.
+// titles, and no recorded dataset is one.
 async function serveLongLabelProfile(page, cdmDataType = "Profile") {
   await page.route("**/pointQuery*", (route) => {
     const datasets = JSON.parse(resolveFixture(route.request().url()).body);
@@ -263,22 +260,6 @@ test.describe("record preview labels", () => {
       .poll(() => labelOverlaps(page))
       .toEqual({ count: 5, problems: [] });
   });
-
-  test("a colour plot's bar titles stay beside their own bars", async ({
-    page,
-  }) => {
-    await serveLongLabelProfile(page, "TimeSeriesProfile"); // routed after the beforeEach's Profile, so it wins
-    await openApp(
-      page,
-      `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&playout=color&pvars=CHLA,PSAL,SIGT`,
-    );
-    await expect(plot(page).first()).toBeVisible();
-    // The time axis, three depth axes and three bars; the record title sits
-    // above the figure.
-    await expect
-      .poll(() => labelOverlaps(page))
-      .toEqual({ count: 7, problems: [] });
-  });
 });
 
 // The pinned strip, read against the panels it labels: whether the scroller
@@ -335,10 +316,10 @@ test.describe("record preview pinned axis", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 600 });
-    await serveLongLabelProfile(page, "TimeSeriesProfile"); // routed after the beforeEach's Profile, so it wins
+    await serveLongLabelProfile(page, "TimeSeries"); // routed after the beforeEach's Profile, so it wins
     await openApp(
       page,
-      `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&playout=color&pvars=CHLA,PSAL,SIGT`,
+      `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&pvars=CHLA,PSAL,SIGT`,
     );
     await expect(plot(page).first()).toBeVisible();
     const scroller = page.locator(".datasetPreviewPlotArea");

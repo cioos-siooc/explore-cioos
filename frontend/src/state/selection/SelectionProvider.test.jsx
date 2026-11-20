@@ -373,12 +373,23 @@ describe("SelectionProvider", () => {
       .map(([input]) => (typeof input === "string" ? input : input.url))
       .filter((url) => url.includes("/preview?"));
 
+  it("an empty ?preview= opens the dataset's unnamed series", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}&preview=` });
+    await waitFor(() => {
+      expect(latest.showPreviewModal).toBe(true);
+      expect(latest.recordLoading).toBe(false);
+    });
+    expect(latest.inspectRecordID).toBe("");
+    expect(previewUrls().at(-1)).toMatch(/&profile=(&|$)/);
+  });
+
   it("a chosen profile rides the preview fetch as `at`", async () => {
     // A plot param that changes what is FETCHED rather than how it is drawn,
     // which is why the provider reads it at all.
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&playout=panels`,
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
     });
     await waitFor(() => expect(latest.recordLoading).toBe(false));
     expect(previewUrls().at(-1)).toContain("at=cast-1");
@@ -408,30 +419,11 @@ describe("SelectionProvider", () => {
   it("an unknown row limit or a chosen profile is not sent as one", async () => {
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&prows=999&pstep=cast-1&playout=panels&pbefore=2024-03-01T00:00:00.000Z`,
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&prows=999&pstep=cast-1&pbefore=2024-03-01T00:00:00.000Z`,
     });
     await waitFor(() => expect(latest.recordLoading).toBe(false));
     expect(previewUrls().at(-1)).not.toContain("limit=");
     expect(previewUrls().at(-1)).not.toContain("before=");
-  });
-
-  it("the colour plot asks for every profile in the window, not the chosen one", async () => {
-    const fixtureRow = pointQueryFixture[0]; // a TimeSeriesProfile
-    await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&playout=color`,
-    });
-    await waitFor(() => expect(latest.recordLoading).toBe(false));
-    expect(previewUrls().at(-1)).toContain("allProfiles=true");
-    expect(previewUrls().at(-1)).not.toContain("at=");
-  });
-
-  it("a colour plot link on a record of one profile fetches as panels", async () => {
-    const fixtureRow = pointQueryFixture[1]; // a TimeSeries
-    await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&playout=color`,
-    });
-    await waitFor(() => expect(latest.recordLoading).toBe(false));
-    expect(previewUrls().at(-1)).not.toContain("allProfiles");
   });
 
   it("opening another record drops the profile and window end chosen for the previous one", async () => {
@@ -439,7 +431,7 @@ describe("SelectionProvider", () => {
     // profile the new station never took and /preview answers NO_DATA.
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({
-      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&playout=panels&pbefore=2024-03-01T00:00:00.000Z`,
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&pbefore=2024-03-01T00:00:00.000Z`,
     });
     await waitFor(() => expect(latest.recordLoading).toBe(false));
 

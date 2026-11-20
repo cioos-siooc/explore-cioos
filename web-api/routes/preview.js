@@ -42,12 +42,6 @@ const Sentry = require("@sentry/node");
  *         name: limit
  *         schema: { type: integer, minimum: 1, maximum: 50000, default: 5000 }
  *         description: How many rows to draw at most.
- *       - in: query
- *         name: allProfiles
- *         schema: { type: boolean }
- *         description: >
- *           Every profile in the window rather than one: `at` is ignored, and a
- *           TimeSeriesProfile record that is one cast stands for its station.
  *     responses:
  *       200:
  *         description: >
@@ -102,6 +96,11 @@ const constraintFor = (column, value) =>
     ? `${column}=${encodeURIComponent(value)}`
     : `${column}=~${encodeURIComponent(`"${escapeErddapRegex(value)}"`)}`;
 
+// A dataset with no id variable is one unnamed series: the record is the whole
+// dataset, so there is nothing to constrain on.
+const recordConstraint = (column, value) =>
+  column ? `&${constraintFor(column, value)}` : "";
+
 // Whether this record holds several profiles to step through. TimeSeriesProfile
 // and TrajectoryProfile set both id variables and the record is the outer one,
 // so the inner one is the step; a Profile record's own id is both, and a
@@ -150,7 +149,7 @@ ds AS (
 ),
 profile_feature AS (
   SELECT p.dataset_pk,
-         COALESCE(p.profile_id, p.timeseries_id) AS feature_id,
+         COALESCE(p.profile_id, p.timeseries_id, '') AS feature_id,
          p.time_min,
          p.time_max,
          p.n_records,
@@ -161,35 +160,9 @@ profile_feature AS (
           WHERE  lower(r) < params.before_day) AS data_end
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
-  WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
-),
--- Under allProfiles a cast record stands for its station, so the window below
--- is sized on the station: sized on the cast, it would fetch the whole station.
--- (No bind names in SQL comments: knex binds them there too.)
-station_feature AS (
-  SELECT f.dataset_pk,
-         f.station_id AS feature_id,
-         MIN(p.time_min) AS time_min,
-         MAX(p.time_max) AS time_max,
-         SUM(p.n_records) AS n_records,
-         -- Over elapsed days, not days with data: casts are days apart, so a
-         -- rate over cast days sizes a window holding one or two of them.
-         SUM(p.n_records)::double precision
-           / GREATEST(EXTRACT(EPOCH FROM MAX(p.time_max) - MIN(p.time_min))
-                        / 86400, 1) AS records_per_day,
-         NULL::text AS cast_id,
-         f.station_id,
-         MAX((SELECT MAX(upper(r)) FROM unnest(p.day_ranges) r, params
-              WHERE  lower(r) < params.before_day)) AS data_end
-  FROM   profile_feature f
-  JOIN   ds ON ds.pk = f.dataset_pk
-  JOIN   cde.profiles p
-         ON  p.dataset_pk    = f.dataset_pk
-         AND p.timeseries_id = f.station_id
-  WHERE  CAST(:WHOLE_STATION AS boolean)
-         AND ds.cdm_data_type = 'TimeSeriesProfile'
-         AND f.cast_id IS NOT NULL
-  GROUP  BY f.dataset_pk, f.station_id
+  -- An empty id names a dataset's one unnamed series, whichever way the
+  -- harvest stored it.
+  WHERE  COALESCE(p.profile_id, p.timeseries_id, '') = :profile
 ),
 trajectory_feature AS (
   SELECT s.dataset_pk,
@@ -212,10 +185,7 @@ trajectory_feature AS (
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
 ),
 feature AS (
-  SELECT * FROM station_feature
-  UNION ALL
   SELECT * FROM profile_feature
-  WHERE  NOT EXISTS (SELECT 1 FROM station_feature)
   UNION ALL
   SELECT * FROM trajectory_feature
 )
@@ -285,7 +255,6 @@ const PREVIEW_CHECKS = [
   check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
   check("before").optional().isISO8601({ strict: true }),
   check("limit").optional().isInt({ min: 1, max: MAX_PREVIEW_ROW_LIMIT }),
-  check("allProfiles").optional().isIn(["true", "false"]),
 ];
 
 const rowLimitOf = (query) => Number(query.limit) || PREVIEW_ROW_LIMIT;
@@ -295,7 +264,6 @@ const rowLimitOf = (query) => Number(query.limit) || PREVIEW_ROW_LIMIT;
 // is the request actually running.
 async function resolvePreview(query) {
   const { dataset, profile, at, timeMin, timeMax, before } = query;
-  const allProfiles = query.allProfiles === "true";
 
   // NOTE: filtered by dataset_id alone, so a dataset_id published on two
   // ERDDAP servers resolves to whichever row sorts first.
@@ -303,7 +271,6 @@ async function resolvePreview(query) {
     profile,
     dataset,
     NUM_RECORDS: rowLimitOf(query),
-    WHOLE_STATION: allProfiles,
     BEFORE: before ?? null,
   });
 
@@ -329,7 +296,7 @@ async function resolvePreview(query) {
     record_step,
   } = record;
 
-  if (!profile_variable) {
+  if (!profile_variable && profile_id !== "") {
     return {
       refusal: {
         status: 422,
@@ -342,15 +309,13 @@ async function resolvePreview(query) {
     };
   }
 
-  const constraint = constraintFor(profile_variable, profile_id);
-  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?${recordConstraint(profile_variable, profile_id)}`;
   // `at` names one profile inside the record, to reach one OUTSIDE the tail
   // window below, so the two are exclusive. A cast record with no `at` draws
   // its own cast.
-  const step =
-    steppedRecord(profile_variable, step_variable) && !allProfiles
-      ? at || record_step
-      : null;
+  const step = steppedRecord(profile_variable, step_variable)
+    ? at || record_step
+    : null;
   const tailWindow = !step && !timeMin && !timeMax;
   const windowed = tailWindow && (!use_whole_profile || Boolean(before));
   if (step) {
@@ -569,7 +534,6 @@ router.get(
       profile,
       dataset,
       NUM_RECORDS: PREVIEW_ROW_LIMIT,
-      WHOLE_STATION: false,
       BEFORE: null,
     });
 
@@ -589,7 +553,7 @@ router.get(
       record_step,
     } = rows.rows[0];
 
-    if (!profile_variable) {
+    if (!profile_variable && profile_id !== "") {
       return res.status(422).send({
         error: "NO_RECORD_ID_VARIABLE",
         dataset: dataset_id,
@@ -611,7 +575,7 @@ router.get(
         : `${step_variable},${TIME_COLUMN}`;
     const erddapQuery =
       `${erddap_url}/tabledap/${dataset_id}.json?${columns}` +
-      `&${constraintFor(profile_variable, profile_id)}&distinct()`;
+      `${recordConstraint(profile_variable, profile_id)}&distinct()`;
 
     try {
       const { data } = await axios.get(erddapQuery, {

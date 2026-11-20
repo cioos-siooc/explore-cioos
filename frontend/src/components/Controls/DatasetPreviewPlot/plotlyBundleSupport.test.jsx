@@ -6,8 +6,8 @@ import {
 } from "../DatasetPreview/previewVariables.js";
 import { facetPlanFor, COLUMNS } from "../DatasetPreview/previewFacetPlan.js";
 import {
-  buildColorFigure,
   buildFigure,
+  buildGridFigure,
 } from "../DatasetPreview/previewFacetFigure.js";
 import { exportFigureFor } from "../DatasetPreview/previewExportFigure.js";
 import { splitPinnedAxis } from "../DatasetPreview/previewPinnedAxis.js";
@@ -17,7 +17,7 @@ import { splitPinnedAxis } from "../DatasetPreview/previewPinnedAxis.js";
 // The rest of the plot is asserted against buildFigure's return value under
 // `node --test`, which is right: a browser is not needed to check an object. But
 // that leaves the assumptions this file covers uncheckable there — that
-// the Plotly build previewPlotly.js assembles carries the colour axis, the heatmap and the across-subplot hover
+// the Plotly build previewPlotly.js assembles carries the colour axis, the contour and the across-subplot hover
 // at all. It is a PARTIAL bundle; if a version ever drops one, the figure would
 // keep passing every other test and quietly draw no colours, or answer for one
 // panel. So this one file loads the real Plotly and asks its own schema.
@@ -208,54 +208,27 @@ describe("the shipped plotly bundle and the axis-wide hover", () => {
   });
 });
 
-describe("the shipped plotly bundle and the colour plot", () => {
-  function colorPlotFigure(colorVariable) {
+describe("the shipped plotly bundle and colour rows", () => {
+  function colorRowsFigure() {
     const dataset = { cdm_data_type: "Profile", first_eov_column: "TE90_01" };
-    return buildColorFigure({
+    return buildGridFigure({
       variablesByName: byColumnName(variablesFrom(TABLE, dataset)),
-      panels: ["TE90_01", colorVariable],
-      xAxis: "PSAL_01",
-      yAxis: "depth",
+      xAxes: ["TE90_01"],
+      yAxes: ["depth"],
+      panelAxis: "x",
+      // Time as the second row, so the bar's tick override is covered too.
+      colorAxes: ["PSAL_01", "time"],
+      colorRows: true,
       data: DATA,
       size: { width: 900, height: 600 },
       uirevision: "test",
     });
   }
 
-  it("understands every key a filled panel sets on its heatmap", async () => {
-    const schema = await plotlySchema();
-    const known = schema.traces.heatmap.attributes;
-    const section = DATA.flatMap((row) =>
-      [1, 2].map((depth) => ({ ...row, depth })),
-    );
-    const { data } = buildColorFigure({
-      variablesByName: byColumnName(
-        variablesFrom(TABLE, { cdm_data_type: "Profile" }),
-      ),
-      panels: ["TE90_01", "time"],
-      xAxis: "PSAL_01",
-      yAxis: "depth",
-      data: section,
-      size: { width: 900, height: 600 },
-      uirevision: "test",
-    });
-
-    data.forEach((trace) => {
-      expect(trace.type).toBe("heatmap");
-      Object.keys(trace)
-        .filter((key) => key !== "type")
-        .forEach((key) => {
-          expect(known, `heatmap.${key}`).toHaveProperty(key);
-        });
-    });
-    expect(known.zsmooth.values).toContain("best");
-  });
-
   it("understands every key a panel's own colourbar sets", async () => {
     const schema = await plotlySchema();
     const known = schema.layout.layoutAttributes.coloraxis;
-    // Time as the second panel, so the bar's tick override is covered too.
-    const { layout } = colorPlotFigure("time");
+    const { layout } = colorRowsFigure();
 
     ["coloraxis", "coloraxis2"].forEach((name) => {
       const { colorbar, ...rest } = layout[name];
@@ -276,11 +249,50 @@ describe("the shipped plotly bundle and the colour plot", () => {
     expect(known.colorbar.lenmode.values).toContain("fraction");
   });
 
-  it("can tie every panel's Y axis to the first, so one zoom moves them all", async () => {
+  it("can tie a repeated row's Y axis to the first, so one zoom moves both", async () => {
     const schema = await plotlySchema();
     expect(schema.layout.layoutAttributes.yaxis).toHaveProperty("matches");
     expect(schema.layout.layoutAttributes.hovermode.values).toContain(
       "closest",
     );
+  });
+});
+
+describe("the shipped plotly bundle and the contour plot type", () => {
+  it("understands every key a filled panel sets on its contour", async () => {
+    const schema = await plotlySchema();
+    const known = schema.traces.contour.attributes;
+    // Two casts, each down the same depths: a section to fill.
+    const section = DATA.flatMap((row, index) =>
+      [1, 2, 3].map((depth) => ({
+        ...row,
+        time: `2025-09-1${index % 2 ? 7 : 6}T00:00:00Z`,
+        depth,
+      })),
+    );
+    const dataset = { cdm_data_type: "TimeSeriesProfile" };
+    const { data } = buildGridFigure({
+      variablesByName: byColumnName(variablesFrom(TABLE, dataset)),
+      xAxes: ["time"],
+      yAxes: ["depth"],
+      panelAxis: "y",
+      colorAxes: ["TE90_01", "PSAL_01"],
+      colorRows: true,
+      data: section,
+      mode: "contour",
+      size: { width: 900, height: 600 },
+      uirevision: "test",
+    });
+
+    const contours = data.filter((trace) => trace.type === "contour");
+    expect(contours).toHaveLength(2);
+    contours.forEach((trace) => {
+      Object.keys(trace)
+        .filter((key) => key !== "type")
+        .forEach((key) => {
+          expect(known, `contour.${key}`).toHaveProperty(key);
+        });
+    });
+    expect(known.contours.coloring.values).toContain("heatmap");
   });
 });

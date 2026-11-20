@@ -135,6 +135,40 @@ test("422s NO_RECORD_ID_VARIABLE when the dataset declares no cf_role variable",
   assert.equal(axios.calls.length, 0);
 });
 
+test("previews a dataset with no cf_role variable as one unconstrained series", async () => {
+  db.queueRaw([{ ...FEATURE_ROW, profile_variable: null, profile_id: "" }]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2024-03-01"]] } },
+  });
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "" });
+  assert.equal(res.status, 200);
+  assert.equal(
+    axios.calls[0].url,
+    "https://erddap.example.com/erddap/tabledap/obs_270.json?",
+  );
+});
+
+test("constrains an unnamed series on its empty id", async () => {
+  db.queueRaw([
+    {
+      ...FEATURE_ROW,
+      cdm_data_type: "Trajectory",
+      profile_variable: "trajectory",
+      profile_id: "",
+    },
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2024-03-01"]] } },
+  });
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "" });
+  assert.equal(res.status, 200);
+  assert.match(axios.calls[0].url, /&trajectory=~%22%22$/);
+});
+
 test("404s NO_DATA when ERDDAP itself has nothing for the constraint", async () => {
   db.queueRaw([FEATURE_ROW]);
   axios.queueResponse({ data: { table: { columnNames: [], rows: [] } } });
@@ -358,94 +392,6 @@ test("`at` wins over a cast record's own cast", async () => {
   const { url } = axios.calls[0];
   assert.ok(url.includes(encodeURIComponent('"PMZA-VAS-24/10/10-14:01:41"')));
   assert.ok(!url.includes(encodeURIComponent("24/10/14-08:31:41")));
-});
-
-// --- every profile in the window (the colour plot) ---------------------------
-
-// What FEATURE_SQL answers for CAST_ROW's record under allProfiles: the station.
-const WHOLE_STATION_ROW = {
-  ...CAST_ROW,
-  record_step: null,
-  n_records: 146972,
-};
-
-test("allProfiles sizes the record on the cast's station, not the cast", async () => {
-  db.queueRaw([WHOLE_STATION_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "PMZA-VAS-24/10/14-08:31:41",
-    allProfiles: "true",
-  });
-
-  assert.match(
-    db.queries[0],
-    /WHERE\s+CAST\(true AS boolean\)\s+AND ds\.cdm_data_type/,
-  );
-});
-
-test("without allProfiles the station stand-in is switched off", async () => {
-  db.queueRaw([CAST_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "PMZA-VAS-24/10/14-08:31:41",
-  });
-
-  assert.match(
-    db.queries[0],
-    /WHERE\s+CAST\(false AS boolean\)\s+AND ds\.cdm_data_type/,
-  );
-});
-
-test("allProfiles ignores `at` and a cast's own cast, keeping the tail window", async () => {
-  db.queueRaw([CAST_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "PMZA-VAS-24/10/14-08:31:41",
-    at: "PMZA-VAS-24/10/10-14:01:41",
-    allProfiles: "true",
-  });
-
-  const { url } = axios.calls[0];
-  assert.ok(url.includes(`station_id=~${encodeURIComponent('"PMZA-VAS"')}`));
-  assert.ok(!url.includes("&profile=~"));
-  assert.ok(url.includes("time>2024-10-01T00:00:00Z"));
-});
-
-test("allProfiles keeps a requested period", async () => {
-  db.queueRaw([STEPPED_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "AZMP-ESG",
-    allProfiles: "true",
-    timeMin: "2020-01-03T00:00:00Z",
-    timeMax: "2020-01-05T23:59:59Z",
-  });
-
-  assert.match(axios.calls[0].url, /&time>=2020-01-03T00:00:00\.000Z/);
-});
-
-test("rejects an allProfiles that is not true or false", async () => {
-  const res = await agent
-    .get("/preview")
-    .query({ dataset: "obs_270", profile: "1", allProfiles: "yes" });
-  assert.equal(res.status, 400);
-  assert.equal(axios.calls.length, 0);
 });
 
 // --- how much of the request the rows are ------------------------------------

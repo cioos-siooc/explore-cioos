@@ -33,7 +33,7 @@ const ALL = 0;
 const timeText = (step) =>
   step ? formatInstant(step.time) || String(step.value) : "";
 
-export default function ProfileSlice({ profiles, step, setStep }) {
+export default function ProfileSlice({ profiles, drawnCount, step, setStep }) {
   const { t } = useTranslation();
   // Memoised because the `|| []` fallback is a fresh array every render, which
   // would re-run every hook below it on every keystroke elsewhere in the pane.
@@ -46,7 +46,9 @@ export default function ProfileSlice({ profiles, step, setStep }) {
   const index = useMemo(() => {
     const drawn = step || current;
     if (!drawn) return ALL;
-    const at = steps.findIndex((entry) => entry.value === drawn);
+    // The URL hands the step back as a string; ERDDAP sends numeric profile
+    // ids (gliders) as numbers.
+    const at = steps.findIndex((entry) => String(entry.value) === drawn);
     // A link naming a profile this record does not have falls back to the
     // window rather than to an empty plot.
     return at < 0 ? first : at + 1;
@@ -84,10 +86,16 @@ export default function ProfileSlice({ profiles, step, setStep }) {
   // and for a transect holding a single profile.
   if (steps.length < 2) return null;
 
-  const label =
-    shownIndex === ALL
-      ? t("previewProfileSliceAll")
-      : timeText(steps[shownIndex - 1]);
+  // The All stop draws only the profiles in /preview's tail window — 6 of a
+  // towed CTD's 202 — so it says how many rather than implying the record.
+  let label;
+  if (shownIndex !== ALL) label = timeText(steps[shownIndex - 1]);
+  else if (drawnCount)
+    label = t("previewProfileSliceLatest", {
+      count: drawnCount,
+      total: profiles.count,
+    });
+  else label = t("previewProfileSliceAll");
 
   // What the "n / N" means. On the All stop that is the window, not the record:
   // the rows drawn are the tail /preview returns, which is a different claim
@@ -113,11 +121,16 @@ export default function ProfileSlice({ profiles, step, setStep }) {
     <div className="previewProfileSlice">
       <div className="previewProfileSliceReadout">
         <span className="previewProfileSliceLabel" title={countTitle}>
+          <span className="previewProfileSliceCaption">
+            {t("previewProfileSlice")}
+          </span>
           {label}
         </span>
-        <span className="previewProfileSliceCount" title={countTitle}>
-          {shownIndex} / {steps.length}
-        </span>
+        {shownIndex !== ALL && (
+          <span className="previewProfileSliceCount" title={countTitle}>
+            {shownIndex} / {steps.length}
+          </span>
+        )}
       </div>
       <div className="previewProfileSliceControls">
         <button
