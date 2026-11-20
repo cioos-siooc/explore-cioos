@@ -207,10 +207,18 @@ station_casts AS (
   WHERE  ds.cdm_data_type = 'TimeSeriesProfile'
     AND  c.cast_id IS NOT NULL
 ),
+-- A cast is a single-day feature, harvested without day_ranges: its days are
+-- its time span.
 station_days AS (
   SELECT DISTINCT day::date AS day
   FROM   station_casts s,
-         unnest(s.day_ranges) r,
+         unnest(
+           CASE WHEN coalesce(array_length(s.day_ranges, 1), 0) > 0
+                THEN s.day_ranges
+                ELSE ARRAY[daterange(s.time_min::date,
+                                     GREATEST(s.time_max::date,
+                                              s.time_min::date) + 1)]
+           END) r,
          generate_series(lower(r), upper(r) - 1, interval '1 day') day
 ),
 station_feature AS (
@@ -277,13 +285,28 @@ CROSS JOIN LATERAL (
                f.data_end::timestamp AT TIME ZONE 'UTC') AS window_end
 ) anchor
 CROSS JOIN LATERAL (
+  -- A station's casts each carry their row count, so its window reaches back
+  -- exactly far enough: a cadence averaged over its sampled days would size
+  -- a fortnightly station's window to a cast or two. The second before the
+  -- earliest cast keeps it inside ERDDAP's strict time> bound.
+  SELECT MIN(c.time_min) - interval '1 second' AS cast_start
+  FROM  (SELECT s.time_min,
+                SUM(s.n_records) OVER (ORDER BY s.time_max DESC)
+                  - s.n_records AS rows_after
+         FROM   station_casts s
+         WHERE  s.time_max <= anchor.window_end) c
+  WHERE  c.rows_after < :NUM_RECORDS
+) casts
+CROSS JOIN LATERAL (
   -- A zero or NULL cadence cannot size a window; it falls through to
   -- fetching the whole record.
-  SELECT CASE WHEN COALESCE(f.records_per_day, 0) > 0
-                THEN anchor.window_end
-                     - (interval '1 hour'
-                        * CEIL(:NUM_RECORDS / (f.records_per_day / 24)))
-         END AS new_start_time
+  SELECT COALESCE(
+           casts.cast_start,
+           CASE WHEN COALESCE(f.records_per_day, 0) > 0
+                  THEN anchor.window_end
+                       - (interval '1 hour'
+                          * CEIL(:NUM_RECORDS / (f.records_per_day / 24)))
+           END) AS new_start_time
 ) win
 LIMIT 1`;
 
