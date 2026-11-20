@@ -9,6 +9,7 @@ import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
+import h3
 import pandas as pd
 import requests
 from cde_harvester.core.day_sets import days_to_ranges
@@ -38,6 +39,11 @@ logger = logging.getLogger(__name__)
 
 OBIS_SOURCE_URL = "https://obis.org"
 OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+
+# The fine hex tier's H3 resolution (web-api/utils/hexTiers.js FINE,
+# database/4_create_hexes.sql): finer would leave gaps between cells on the
+# map, coarser would blur them.
+OBIS_H3_RES = 6
 
 # Bounds the per-occurrence dicts `to_dict` builds (540 bytes/row, ~1.1 GiB on
 # the largest OBIS dataset if all live at once).
@@ -536,11 +542,18 @@ class OBISHarvester(BaseHarvester):
             day_source = pd.to_datetime(day_source, errors="coerce", utc=True, format="ISO8601")
         df["day"] = day_source.dt.floor("D")
 
-        # ~5 nmi grid; round(8) because the multiply-back can differ in the last
-        # bit across rows, causing duplicate-key violations on insert.
-        GRID_DEG = 1 / 12
-        df["lat_grid"] = ((df["decimalLatitude"] / GRID_DEG).round() * GRID_DEG).round(8)
-        df["lon_grid"] = ((df["decimalLongitude"] / GRID_DEG).round() * GRID_DEG).round(8)
+        # Binned on the map's fine hex grid and placed at the cell centre, so
+        # an OBIS cell is exactly one fine hex. Per distinct coordinate: many
+        # occurrences share a station.
+        coords = df[["decimalLatitude", "decimalLongitude"]].drop_duplicates()
+        centres = [
+            h3.cell_to_latlng(h3.latlng_to_cell(lat, lon, OBIS_H3_RES))
+            for lat, lon in coords.itertuples(index=False)
+        ]
+        # round(8): a stable key, so partials from other chunks merge on it.
+        coords["lat_grid"] = [round(lat, 8) for lat, _ in centres]
+        coords["lon_grid"] = [round(lon, 8) for _, lon in centres]
+        df = df.merge(coords, on=["decimalLatitude", "decimalLongitude"], how="left")
 
         if "scientificName" not in df.columns:
             df["scientificName"] = None

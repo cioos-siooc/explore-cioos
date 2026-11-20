@@ -353,7 +353,7 @@ const HEX_HOVER_LAYERS = [
 const HEX_SOURCE_IDS = ["cde-tiles", "cde-cells"];
 const DATA_SOURCE_IDS = [...HEX_SOURCE_IDS, "tracks"];
 
-// The coverage cell is a fixed 20 km across (web-api/routes/tiles.js), so
+// The coverage cell is a fixed ~7 km across (web-api/utils/hexTiers.js), so
 // past the basemap hand-off a full fill would bury the imagery; the fill
 // thins to a tint over the same window and a thin border takes over
 // ('coverage-hex-outlines').
@@ -2267,8 +2267,8 @@ export default function CreateMap({
       maxzoom: 14,
       promoteId: "pk",
     });
-    // The cells' geometry is the same at every zoom from 4 up, so past z10
-    // (~7 m per tile unit at 45°N on a 20 km cell) a deeper tile only refetched
+    // The cells' geometry is the same at every zoom from 5 up, so past z10
+    // (~7 m per tile unit at 45°N on a ~7 km cell) a deeper tile only refetched
     // identical data on every zoom step.
     map.current.addSource("cde-cells", {
       type: "vector",

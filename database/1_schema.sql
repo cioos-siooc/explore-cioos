@@ -5,36 +5,38 @@
 
 -- We are using features from PostGIS 3
 CREATE EXTENSION IF NOT EXISTS postgis;
+-- Before the schema exists, so the extensions land in public and survive
+-- rebuild_schema's DROP SCHEMA cde CASCADE. Keep in step with
+-- 3_h3_extension_migration.sql.
+CREATE EXTENSION IF NOT EXISTS h3 WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS h3_postgis WITH SCHEMA public CASCADE;
 CREATE schema cde;
 
 SET search_path TO cde, public;
 
--- (i, j) are the cell coordinates in PostGIS's origin-anchored hexagon grid
--- (ST_HexagonGrid, 100 km for zoom_0, 10 km for zoom_1). This natural key keeps
--- hex pks stable across loads: create_hexes() upserts on (i, j) and never
--- deletes. Nullable so create_hexes() can insert a cell and set (i, j) within
--- the same load without a mid-transaction constraint failure.
+-- h3 is the cell's H3 index (equal-area grid: res 3 for zoom_0, res 6 for
+-- zoom_1). This natural key keeps hex pks stable across loads: create_hexes()
+-- upserts on h3 and never deletes. MultiPolygon because a cell crossing the
+-- antimeridian is split in two.
 DROP TABLE IF EXISTS hexes_zoom_0;
 CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
-    i integer,
-    j integer,
-    geom geometry(Polygon,3857)
+    h3 h3index,
+    geom geometry(MultiPolygon,3857)
 );
 
 CREATE INDEX ON cde.hexes_zoom_0 USING GIST (geom);
-CREATE UNIQUE INDEX hexes_zoom_0_ij_key ON cde.hexes_zoom_0 (i, j);
+CREATE UNIQUE INDEX hexes_zoom_0_h3_key ON cde.hexes_zoom_0 (h3);
 
 DROP TABLE IF EXISTS hexes_zoom_1;
 CREATE TABLE hexes_zoom_1 (
     pk serial PRIMARY KEY,
-    i integer,
-    j integer,
-    geom geometry(Polygon,3857)
+    h3 h3index,
+    geom geometry(MultiPolygon,3857)
   );
 
 CREATE INDEX ON cde.hexes_zoom_1 USING GIST (geom);
-CREATE UNIQUE INDEX hexes_zoom_1_ij_key ON cde.hexes_zoom_1 (i, j);
+CREATE UNIQUE INDEX hexes_zoom_1_h3_key ON cde.hexes_zoom_1 (h3);
 
 
 
@@ -358,8 +360,8 @@ CREATE INDEX trajectory_days_dataset_pk_idx ON trajectory_days (dataset_pk, traj
 -- Trajectory coverage, one row per (dataset, trajectory, hex tier, hex).
 -- DERIVED, not harvested: trajectory_build_hexes() (4_create_hexes.sql) sweeps
 -- each track's segments through the hex grid, so a hex lights up when the
--- track PASSED THROUGH it. Binning fix positions instead leaves whole hex rows
--- unlit north of ~57N (a lat/lon bin shrinks below a 3857 hex row).
+-- track PASSED THROUGH it. Binning fix positions instead leaves the hexes
+-- between sparse fixes unlit.
 --
 -- `days` is a COUNT OF DISTINCT UTC DAYS in the hex, not a time span: a ship
 -- crossing the same place each January contributes one day per visit.
@@ -368,10 +370,11 @@ CREATE TABLE trajectory_hexes (
     pk serial PRIMARY KEY,
     dataset_pk integer,
     trajectory_id text DEFAULT '',
-    -- 0 = cde.hexes_zoom_0 (100 km, z<4), 1 = cde.hexes_zoom_1 (10 km, z>=4).
-    -- Each tier is aggregated independently so `days` is exact at both: summing
-    -- the 10 km rows into a 100 km hex would count a day once per 10 km hex the
-    -- platform crossed that day.
+    -- 0 = cde.hexes_zoom_0 (coarse), 1 = cde.hexes_zoom_1 (fine); the zoom
+    -- each serves is in web-api/utils/hexTiers.js. Each tier is aggregated
+    -- independently so `days` is exact at both: summing the fine rows into a
+    -- coarse hex would count a day once per fine hex the platform crossed
+    -- that day.
     hex_tier smallint NOT NULL,
     hex_pk integer NOT NULL,
     -- hex centroid, so the shared time/depth/space filters (dbFilter's

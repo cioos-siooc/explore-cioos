@@ -821,6 +821,26 @@ wheels = [
 ]
 
 [[package]]
+name = "h3"
+version = "4.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/a8/307aba523fae45079c7e940ec394ffc81ffe9231f07a982ca97f73b2fa36/h3-4.5.1.tar.gz", hash = "sha256:be7fd86fcf742d23c7e7e249b5a416b5cb36ecc2b2169c585f7d7a17df7f7e66", size = 182858, upload-time = "2026-11-18T20:36:00.935Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/57/a5f071456834476f438faaaeb032d8e244248d1e83e845ab41cb3781a810/h3-4.5.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:01ebd87691906e9949bb89d3a69a43b5b710c8db0810f3a0102f264cbd09ee6f", size = 877391, upload-time = "2026-11-18T20:35:31.291Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/a4/e37836f975974bb135cae78ecd11a08c73d332c117c3a0da90ad4e1a4515/h3-4.5.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7ee2896909ee93d743e03e7e351c9cd39c650a6d794bf38be0b19a2961b22789", size = 1038065, upload-time = "2026-11-18T20:35:32.326Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/3c/e5d82221e8738f53d66fb28eeeaf37326aa73bb0b3ebc292068d3d8148af/h3-4.5.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f36c08569f2f19cb71cb78aa3647391efae9761c154af4121eb6625fcb61131e", size = 1079107, upload-time = "2026-11-18T20:35:33.51Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/89/a17cdf4d529800a92e01225a8163da49fdfd8978e7e34c2fce32d5b91d75/h3-4.5.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:e1780273c990771899824c31ac70aeb5405842721ebb231c54db292dbf738186", size = 1089208, upload-time = "2026-11-18T20:35:34.686Z" },
+    { url = "https://files.pythonhosted.org/packages/14/9c/5535e5cae82c3a65996b62d26a27d4b46ef1f88d5fee175700fc5628b3a0/h3-4.5.1-cp314-cp314-win_amd64.whl", hash = "sha256:fc9729de2377d699e04f7debaf577195ebe55c184340625f924cb1a7b9048e19", size = 861557, upload-time = "2026-11-18T20:35:35.862Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/9c/e1eaa9c601dbacb975b841eff8aabffbc38f1c0c56a0a7c16d73a23a079e/h3-4.5.1-cp314-cp314-win_arm64.whl", hash = "sha256:a64daeab96f70e90846ee7da7ef8530d2ef6818a3d456fd35cba73c7ec2438df", size = 799872, upload-time = "2026-11-18T20:35:36.947Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/a6/85d627d5adc7f80d6620240c542fe1abfb8edd8b3904ee6ef6b00eba2efb/h3-4.5.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:098250f5a4f1e3d1dfba40dc4f8c5a1ec5ca69fa8a34f91c4c3ab7553048fe70", size = 920591, upload-time = "2026-11-18T20:35:38.301Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/a9/5c6ddb4429d638ef2580218f4f91225acb294b2192dc471577e45a5fa004/h3-4.5.1-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:06a401e5b628f0b290589e15f8ca9dd99826f0747a1ce607bfd1d0fad18ec79e", size = 1016471, upload-time = "2026-11-18T20:35:39.432Z" },
+    { url = "https://files.pythonhosted.org/packages/33/26/fab01a8d6eb32424ead59d5cab31b11167f06b2ff765e2f0aff5a1104031/h3-4.5.1-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c9bbbc9aee03eb639856cea0eff45c2a586013f7c014359d2c5d9dcd2a0c5e40", size = 1060620, upload-time = "2026-11-18T20:35:40.749Z" },
+    { url = "https://files.pythonhosted.org/packages/be/90/a690eefde6ddaa61fa4f9bcf66b315f4dee299a1e2f006bc710b7070c025/h3-4.5.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:809d860b0999467783eab39d18a948200c8f4cceab652ab0f76c9ef383764527", size = 1071944, upload-time = "2026-11-18T20:35:42.318Z" },
+    { url = "https://files.pythonhosted.org/packages/59/5f/d338c80160355c6a99785816d208a55a4a2257377a7da34b17f13a77e312/h3-4.5.1-cp314-cp314t-win_amd64.whl", hash = "sha256:ef4f5b8f6a542ff30cdd2438c5ca18e13cf502523175a2ca11dca44d281a13ea", size = 906667, upload-time = "2026-11-18T20:35:43.942Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/19/dc2120f118963abbe07cda1df791700fc71ed08ba14195ba5659e4b6a1af/h3-4.5.1-cp314-cp314t-win_arm64.whl", hash = "sha256:cc260908ab90a813eeb1bc1da3b209346be5ee43c1ca73711470a20323a0d9e7", size = 837228, upload-time = "2026-11-18T20:35:45.119Z" },
+]
+
+[[package]]
 name = "harvester"
 version = "0.2.0"
 source = { editable = "../harvester" }
@@ -829,6 +849,7 @@ dependencies = [
     { name = "diskcache" },
     { name = "duckdb" },
     { name = "erddapy" },
+    { name = "h3" },
     { name = "lxml" },
     { name = "numpy" },
     { name = "pandas" },
@@ -851,6 +872,7 @@ requires-dist = [
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "duckdb", specifier = ">=2.0.0" },
     { name = "erddapy", specifier = ">=3.3.1" },
+    { name = "h3", specifier = ">=4.5.1" },
     { name = "lxml", specifier = ">=6.1.0" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "pandas", specifier = ">=3.0.6" },
