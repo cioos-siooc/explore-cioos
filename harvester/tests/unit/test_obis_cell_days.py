@@ -4,10 +4,11 @@ outweigh every other source)."""
 import ast
 import datetime
 
+import h3
 import pandas as pd
 from cde_harvester.core.day_sets import ranges_to_csv_cell, total_days
 from cde_harvester.loading.loader import prepare_obis_cells_dataframe
-from cde_harvester.sources.obis.harvester import OBISHarvester
+from cde_harvester.sources.obis.harvester import OBIS_H3_RES, OBISHarvester
 
 DAY = 86_400_000  # OBIS dates are epoch milliseconds
 
@@ -117,9 +118,15 @@ class TestDayCountPerCell:
             [occurrence(d, lat=44.6, lon=-63.6) for d in (1, 2, 3)]
             + [occurrence(1, lat=48.0, lon=-60.0)]
         )
-        by_lat = cells.set_index(cells["latitude"].round(2))["days"]
-        assert by_lat.loc[44.58] == 3
-        assert by_lat.loc[48.0] == 1
+        by_cell = pd.Series(
+            cells["days"].to_numpy(),
+            index=[
+                h3.latlng_to_cell(la, lo, OBIS_H3_RES)
+                for la, lo in zip(cells["latitude"], cells["longitude"], strict=True)
+            ],
+        )
+        assert by_cell.loc[h3.latlng_to_cell(44.6, -63.6, OBIS_H3_RES)] == 3
+        assert by_cell.loc[h3.latlng_to_cell(48.0, -60.0, OBIS_H3_RES)] == 1
 
 
 class TestLoaderRoundTrip:
