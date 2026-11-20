@@ -4,7 +4,8 @@ name: Deploy
 #   beta*          -> beta        any development*/main/master commit
 #   vX.Y.Z-rc.N    -> staging     main or master only
 #   vX.Y.Z         -> production  main or master only, and only a SHA whose staging
-#                                 deployment succeeded
+#                                 deployment succeeded and whose cde_staging
+#                                 staging-verify.yml has tested and stamped
 # beta and staging share one stack on the Juno host cioos-co-dev-explore
 # (beta.explore.cioos.ca, behind Caddy basic_auth), one deploy at a time, and
 # always keep their volumes. Staging is a rehearsal on its own database,
@@ -137,9 +138,7 @@ jobs:
     name: Deploy ${{ needs.release.outputs.target }}
     needs: release
     if: needs.release.outputs.target != 'production'
-    # A full harvest of production's sources takes hours; 360 is the ceiling
-    # of a GitHub-hosted runner.
-    timeout-minutes: ${{ inputs.full_harvest && 360 || 90 }}
+    timeout-minutes: 90
     runs-on: ubuntu-latest
     # beta and staging deploy the same stack, but stay separate GitHub
     # environments so only a staging deployment satisfies the production gate.
@@ -189,13 +188,18 @@ jobs:
           psql -d postgres -c 'CREATE DATABASE cde_staging'
           { echo 'SET client_min_messages = warning;'; cat database/1_schema.sql database/[3-9]_*.sql; } | psql -1 -d cde_staging
 
-      # Unstamped until this run's tests pass, so production can never ship a
-      # cde_staging that a later, failed rehearsal has migrated.
-      - name: Unstamp cde_staging
+      # Pending until staging-verify.yml's tests pass, so production can never
+      # ship a cde_staging that a later, failed rehearsal has migrated. <since>
+      # tells it which full harvest to wait for (0: none).
+      - name: Mark cde_staging pending
         if: env.REHEARSAL == 'true'
+        env:
+          FULL_HARVEST: ${{ inputs.full_harvest }}
         run: |
+          since=0
+          if [ "$FULL_HARVEST" = true ]; then since=$(date +%s); fi
           .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
-            -d postgres -c 'COMMENT ON DATABASE cde_staging IS NULL'
+            -d postgres -c "COMMENT ON DATABASE cde_staging IS 'pending $SHA $since $STAGING_DB'"
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
@@ -222,78 +226,18 @@ jobs:
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
 
-      - name: Wait for the staging site
-        if: env.REHEARSAL == 'true'
-        run: curl --fail --silent --retry 60 --retry-all-errors --retry-delay 5 "$STAGING_URL/api/health/ready"
-
-      - name: Full harvest
+      # Started, not awaited: it takes days. staging-verify.yml's schedule
+      # tests and stamps cde_staging once it has finished.
+      - name: Start a full harvest
         if: env.REHEARSAL == 'true' && inputs.full_harvest
         run: .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/run-harvest.sh
 
-      - name: Install Node.js
-        if: env.REHEARSAL == 'true'
-        uses: actions/setup-node@v7
-        with:
-          node-version: 26
-          cache: npm
-          cache-dependency-path: |
-            test/package-lock.json
-            frontend/package-lock.json
-
-      - name: API integration tests
-        if: env.REHEARSAL == 'true'
-        run: |
-          read -r latitude longitude < <(
-            .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging -F ' ' \
-              -c 'SELECT latitude, longitude FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 1'
-          )
-          test -n "${latitude:-}" && test -n "${longitude:-}"
-          npm --prefix test ci --quiet
-          API_URL="$STAGING_URL/api" CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" \
-            npm --prefix test run test:integration
-
-      - name: Frontend smoke test
-        if: env.REHEARSAL == 'true'
-        working-directory: frontend
-        env:
-          CI: "true"
-        run: |
-          npm ci --quiet
-          npx playwright install --with-deps chromium
-          LIVE_BASE_URL="$STAGING_URL" npm run test:e2e:live
-
-      - name: Submit and complete a download request
-        if: env.REHEARSAL == 'true'
-        env:
-          SITE_URL: ${{ env.STAGING_URL }}
-        run: |
-          PSQL=".github/scripts/on-host.sh $STAGING $STAGING_DIR $STAGING_STACK .github/scripts/host-psql.sh -d cde_staging" \
-            .github/scripts/test-download-request.sh
-
-      # Catches a migration or harvest that silently loses data.
-      - name: Dataset count within 10% of production
-        if: env.REHEARSAL == 'true' && env.STAGING_DB != 'fresh'
-        run: |
-          count='SELECT count(*) FROM cde.datasets'
-          staged=$(.github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging -c "$count")
-          live=$(.github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/host-psql.sh -c "$count")
-          echo "cde_staging: $staged datasets, production: $live"
-          test $((staged * 10)) -ge $((live * 9))
-
-      - name: Stamp cde_staging as tested
-        if: env.REHEARSAL == 'true'
-        run: |
-          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
-            -d postgres -c "COMMENT ON DATABASE cde_staging IS '$SHA'"
-
-      - uses: actions/upload-artifact@v7
-        if: failure() && env.REHEARSAL == 'true'
-        with:
-          name: staging-e2e-report
-          path: |
-            frontend/playwright-report/
-            frontend/test-results/
-          retention-days: 7
+  verify:
+    name: Verify staging
+    needs: [release, staging]
+    if: needs.release.outputs.target == 'staging' && !inputs.full_harvest
+    uses: ./.github/workflows/staging-verify.yml
+    secrets: inherit
 
   production:
     name: Deploy production

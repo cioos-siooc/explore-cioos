@@ -101,7 +101,7 @@ jobs:
         run: curl --fail --retry 60 --retry-all-errors --retry-delay 2 "$API_URL/openapi.json"
 
       - name: Run the sample harvest
-        run: timeout 25m .github/scripts/run-harvest.sh
+        run: timeout 25m .github/scripts/run-harvest.sh --watch
 
       - name: Install Node.js
         uses: actions/setup-node@v7

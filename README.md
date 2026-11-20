@@ -293,10 +293,19 @@ data, in its own `cde_staging` database (beta keeps the stack's usual one):
    `staging_db=fresh`, it starts empty).
 2. The release deploys against it, so `db_migrate` applies the migrations to
    real data.
-3. Optionally a full harvest runs.
-4. The API, frontend smoke and download tests run against the stack, plus a
-   check that `cde_staging` holds at least 90% of production's datasets.
+3. Optionally a full harvest is **started**; the deploy doesn't wait for it.
+4. [Verify staging](.github/workflows/staging-verify.yml) runs the API,
+   frontend smoke and download tests against the stack, plus a check that
+   `cde_staging` holds at least 90% of production's datasets. Without a harvest
+   the deploy calls it straight away; with one, its 6-hourly schedule waits for
+   that harvest to finish.
 5. On success `cde_staging` is stamped with the commit.
+
+Until then `cde_staging` is marked `pending <sha> …`. A failed harvest, one
+still unfinished after 4 days, failed tests, or a beta deploy taking the stack
+mark it `failed <sha> <reason>` and fail the Verify staging run. Rerun Verify
+staging by hand to check sooner than the schedule. On the staging host,
+`COMMENT ON DATABASE cde_staging` shows the state.
 
 A production deploy then **ships that database**. It is copied to production as
 `cde_next`, the app services stop, production's live `download_jobs` (usage
@@ -315,7 +324,7 @@ Dispatch inputs (a published release uses the defaults):
 | Input | Default | Effect |
 |---|---|---|
 | `staging_db` | `copy-prod` | staging: `copy-prod` refreshes `cde_staging` from production; `keep` reuses it; `fresh` starts it empty from the release's schema (needs `full_harvest`; skips the 90% check) |
-| `full_harvest` | false | staging: full harvest before the tests (job limit 6 h) |
+| `full_harvest` | false | staging: start a full harvest; Verify staging tests once it finishes |
 | `ship_database` | true | production: ship `cde_staging`; false deploys code only |
 
 To roll back a promotion, on the production host stop the stack, rename the
