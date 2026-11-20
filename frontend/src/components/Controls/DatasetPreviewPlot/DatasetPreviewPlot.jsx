@@ -81,6 +81,8 @@ import { POSITION_INDEX_COLUMN } from "../DatasetPreview/previewTrackIndex.js";
 import { MAX_COLOR_PANELS } from "../DatasetPreview/usePreviewPlotParams.js";
 import { usePreviewPlot } from "../DatasetPreview/PreviewPlotProvider.jsx";
 import { ROW_LIMITS } from "../../../state/selection/previewParams.js";
+import Button from "../../ui/Button.jsx";
+import { Disclosure, DisclosurePanel } from "../../ui/Disclosure.jsx";
 
 const PARAMS_PANE_ID = "datasetPreviewParamsPane";
 const SETTINGS_TITLE_ID = "datasetPreviewSettingsTitle";
@@ -688,6 +690,7 @@ export default function DatasetPreviewPlot() {
         <DropdownButton
           className="dropdownButtonLeft"
           data-testid="preview-mode-picker"
+          selectedKey={plotType}
           title={
             <span className="dropdownToggleLabel">
               {t(plotModes.find(({ value }) => value === plotType).labelKey)}
@@ -697,8 +700,8 @@ export default function DatasetPreviewPlot() {
           {plotModes.map(({ value, labelKey }) => (
             <Dropdown.Item
               key={value}
-              active={value === plotType}
-              onClick={() => setPlotType(value)}
+              id={value}
+              onAction={() => setPlotType(value)}
             >
               {t(labelKey)}
             </Dropdown.Item>
@@ -762,44 +765,45 @@ export default function DatasetPreviewPlot() {
         </ControlRow>
       )}
 
-      <button
-        type="button"
-        className="labelEditorToggle"
-        aria-expanded={showLabels}
-        onClick={() => setShowLabels(!showLabels)}
+      <Disclosure
+        className="labelEditorDisclosure"
+        isExpanded={showLabels}
+        onExpandedChange={setShowLabels}
       >
-        {t("datasetPreviewPlotCustomizePlot")}
-        {showLabels ? (
-          <ChevronUp size={12} aria-hidden="true" />
-        ) : (
-          <ChevronDown size={12} aria-hidden="true" />
-        )}
-      </button>
-      {showLabels && (
-        <div className="labelEditor">
-          <ControlRow caption={t("datasetPreviewPlotCurves")}>
-            <SegmentedToggle
-              label={t("datasetPreviewPlotCurves")}
-              data-testid="preview-stack-toggle"
-              options={[
-                {
-                  value: "panels",
-                  label: t("datasetPreviewPlotCurvesPanels"),
-                },
-                {
-                  value: "stacked",
-                  label: t("datasetPreviewPlotCurvesStacked"),
-                },
-              ]}
-              value={stacked ? "stacked" : "panels"}
-              onChange={(value) => setStacked(value === "stacked")}
-            />
-          </ControlRow>
-          {colorScaleRow}
-          {sharedAxes.map((columnName) => customizeRow(columnName, null))}
-          {panels.map((columnName, index) => customizeRow(columnName, index))}
-        </div>
-      )}
+        <Button slot="trigger" className="labelEditorToggle">
+          {t("datasetPreviewPlotCustomizePlot")}
+          {showLabels ? (
+            <ChevronUp size={12} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={12} aria-hidden="true" />
+          )}
+        </Button>
+        <DisclosurePanel>
+          <div className="labelEditor">
+            <ControlRow caption={t("datasetPreviewPlotCurves")}>
+              <SegmentedToggle
+                label={t("datasetPreviewPlotCurves")}
+                data-testid="preview-stack-toggle"
+                options={[
+                  {
+                    value: "panels",
+                    label: t("datasetPreviewPlotCurvesPanels"),
+                  },
+                  {
+                    value: "stacked",
+                    label: t("datasetPreviewPlotCurvesStacked"),
+                  },
+                ]}
+                value={stacked ? "stacked" : "panels"}
+                onChange={(value) => setStacked(value === "stacked")}
+              />
+            </ControlRow>
+            {colorScaleRow}
+            {sharedAxes.map((columnName) => customizeRow(columnName, null))}
+            {panels.map((columnName, index) => customizeRow(columnName, index))}
+          </div>
+        </DisclosurePanel>
+      </Disclosure>
 
       <button
         type="button"

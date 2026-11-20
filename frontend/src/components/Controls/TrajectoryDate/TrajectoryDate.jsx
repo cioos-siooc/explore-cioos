@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 import { tracksMinDate, trailingWindowOptions } from "../../config.js";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
-import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
+import TimeRail from "../TimeRail/TimeRail.jsx";
 import TrackHeadIcon from "./TrackHeadIcon.jsx";
 import {
   MS_PER_DAY,
@@ -15,6 +15,7 @@ import {
   msToIso,
   todayIso,
 } from "../TimeRail/timeAxis.js";
+import DateField from "../../ui/DateField.jsx";
 import "./styles.css";
 
 // The rail spans the tracks' own domain (tracksMinDate), not the catalogue's:

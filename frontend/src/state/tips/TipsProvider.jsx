@@ -118,6 +118,18 @@ export default function TipsProvider({ children }) {
     offerTip(key);
   }, [held, offerTip]);
 
+  // A modal's tip has been read once its modal closes; left active it would
+  // come back over the map, pointing at nothing.
+  const modalsOpen = useRef({});
+  useEffect(() => {
+    const now = { filters: showFiltersModal, download: showDownloadModal };
+    const modal = TIP_MODALS[activeTip];
+    if (!touring && modal && modalsOpen.current[modal] && !now[modal]) {
+      setActiveTip();
+    }
+    modalsOpen.current = now;
+  }, [showFiltersModal, showDownloadModal, activeTip, touring]);
+
   // Undefined, not false, so React drops the attribute.
   const tipHighlight = useCallback(
     (key) => (key && key === activeTip) || undefined,

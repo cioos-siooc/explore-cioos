@@ -63,7 +63,7 @@ export default function TipCard({ inModal }) {
       event.preventDefault();
       stepTour(step);
     };
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- the tour's page-wide arrow keys, while a tip shows
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, stepTour]);
 
@@ -89,7 +89,7 @@ export default function TipCard({ inModal }) {
   // control it would jump into the flow whenever a search hid that control.
   const anchor = inModal ? undefined : targets[0];
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- Escape from the buttons inside a status that never takes focus itself
       className={classNames("tipCard", {
         tipCardInModal: inModal,
         tipCardAnchored: anchor,
@@ -99,10 +99,11 @@ export default function TipCard({ inModal }) {
       role="status"
       data-testid="tip-card"
       onKeyDown={(e) => {
-        if (e.key === "Escape") dismissTip();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          dismissTip();
+        }
       }}
-      // Stepping the tour shouldn't count as an outside click (useOutsideAlerter).
-      onMouseDown={inModal ? (e) => e.stopPropagation() : undefined}
     >
       <div className="tipCardHeader">
         <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />

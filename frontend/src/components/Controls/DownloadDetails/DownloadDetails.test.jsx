@@ -202,6 +202,75 @@ describe("DownloadDetails", () => {
     });
   });
 
+  describe("when no dataset can be emailed", () => {
+    const sizedAt = (sizes) => {
+      const realFetch = global.fetch;
+      global.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/downloadEstimate")) {
+          return Promise.resolve(
+            Response.json(
+              Object.entries(sizes).map(([pk, size]) => ({
+                pk: Number(pk),
+                size,
+              })),
+            ),
+          );
+        }
+        return realFetch(input, init);
+      };
+    };
+
+    it("says every dataset is over 1 GB and where to go instead", async () => {
+      sizedAt({ [EST_SMALL.pk]: 2e9, [EST_LARGE.pk]: 3e9 });
+      renderDetails();
+      const reason = await screen.findByTestId("download-blocked");
+      expect(reason).toHaveTextContent(
+        "All 2 datasets are over 1 GB after your limits",
+      );
+      expect(reason).toHaveTextContent("Query the sources myself");
+      const summary = screen.getByTestId("download-summary");
+      expect(summary).toHaveTextContent("0 of 2 datasets (2 over 1 GB)");
+      expect(summary).not.toHaveTextContent("Size estimate unavailable");
+      expect(
+        screen.getByTitle("Select all").querySelector("input"),
+      ).toBeDisabled();
+    });
+
+    it("asks for a tick once the user has cleared them all", async () => {
+      sizedAt({ [EST_SMALL.pk]: 1e6, [EST_LARGE.pk]: 3e9 });
+      const { user } = renderDetails();
+      await waitFor(() =>
+        expect(screen.getByTestId("download-summary")).toHaveTextContent(
+          "1 of 2 datasets (1 over 1 GB)",
+        ),
+      );
+      const selectAll = screen.getByTitle("Select all").querySelector("input");
+      expect(selectAll).toBeChecked();
+      expect(selectAll.indeterminate).toBe(false);
+      await user.click(selectAll);
+      expect(await screen.findByTestId("download-blocked")).toHaveTextContent(
+        "Tick at least one dataset to request it.",
+      );
+    });
+
+    it("says the size couldn't be measured when the estimate fails", async () => {
+      installMockFetch();
+      const realFetch = global.fetch;
+      global.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/downloadEstimate")) {
+          return Promise.resolve(new Response(null, { status: 500 }));
+        }
+        return realFetch(input, init);
+      };
+      renderDetails();
+      expect(await screen.findByTestId("download-blocked")).toHaveTextContent(
+        "We couldn't measure these datasets",
+      );
+    });
+  });
+
   it("asks /downloadEstimate for the basket once, with no empty parameter, even under a Datasets filter", async () => {
     const urls = [];
     const realFetch = global.fetch;

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 from cde_harvester.core.errors import (
     DEPTH_AND_ALTITUDE,
+    FILE_LISTING,
     INGEST_FLAG_FALSE,
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
@@ -241,6 +242,23 @@ class TestIngestFlag:
         checker = _checker()
         checker.dataset.globals["cde_ingest"] = "True"
         assert checker.cde_ingest_flag() is True
+
+
+class TestFileListing:
+    def test_file_names_dataset_skipped_whatever_its_cdm_type(self):
+        """EDDTableFromFileNames sets (e.g. Salish Sea "Files, ..." datasets)
+        declare cdm_data_type=Grid on tabledap."""
+        checker = _checker(
+            cdm_data_type="Grid",
+            variables_list=["url", "name", "lastModified", "size", "fileType"],
+        )
+        assert checker.passes_all_checks() is False
+        assert checker.failure_reason_code == FILE_LISTING
+
+    def test_dataset_with_only_some_listing_names_passes(self):
+        checker = _checker()
+        checker.dataset.variables_list = [*checker.dataset.variables_list, "name"]
+        assert checker.check_not_file_listing() is True
 
 
 class TestDepthAndAltitude:

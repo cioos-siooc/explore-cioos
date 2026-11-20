@@ -108,8 +108,8 @@ describe("QuickFilters", () => {
 
     await openArea(user);
 
-    expect(screen.getByTestId(on)).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId(off)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId(on)).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId(off)).toHaveAttribute("aria-checked", "false");
   });
 
   it("offers a zoom to the drawn shape only while there is one", async () => {
@@ -155,11 +155,11 @@ describe("QuickFilters", () => {
 
     await waitFor(() => expect(seen.draw.at(-1)).toBe("box"));
     expect(screen.getByTestId("quick-filter-area-box")).toHaveAttribute(
-      "aria-pressed",
+      "aria-checked",
       "true",
     );
     expect(screen.getByTestId("quick-filter-area-polygon")).toHaveAttribute(
-      "aria-pressed",
+      "aria-checked",
       "false",
     );
   });

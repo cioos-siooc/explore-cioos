@@ -30,6 +30,7 @@ import {
   labelFor,
   shortLabelFor,
 } from "../DatasetPreview/previewVariables.js";
+import topLayer from "../../ui/topLayer.js";
 
 const columnNameOf = (variable) => variable.columnName;
 
@@ -210,7 +211,7 @@ function SortableMultiValue(props) {
         "aria-label": `Remove ${props.children}`,
       }}
     >
-      <span
+      <span // eslint-disable-line jsx-a11y/no-static-element-interactions -- keep: dnd-kit spreads the drag handle's role and keyboard handlers
         className="variableSelectDragHandle"
         ref={setActivatorNodeRef}
         {...attributes}
@@ -350,7 +351,7 @@ export default function VariablePicker({
                   : "datasetPreviewPlotAllVariablesSelected",
             )
           }
-          menuPortalTarget={document.body}
+          menuPortalTarget={topLayer()}
           menuPosition="fixed"
           styles={STYLES}
           // react-select skips its own handling of a key it sees prevented, which

@@ -153,9 +153,11 @@ describe("DatasetInspector", () => {
     await renderReady();
     await screen.findByText("Oxygen");
     for (const value of ["Oxygen"]) {
+      // A chip with a definition is a focusable tooltip target, which is a
+      // button, but never a pressable filter toggle.
       const chip = screen.getByText(value);
       expect(chip).toHaveClass("metadataChip");
-      expect(chip.closest("button")).toBeNull();
+      expect(chip).not.toHaveAttribute("aria-pressed");
     }
     expect(screen.queryAllByTestId("filter-option")).toHaveLength(0);
   });

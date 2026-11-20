@@ -1,9 +1,16 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import Modal from "./Modal.jsx";
+import topLayer from "./topLayer.js";
 import { MOBILE_WIDTH, setViewportWidth } from "../../test/viewport.js";
 
 // jsdom has no PointerEvent; a MouseEvent carries the coordinates, and the
@@ -85,6 +92,12 @@ describe("Modal", () => {
       </>,
     );
     expect(document.body).toHaveClass("cioos-modal-open");
+    // react-aria hands focus back a frame after the inner one goes.
+    await waitFor(() =>
+      expect(screen.getByRole("dialog")).toContainElement(
+        document.activeElement,
+      ),
+    );
     await user.keyboard("{Escape}");
     expect(hideOuter).toHaveBeenCalledTimes(1);
   });
@@ -99,8 +112,42 @@ describe("Modal", () => {
     );
     await user.click(screen.getByText("content"));
     expect(onHide).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("dialog"));
+    await user.click(document.querySelector(".modal"));
     expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the page behind it, but not a menu portalled to the top layer", async () => {
+    render(
+      <>
+        <button>behind</button>
+        <Modal show>
+          <Modal.Body>content</Modal.Body>
+        </Modal>
+      </>,
+    );
+    expect(screen.queryByRole("button", { name: "behind" })).toBeNull();
+    const menu = document.createElement("button");
+    menu.textContent = "menu";
+    act(() => topLayer().appendChild(menu));
+    // react-aria hides late arrivals from a MutationObserver.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(screen.getByRole("button", { name: "menu" })).toBeInTheDocument();
+  });
+
+  it("is not dismissed by a press on something over the page but outside it", async () => {
+    const user = userEvent.setup();
+    const onHide = vi.fn();
+    const tip = document.createElement("div");
+    tip.textContent = "tip";
+    document.body.appendChild(tip);
+    render(
+      <Modal show onHide={onHide}>
+        <Modal.Body>content</Modal.Body>
+      </Modal>,
+    );
+    await user.click(tip);
+    expect(onHide).not.toHaveBeenCalled();
+    tip.remove();
   });
 
   it("Modal.Header's close button calls onHide", async () => {
@@ -136,7 +183,7 @@ describe("Modal", () => {
     await user.click(opener);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   // `onHide` is a new inline arrow each render; a re-render is not an opening
@@ -195,14 +242,14 @@ describe("Modal", () => {
 
     it("is a centred dialog with no handle above the phone rung", () => {
       render(<Sheet />);
-      expect(screen.getByRole("dialog")).not.toHaveClass("sheet");
+      expect(document.querySelector(".modal")).not.toHaveClass("sheet");
       expect(document.querySelector(".sheetHandle")).toBeNull();
     });
 
     it("stays mounted after closing until its slide out ends", () => {
       setViewportWidth(MOBILE_WIDTH);
       const { rerender } = render(<Sheet />);
-      expect(screen.getByRole("dialog")).toHaveClass("sheet");
+      expect(document.querySelector(".modal")).toHaveClass("sheet");
       rerender(<Sheet show={false} />);
       const sheet = document.querySelector(".modal.sheetClosing");
       expect(sheet).toBeInTheDocument();

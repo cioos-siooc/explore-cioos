@@ -13,7 +13,7 @@
   --harvest-hairline: #ede8e2;
   --harvest-row-hover: #f8f6f3;
   --harvest-input-border: #c6d8db;
-  --harvest-spark-empty: #aaa;
+  --harvest-spark-empty: var(--cioos-ink-40);
 }
 
 /* ── Harvest section root layout ──────────────────────────────────────────── */
@@ -189,7 +189,7 @@
   background: var(--cioos-white);
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   font-size: 0.88rem;
 }
 
@@ -230,7 +230,7 @@
   background: var(--cioos-white);
   border-radius: 6px;
   padding: 1rem 1.1rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   text-decoration: none;
   color: inherit;
   display: block;
@@ -238,7 +238,7 @@
 }
 
 .harvest-card:hover {
-  box-shadow: 0 3px 8px rgb(0 0 0 / 12%);
+  box-shadow: 0 3px 8px rgb(21 47 55 / 12%);
   text-decoration: none;
   color: inherit;
 }
@@ -359,7 +359,7 @@
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   display: flex;
   flex-wrap: wrap;
   gap: 1.25rem;
@@ -420,7 +420,7 @@
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   font-size: 0.88rem;
 }
 
@@ -626,7 +626,8 @@ a.harvest-link:hover {
 .harvest-doc blockquote {
   margin: 0 0 1rem;
   padding: 0.5rem 1rem;
-  border-left: 3px solid var(--cioos-teal-light);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
   background: var(--cioos-surface-2);
 }
 

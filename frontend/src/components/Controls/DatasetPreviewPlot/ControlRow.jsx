@@ -1,7 +1,5 @@
 import * as React from "react";
 
-import Tooltip from "../../ui/Tooltip.jsx";
-
 /**
  * One labelled control in the parameters pane: the caption above it, and an
  * optional `action` (a small button acting on that control's value) below it.
@@ -9,7 +7,6 @@ import Tooltip from "../../ui/Tooltip.jsx";
  */
 export default function ControlRow({
   caption,
-  tooltip,
   action,
   startsGroup = false,
   children,
@@ -23,13 +20,7 @@ export default function ControlRow({
       <div className="controlHeader">
         <span className="controlCaption">{caption}</span>
       </div>
-      {tooltip ? (
-        <Tooltip placement="right" content={tooltip}>
-          {control}
-        </Tooltip>
-      ) : (
-        control
-      )}
+      {control}
       {action}
     </div>
   );

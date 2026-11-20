@@ -292,11 +292,11 @@
   align-self: start;
 }
 
-.introFooterCard > .form-switch {
+.introFooterCard > .form-check-input {
   grid-area: end;
 }
 
-.introFooterCard:has(> .form-switch) {
+.introFooterCard:has(> .form-check-input) {
   grid-template-areas:
     "icon title end"
     "body body end";

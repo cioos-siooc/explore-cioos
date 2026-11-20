@@ -109,13 +109,11 @@ export default function DownloadPanel() {
               }
               onClick={() => handleSubmission()}
             >
-              {(!isEmpty(pointsToDownload) &&
-                submissionFeedback &&
-                submissionState !== "submitted" &&
-                t("submitRequestButtonResubmitText")) ||
-                (isEmpty(pointsToDownload) &&
-                  t("submitRequestButtonSelectDataText")) ||
-                t("submitRequestButtonSubmitText")}
+              {!isEmpty(pointsToDownload) &&
+              submissionFeedback &&
+              submissionState !== "submitted"
+                ? t("submitRequestButtonResubmitText")
+                : t("submitRequestButtonSubmitText")}
             </button>
           </div>
           <Switch

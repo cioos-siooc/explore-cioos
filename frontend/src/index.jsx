@@ -8,6 +8,7 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import Loading from "./components/Controls/Loading/Loading.jsx";
 import { resources } from "./locales/resources.js";
 import App from "./components/App.jsx";
+import LocaleProvider from "./components/ui/LocaleProvider.jsx";
 import { BrowserRouter, Navigate, Route } from "react-router";
 import { clearLegacyCookies } from "./state/usePersistentState.js";
 
@@ -65,24 +66,26 @@ i18n
 const domContainer = document.querySelector("#app");
 createRoot(domContainer).render(
   <Suspense fallback={<Loading />}>
-    {/* Synchronous URL updates, as in v6: SelectionProvider and UrlSync rely on
+    <LocaleProvider>
+      {/* Synchronous URL updates, as in v6: SelectionProvider and UrlSync rely on
         a URL write batching with the state set beside it. */}
-    <BrowserRouter basename={process.env.BASE_URL} useTransitions={false}>
-      <SentryRoutes>
-        <Route path="/" element={<App />} />
-        <Route path="/harvest" element={<HarvestOverview />} />
-        <Route path="/harvest/server/:slug" element={<HarvestServer />} />
-        <Route
-          path="/harvest/dataset/:slug/:datasetId"
-          element={<HarvestDataset />}
-        />
-        <Route path="/harvest/run/:runId" element={<HarvestRun />} />
-        <Route
-          path="/harvest/docs"
-          element={<Navigate to="/harvest/docs/workflow" replace />}
-        />
-        <Route path="/harvest/docs/:doc" element={<HarvestDocs />} />
-      </SentryRoutes>
-    </BrowserRouter>
+      <BrowserRouter basename={process.env.BASE_URL} useTransitions={false}>
+        <SentryRoutes>
+          <Route path="/" element={<App />} />
+          <Route path="/harvest" element={<HarvestOverview />} />
+          <Route path="/harvest/server/:slug" element={<HarvestServer />} />
+          <Route
+            path="/harvest/dataset/:slug/:datasetId"
+            element={<HarvestDataset />}
+          />
+          <Route path="/harvest/run/:runId" element={<HarvestRun />} />
+          <Route
+            path="/harvest/docs"
+            element={<Navigate to="/harvest/docs/workflow" replace />}
+          />
+          <Route path="/harvest/docs/:doc" element={<HarvestDocs />} />
+        </SentryRoutes>
+      </BrowserRouter>
+    </LocaleProvider>
   </Suspense>,
 );

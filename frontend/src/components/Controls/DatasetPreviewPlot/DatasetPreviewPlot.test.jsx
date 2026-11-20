@@ -304,7 +304,7 @@ describe("DatasetPreviewPlot", () => {
         screen.queryByRole("dialog", { name: "Plot settings" }),
       ).toBeNull(),
     );
-    expect(gear).toHaveFocus();
+    await waitFor(() => expect(gear).toHaveFocus());
   });
 
   it("lets a finger pan the plot, with the pan tool kept to return to", async () => {
@@ -416,7 +416,7 @@ describe("DatasetPreviewPlot", () => {
     const row = rowCaptioned("Color scale");
     expect(row.querySelectorAll(".colorScaleItem")).toHaveLength(2);
 
-    await user.click(within(row).getByRole("button", { name: "Shared" }));
+    await user.click(within(row).getByRole("radio", { name: "Shared" }));
     await waitFor(() =>
       expect(row.querySelectorAll(".colorScaleItem")).toHaveLength(0),
     );
@@ -558,7 +558,7 @@ describe("DatasetPreviewPlot", () => {
     const user = open();
     await plotted();
     await user.click(screen.getByRole("button", { name: "Markers + Line" }));
-    await user.click(screen.getByRole("button", { name: "Markers" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Markers" }));
     expect(screen.getByRole("button", { name: "Markers" })).toHaveAttribute(
       "aria-haspopup",
     );
@@ -637,8 +637,8 @@ describe("DatasetPreviewPlot", () => {
     await user.click(screen.getByRole("button", { name: "More options" }));
     await user.type(screen.getByLabelText("temperature (degree_C)"), "Temp");
 
-    await user.click(screen.getByRole("button", { name: "Table" }));
-    await user.click(screen.getByRole("button", { name: "Plot" }));
+    await user.click(screen.getByRole("radio", { name: "Table" }));
+    await user.click(screen.getByRole("radio", { name: "Plot" }));
     await plotted();
     await user.click(screen.getByRole("button", { name: "More options" }));
 
@@ -674,8 +674,8 @@ describe("DatasetPreviewPlot", () => {
       screen.getByRole("button", { name: "Hide the plot settings panel" }),
     );
 
-    await user.click(screen.getByRole("button", { name: "Table" }));
-    await user.click(screen.getByRole("button", { name: "Plot" }));
+    await user.click(screen.getByRole("radio", { name: "Table" }));
+    await user.click(screen.getByRole("radio", { name: "Plot" }));
     await plotted();
 
     expect(
@@ -708,9 +708,9 @@ describe("a window of the record", () => {
     const user = open("/", TIMESERIES, TABLE, PARTIAL);
     await plotted();
     const rows = within(screen.getByTestId("preview-row-limit"));
-    await user.click(rows.getByRole("button", { name: "20,000" }));
+    await user.click(rows.getByRole("radio", { name: "20,000" }));
     expect(search().get("prows")).toBe("20000");
-    await user.click(rows.getByRole("button", { name: "5,000" }));
+    await user.click(rows.getByRole("radio", { name: "5,000" }));
     expect(search().get("prows")).toBeNull();
   });
 

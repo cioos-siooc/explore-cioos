@@ -7,7 +7,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  width: 24px;
   padding: 0;
   border: none;
   border-left: 1px solid var(--cioos-hairline);
@@ -18,11 +18,11 @@
   transition: background-color var(--cioos-transition-fast);
 }
 
-.sortSelectDirection:hover {
+.sortSelectDirection[data-hovered] {
   background-color: var(--cioos-surface-2);
 }
 
-.sortSelectDirection:focus-visible {
+.sortSelectDirection[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }

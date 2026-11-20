@@ -78,10 +78,7 @@ test.describe("record preview", () => {
     const mode = page.getByTestId("preview-mode-picker-toggle");
     const pick = async (name) => {
       await mode.click();
-      await page
-        .locator(".dropdown-menu")
-        .getByRole("button", { name, exact: true })
-        .click();
+      await page.getByRole("menuitemradio", { name, exact: true }).click();
     };
 
     await expect(mode).toHaveText("Markers + Line");
@@ -111,9 +108,9 @@ test.describe("record preview", () => {
     await expect(mode).toHaveText("Line");
     await closeSettings(page);
 
-    await page.getByRole("button", { name: "Table" }).click();
+    await page.getByRole("radio", { name: "Table" }).click();
     await expect(plot(page)).toHaveCount(0);
-    await page.getByRole("button", { name: "Plot" }).click();
+    await page.getByRole("radio", { name: "Plot" }).click();
 
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);

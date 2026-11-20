@@ -98,6 +98,20 @@ test.describe("pointing at the map", () => {
     }).toPass({ timeout: 20_000 });
   });
 
+  test("the hover chip follows a language switch", async ({ page }) => {
+    await openAt(page, HEX);
+    const { x, y } = await canvasCentre(page);
+    await page.locator(".languageSelector").first().click();
+    await expect(page).toHaveURL(/[?&]lang=fr/);
+    await expect(async () => {
+      await page.mouse.move(x + 1, y);
+      await page.mouse.move(x, y);
+      await expect(page.locator(".mapChip")).toHaveText("18 jours de données", {
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 20_000 });
+  });
+
   test("a hex tile that fails once is fetched again", async ({
     page,
     consoleGuard,

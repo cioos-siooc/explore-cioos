@@ -38,12 +38,22 @@ export const toggleOptionExcluded = (option) => ({
 
 // Sizes come from /downloadEstimate, never a measured file, so every figure
 // carries its own tilde. A null size (no estimate, e.g. OBIS) is a dash, not 0.
-export function formatSize(size) {
-  return bytes(size, { unitSeparator: " " });
+// French writes octets (Go, not GB) and a decimal comma.
+const FRENCH_BYTE_UNITS = { B: "o", KB: "Ko", MB: "Mo", GB: "Go", TB: "To" };
+function localizedBytes(size, language, unitSeparator) {
+  const text = bytes(size, { unitSeparator });
+  if (!language?.startsWith("fr")) return text;
+  return text
+    .replace(".", ",")
+    .replace(/[KMGT]?B$/, (unit) => FRENCH_BYTE_UNITS[unit]);
 }
 
-export function formatSizeEstimate(size) {
-  return Number.isFinite(size) ? `~${bytes(size)}` : "—";
+export function formatSize(size, language) {
+  return localizedBytes(size, language, " ");
+}
+
+export function formatSizeEstimate(size, language) {
+  return Number.isFinite(size) ? `~${localizedBytes(size, language, "")}` : "—";
 }
 
 // Sums sizes, leaving out the ones with no estimate and flagging that it did,
@@ -887,21 +897,6 @@ export function useChanged(...values) {
   }
   setPrevious(values);
   return true;
-}
-
-// https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
-export function useOutsideAlerter(ref, callback, value) {
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (ref.current && !ref.current.contains(event.target)) {
-        callback(value);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [ref, callback, value]);
 }
 
 export function getCookieValue(cookieName) {

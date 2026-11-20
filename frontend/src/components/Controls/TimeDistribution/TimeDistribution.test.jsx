@@ -68,7 +68,7 @@ describe("TimeDistribution", () => {
     renderWithProviders(<TimeDistribution datasetPk={42} query="" />);
     await screen.findByTestId("plot");
     await userEvent.click(
-      screen.getByRole("button", { name: "By time of year" }),
+      screen.getByRole("radio", { name: "By time of year" }),
     );
     await waitFor(() => expect(requested().get("view")).toBe("seasonal"));
   });

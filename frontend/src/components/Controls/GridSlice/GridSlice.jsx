@@ -10,10 +10,10 @@ import {
   toElevation,
 } from "../../../wmsUtilities";
 import Rail from "../Rail/Rail.jsx";
-import { DateField } from "../TimeRail/TimeRail.jsx";
 import { DepthField } from "../DepthRail/DepthRail.jsx";
 import { MS_PER_DAY, msToIso } from "../TimeRail/timeAxis.js";
 import gridTimeTicks from "./gridTimeTicks.js";
+import DateField from "../../ui/DateField.jsx";
 import "./styles.css";
 
 // The harvest can carry a vertical axis with unknown bounds; a NaN node would

@@ -90,7 +90,7 @@ describe("SourceFilter", () => {
     );
     expect(screen.getByText("OBIS Canada")).toBeInTheDocument();
     await user.click(document.querySelector(".sourceGroupChevron"));
-    expect(screen.queryByText("OBIS Canada")).not.toBeInTheDocument();
+    expect(screen.getByText("OBIS Canada")).not.toBeVisible();
     expect(setObisNodesSelected).not.toHaveBeenCalled();
   });
 

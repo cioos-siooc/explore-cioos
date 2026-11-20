@@ -8,6 +8,7 @@ import { installMockFetch } from "../../../../test/mockFetch.js";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
+import { REGION_TIMEOUT_MS } from "../../../../state/useRegionSearch.js";
 import { polygonIsRectangle } from "../../../../utilities.jsx";
 import QuickFilters from "../../../AppShell/QuickFilters/QuickFilters.jsx";
 import SpatialFilter from "./SpatialFilter.jsx";
@@ -41,7 +42,7 @@ const reply = {
 };
 
 describe("SpatialFilter place search", () => {
-  // The q of each GeoNames request; `answer(q)` is what it gets back.
+  // The q of each GeoNames request; `answer(q, signal)` is what it gets back.
   let queries;
   let answer;
   beforeEach(() => {
@@ -56,7 +57,8 @@ describe("SpatialFilter place search", () => {
         if (url.hostname !== "geogratis.gc.ca") return fallback(input, init);
         const q = url.searchParams.get("q");
         queries.push(q);
-        return new Response(JSON.stringify(answer(q)), { status: 200 });
+        const body = await answer(q, init.signal);
+        return new Response(JSON.stringify(body), { status: 200 });
       }),
     );
   });
@@ -117,6 +119,33 @@ describe("SpatialFilter place search", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Searching places…");
     await screen.findByText("Bay of Fundy");
     expect(screen.queryByText("Searching places…")).toBeNull();
+  });
+
+  it("gives up and says so when NRCan does not answer", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      answer = (q, signal) =>
+        new Promise((_, reject) =>
+          signal.addEventListener("abort", () => reject(signal.reason)),
+        );
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      renderWithProviders(<SpatialFilter />, { providers: "app" });
+
+      await user.type(screen.getByTestId("spatial-filter-place-input"), "fun");
+      expect(screen.getByRole("status")).toHaveTextContent("Searching places…");
+
+      await act(() => vi.advanceTimersByTimeAsync(300));
+      expect(queries).toEqual(["fun*"]);
+      await act(() => vi.advanceTimersByTimeAsync(REGION_TIMEOUT_MS));
+      expect(screen.queryByText("Searching places…")).toBeNull();
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Place search (NRCan) is unavailable right now.",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("names a picked area and links its NRCan record, until it is edited", async () => {

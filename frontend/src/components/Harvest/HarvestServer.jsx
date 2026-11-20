@@ -18,6 +18,7 @@ import warningLabel from "./warningLabel.js";
 import { harvestMode } from "./harvestMode.js";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from "./format.js";
+import { ToggleButton } from "../ui/Button.jsx";
 
 export default function HarvestServer() {
   const { t } = useTranslation();
@@ -154,8 +155,7 @@ export default function HarvestServer() {
               {warningSummary.map((w) => (
                 <tr key={w.code}>
                   <td>
-                    <button
-                      type="button"
+                    <ToggleButton
                       className="harvest-clickable harvest-text-sm"
                       style={{
                         background: "none",
@@ -165,11 +165,11 @@ export default function HarvestServer() {
                         color: "var(--cioos-primary-800)",
                       }}
                       title={t("harvest.warnings.filterBy")}
-                      aria-pressed={warning === w.code}
-                      onClick={() => applyFilters(statusFilter, q, w.code)}
+                      isSelected={warning === w.code}
+                      onChange={() => applyFilters(statusFilter, q, w.code)}
                     >
                       ⚠ {warningLabel(t, w.code)}
-                    </button>
+                    </ToggleButton>
                   </td>
                   <td className="harvest-num-total">{w.n_datasets}</td>
                   <td className="harvest-num-total">{w.total_count}</td>

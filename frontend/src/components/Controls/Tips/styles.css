@@ -134,6 +134,7 @@
 .tipCardText {
   margin: 0 var(--cioos-space-sm) var(--cioos-space-xs) 0;
   line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .tipGlyph {

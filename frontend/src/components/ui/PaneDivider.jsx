@@ -45,7 +45,7 @@ export default function PaneDivider({
   };
 
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- keep: window splitter pattern, react-aria has no splitter
       className="paneDivider"
       role="separator"
       aria-orientation="vertical"
@@ -54,16 +54,13 @@ export default function PaneDivider({
       aria-valuemin={min}
       aria-valuemax={max}
       aria-controls={controls}
-      tabIndex={0}
+      tabIndex={0} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex -- keep: window splitter pattern, react-aria has no splitter
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         drag.current = { x: event.clientX, from: value };
         onDragChange(true);
-        // Deliberately no preventDefault, unlike Rail: the compatibility
-        // mousedown is what ui/Dropdown closes an open menu on, and a menu left
-        // open would hang over the plot at the position it was measured at
-        // before the drag. setPointerCapture is optional-called because jsdom
-        // does not implement it at all.
+        // setPointerCapture is optional-called because jsdom does not
+        // implement it at all.
         event.currentTarget.setPointerCapture?.(event.pointerId);
       }}
       onPointerMove={(event) => {

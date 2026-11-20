@@ -3,6 +3,8 @@ import classNames from "classnames";
 import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
+import Button from "./Button.jsx";
+
 import "./pagerStyles.css";
 
 export const PAGE_SIZES = [25, 50, 100];
@@ -45,6 +47,8 @@ export default function Pager({
   onPageSizeChange,
   label,
   perPageLabel,
+  // Says what the total leaves out, when it isn't every item.
+  rangeTitle,
   // Shown after the range, e.g. the download modal's selection totals.
   children,
   "data-testid": testId,
@@ -56,7 +60,7 @@ export default function Pager({
 
   return (
     <nav className="pager" aria-label={label} data-testid={testId}>
-      <span className="pagerRange">
+      <span className="pagerRange" title={rangeTitle}>
         {t("pagerRangeText", {
           first: firstItem + 1,
           last: Math.min(firstItem + pageSize, total),
@@ -66,44 +70,41 @@ export default function Pager({
       {children}
       {pageCount > 1 && (
         <div className="pagerControls">
-          <button
-            type="button"
+          <Button
             className="pagerStep"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1}
+            onPress={() => onPageChange(page - 1)}
+            isDisabled={page === 1}
             title={t("pagerPreviousTitle")}
             aria-label={t("pagerPreviousTitle")}
           >
             <ChevronLeft size={12} aria-hidden="true" />
-          </button>
+          </Button>
           {pageButtons(page, pageCount).map((entry) =>
             typeof entry === "number" ? (
-              <button
+              <Button
                 key={entry}
-                type="button"
                 className={classNames("pagerPage", { active: entry === page })}
-                onClick={() => onPageChange(entry)}
+                onPress={() => onPageChange(entry)}
                 aria-current={entry === page ? "page" : undefined}
                 title={t("pagerPageTitle", { page: entry })}
               >
                 {entry}
-              </button>
+              </Button>
             ) : (
               <span key={entry} className="pagerGap" aria-hidden="true">
                 …
               </span>
             ),
           )}
-          <button
-            type="button"
+          <Button
             className="pagerStep"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === pageCount}
+            onPress={() => onPageChange(page + 1)}
+            isDisabled={page === pageCount}
             title={t("pagerNextTitle")}
             aria-label={t("pagerNextTitle")}
           >
             <ChevronRight size={12} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       )}
       <label className="pagerSize">

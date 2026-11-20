@@ -189,6 +189,37 @@ describe("Sidebar wide view", () => {
     expect(screen.getByTestId("sidebar")).toHaveClass("wide");
   });
 
+  it("closes the datasets list on Escape once it is narrow", async () => {
+    const { user } = renderWithProviders(
+      <>
+        <Sidebar />
+        <Probe />
+      </>,
+      { providers: "app", url: "/?wide=1" },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("state")).toHaveTextContent("ready"),
+    );
+    act(() => latestUI.setSidebarOpen(true));
+    expect(screen.getByTestId("sidebar")).toHaveClass("wide");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.getByTestId("sidebar")).not.toHaveClass("wide"),
+    );
+    expect(latestUI.sidebarOpen).toBe(true);
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(latestUI.sidebarOpen).toBe(false));
+  });
+
+  it("leaves Escape on a dataset page to the page", async () => {
+    const { user } = await renderDatasetPage();
+    await waitFor(() => expect(latestUI.sidebarOpen).toBe(true));
+    await user.keyboard("{Escape}");
+    expect(latestUI.sidebarOpen).toBe(true);
+  });
+
   it("reopens at the size it was hidden at, like a minimized window", async () => {
     const { user } = await renderDatasetPage("&wide=1");
     await user.click(screen.getByTestId("sidebar-collapse"));

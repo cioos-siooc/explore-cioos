@@ -193,29 +193,24 @@ class ERDDAPHarvester(BaseHarvester):
 
         unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
         if not unsupported_datasets.empty:
-            unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
-            erddap_logger.warning(
-                f"Skipping datasets because cdm_data_type is not "
-                f"{cdm_data_types_supported}: {unsupported_datasets_list}"
+            erddap_logger.info(
+                "Skipping datasets whose cdm_data_type CDE does not map: %s",
+                unsupported_datasets["datasetID"].to_list(),
             )
             base = self.erddap_url.rstrip("/")
-            for dataset_id in unsupported_datasets_list:
+            for dataset_id, cdm_type in unsupported_datasets[
+                ["datasetID", "cdm_data_type"]
+            ].itertuples(index=False):
                 skipped_datasets_reasons += [
                     [erddap_url, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
                 ]
-                cdm_type = unsupported_datasets.loc[
-                    unsupported_datasets["datasetID"] == dataset_id, "cdm_data_type"
-                ].iloc[0]
                 attempt_records.append(_build_attempt(
                     self.run_id, self.erddap_url, dataset_id,
                     status="skipped",
                     reason_code=CDM_DATA_TYPE_UNSUPPORTED,
                     error_message=(
-                        f"cdm_data_type={cdm_type!r}: CDE harvests only "
-                        f"{', '.join(cdm_data_types_supported)}, the types whose "
-                        "feature structure (cf_role ids, LLAT variables) it can "
-                        "map. Set cdm_data_type in datasets.xml if one of them "
-                        "describes this dataset"
+                        f"Not mapped: cdm_data_type={cdm_type!r}. CDE maps "
+                        f"{', '.join(cdm_data_types_supported)} datasets."
                     ),
                     query_urls=[f"{base}/info/{dataset_id}/index.html"],
                 ))

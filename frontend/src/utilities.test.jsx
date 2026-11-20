@@ -13,6 +13,7 @@ import {
   filterOptionLabel,
   formatDatasetCount,
   formatErddapServerName,
+  formatSize,
   formatSizeEstimate,
   generateColorStops,
   getCurrentRangeLevel,
@@ -728,6 +729,13 @@ describe("formatSizeEstimate", () => {
   it("marks an estimate with a tilde", () => {
     expect(formatSizeEstimate(1024)).toBe("~1KB");
     expect(formatSizeEstimate(0)).toBe("~0B");
+  });
+
+  it("writes French sizes in octets with a decimal comma", () => {
+    expect(formatSizeEstimate(1.67 * 1024 ** 3, "fr")).toBe("~1,67Go");
+    expect(formatSizeEstimate(0, "fr")).toBe("~0o");
+    expect(formatSize(1.5 * 1024 ** 2, "fr")).toBe("1,5 Mo");
+    expect(formatSize(1.5 * 1024 ** 2, "en")).toBe("1.5 MB");
   });
 
   it("shows a missing estimate as a dash, not zero bytes", () => {

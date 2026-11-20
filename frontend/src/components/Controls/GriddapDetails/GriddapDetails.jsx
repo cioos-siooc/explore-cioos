@@ -9,6 +9,7 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import WmsLegend from "../WmsLegend/WmsLegend.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
 
 // WmsLegend renders inline here while the page is open; with the sidebar
 // collapsed it moves into DatasetMapCard.
@@ -111,8 +112,8 @@ export default function GriddapDetails({
               label={t("griddapShowOnMapToggle")}
               checked={overlayActive}
               disabled={!variables.length}
-              onChange={(event) =>
-                event.target.checked ? showOverlay() : setActiveWmsOverlay()
+              onChange={(show) =>
+                show ? showOverlay() : setActiveWmsOverlay()
               }
             />
           </div>
@@ -149,18 +150,17 @@ export default function GriddapDetails({
             return (
               <li key={variable.name}>
                 {dataset.wms_url ? (
-                  <button
-                    type="button"
+                  <ToggleButton
                     className="griddapVariable"
-                    aria-pressed={
+                    isSelected={
                       overlayActive &&
                       activeWmsOverlay.variable?.name === variable.name
                     }
                     title={t("griddapVariableShowTitle")}
-                    onClick={() => selectVariable(variable)}
+                    onChange={() => selectVariable(variable)}
                   >
                     {content}
-                  </button>
+                  </ToggleButton>
                 ) : (
                   <div className="griddapVariable">{content}</div>
                 )}
