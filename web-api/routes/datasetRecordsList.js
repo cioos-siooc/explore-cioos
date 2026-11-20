@@ -84,14 +84,14 @@ router.get(
   }),
   async (req, res) => {
     const { datasetPKs, recordId } = req.query;
-    // coalesce(profile_id, timeseries_id) is the record list's own key (see
+    // coalesce(timeseries_id, profile_id) is the record list's own key (see
     // shapeQuery's records CTE).
     const { rows } = await db.raw(
       `SELECT DISTINCT p.longitude, p.latitude
        FROM cde.profiles p
        JOIN cde.datasets d ON d.pk = p.dataset_pk
        WHERE d.pk_url = :datasetPK
-         AND coalesce(p.profile_id, p.timeseries_id) = :recordId`,
+         AND coalesce(p.timeseries_id, p.profile_id) = :recordId`,
       { datasetPK: parseInt(datasetPKs, 10), recordId },
     );
     res.send({ coordinates: rows.map((r) => [r.longitude, r.latitude]) });

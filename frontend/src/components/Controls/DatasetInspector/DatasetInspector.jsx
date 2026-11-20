@@ -500,7 +500,7 @@ export default function DatasetInspector({
     dataset,
     isTrajectoryDataset
       ? ["trajectory_id", "profile_id", "timeseries_id"]
-      : ["profile_id", "timeseries_id", "trajectory_id"],
+      : ["timeseries_id", "profile_id", "trajectory_id"],
     t,
   );
 

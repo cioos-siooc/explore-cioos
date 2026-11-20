@@ -169,8 +169,10 @@ profile_feature AS (
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
   -- An empty id names a dataset's one unnamed series, whichever way the
-  -- harvest stored it.
-  WHERE  COALESCE(p.profile_id, p.timeseries_id, '') = :profile
+  -- harvest stored it. A station id names every cast of a TimeSeriesProfile
+  -- harvested per cast: the record list keys it on its station.
+  WHERE  :profile IN (COALESCE(p.profile_id, p.timeseries_id, ''),
+                      p.timeseries_id)
 ),
 trajectory_feature AS (
   SELECT s.dataset_pk,
@@ -193,19 +195,18 @@ trajectory_feature AS (
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
 ),
 -- A TimeSeriesProfile is stored per cast unless a station holds more than the
--- harvester's cap (timeseries_profile.py), so its record id can be a cast. The
--- cast stands for its whole station: one feature over all of the station's
--- casts, so the window is sized from the station's cadence and the record
--- constraint lands on the station.
+-- harvester's cap (timeseries_profile.py), so its record id can be a cast or
+-- its station. Either stands for the whole station: one feature over all of
+-- the station's casts, so the window is sized from the station's cadence and
+-- the record constraint lands on the station.
 station_casts AS (
   SELECT p.*
-  FROM   profile_feature c
-  JOIN   ds ON ds.pk = c.dataset_pk
-  JOIN   cde.profiles p
-         ON  p.dataset_pk    = c.dataset_pk
-         AND p.timeseries_id = c.station_id
+  FROM   cde.profiles p
+  JOIN   ds ON ds.pk = p.dataset_pk
   WHERE  ds.cdm_data_type = 'TimeSeriesProfile'
-    AND  c.cast_id IS NOT NULL
+    AND  p.profile_id IS NOT NULL
+    AND  p.timeseries_id IN (SELECT station_id FROM profile_feature
+                             WHERE  cast_id IS NOT NULL)
 ),
 -- A cast is a single-day feature, harvested without day_ranges: its days are
 -- its time span.
