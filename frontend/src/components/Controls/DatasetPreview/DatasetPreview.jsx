@@ -69,12 +69,11 @@ export default function DatasetPreview({
     inspectDataset,
     datasetPreview?.table,
     rows,
-    profiles.current,
   );
   const { selectedVis, setSelectedVis, linkKey, step, before, rowLimit } =
     plotParams;
 
-  const drawsOneProfile = Boolean(step || profiles.current);
+  const drawsOneProfile = Boolean(step);
   // Said beside the title, so the table and the plot both say it.
   const sample = useMemo(
     () =>

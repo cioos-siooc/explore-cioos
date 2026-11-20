@@ -184,8 +184,48 @@ trajectory_feature AS (
   WHERE  s.trajectory_id = :profile
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
 ),
+-- A TimeSeriesProfile is stored per cast unless a station holds more than the
+-- harvester's cap (timeseries_profile.py), so its record id can be a cast. The
+-- cast stands for its whole station: one feature over all of the station's
+-- casts, so the window is sized from the station's cadence and the record
+-- constraint lands on the station.
+station_casts AS (
+  SELECT p.*
+  FROM   profile_feature c
+  JOIN   ds ON ds.pk = c.dataset_pk
+  JOIN   cde.profiles p
+         ON  p.dataset_pk    = c.dataset_pk
+         AND p.timeseries_id = c.station_id
+  WHERE  ds.cdm_data_type = 'TimeSeriesProfile'
+    AND  c.cast_id IS NOT NULL
+),
+station_days AS (
+  SELECT DISTINCT day::date AS day
+  FROM   station_casts s,
+         unnest(s.day_ranges) r,
+         generate_series(lower(r), upper(r) - 1, interval '1 day') day
+),
+station_feature AS (
+  SELECT s.dataset_pk,
+         s.timeseries_id AS feature_id,
+         MIN(s.time_min) AS time_min,
+         MAX(s.time_max) AS time_max,
+         SUM(s.n_records) AS n_records,
+         SUM(s.n_records)::double precision
+           / GREATEST((SELECT COUNT(*) FROM station_days), 1)
+           AS records_per_day,
+         NULL::text AS cast_id,
+         s.timeseries_id AS station_id,
+         (SELECT MAX(day) + 1 FROM station_days, params
+          WHERE  day < params.before_day) AS data_end
+  FROM   station_casts s
+  GROUP  BY s.dataset_pk, s.timeseries_id
+),
 feature AS (
+  SELECT * FROM station_feature
+  UNION ALL
   SELECT * FROM profile_feature
+  WHERE  NOT EXISTS (SELECT 1 FROM station_feature)
   UNION ALL
   SELECT * FROM trajectory_feature
 )
@@ -206,13 +246,7 @@ SELECT ds.dataset_id,
        -- which is what decides whether a record has profiles to step through;
        -- a Profile record's own id is both, and a TimeSeries has none.
        ds.profile_id_variable AS step_variable,
-       -- A TimeSeriesProfile is stored per cast unless a station holds more
-       -- than the harvester's cap (timeseries_profile.py), so its record id can
-       -- be a cast. The constraint above is on the station, so constrain on the
-       -- cast's station and step to the cast itself.
-       CASE WHEN cast_record.is_cast THEN f.station_id ELSE f.feature_id END
-         AS profile_id,
-       CASE WHEN cast_record.is_cast THEN f.cast_id END AS record_step,
+       f.feature_id AS profile_id,
        f.n_records,
        -- Not a text cast, whose space and non-Z offset would go straight
        -- into an ERDDAP URL.
@@ -223,11 +257,6 @@ SELECT ds.dataset_id,
          OR f.n_records <= :NUM_RECORDS) AS use_whole_profile
 FROM   feature f
 JOIN   ds ON ds.pk = f.dataset_pk
-CROSS JOIN LATERAL (
-  SELECT ds.cdm_data_type = 'TimeSeriesProfile'
-         AND f.cast_id IS NOT NULL
-         AND f.station_id IS NOT NULL AS is_cast
-) cast_record
 CROSS JOIN params
 CROSS JOIN LATERAL (
   -- Where the window is sized back from: the newest row, or the requested
@@ -293,7 +322,6 @@ async function resolvePreview(query) {
     profile_id,
     new_start_time,
     use_whole_profile,
-    record_step,
   } = record;
 
   if (!profile_variable && profile_id !== "") {
@@ -311,11 +339,8 @@ async function resolvePreview(query) {
 
   let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?${recordConstraint(profile_variable, profile_id)}`;
   // `at` names one profile inside the record, to reach one OUTSIDE the tail
-  // window below, so the two are exclusive. A cast record with no `at` draws
-  // its own cast.
-  const step = steppedRecord(profile_variable, step_variable)
-    ? at || record_step
-    : null;
+  // window below, so the two are exclusive.
+  const step = steppedRecord(profile_variable, step_variable) ? at : null;
   const tailWindow = !step && !timeMin && !timeMax;
   const windowed = tailWindow && (!use_whole_profile || Boolean(before));
   if (step) {
@@ -508,9 +533,7 @@ router.get(
  *         description: >
  *           { column, steps: [{ value, time }], count, truncated }. `count` is
  *           always the true number of profiles; `steps` is every k-th of them
- *           once that passes 5000, with `truncated` saying so. `current` is
- *           the cast the record itself names (a TimeSeriesProfile harvested
- *           per cast), which /preview draws when no `at` is given; else null.
+ *           once that passes 5000, with `truncated` saying so.
  *       404:
  *         description: Unknown dataset or unknown record.
  *       422:
@@ -550,7 +573,6 @@ router.get(
       cdm_data_type,
       erddap_url,
       profile_id,
-      record_step,
     } = rows.rows[0];
 
     if (!profile_variable && profile_id !== "") {
@@ -609,7 +631,6 @@ router.get(
         steps,
         count: ordered.length,
         truncated,
-        current: record_step ?? null,
       });
     } catch (error) {
       const status = error.response?.status;

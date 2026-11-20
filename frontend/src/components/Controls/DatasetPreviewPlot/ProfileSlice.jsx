@@ -38,29 +38,24 @@ export default function ProfileSlice({ profiles, drawnCount, step, setStep }) {
   // Memoised because the `|| []` fallback is a fresh array every render, which
   // would re-run every hook below it on every keystroke elsewhere in the pane.
   const steps = useMemo(() => (profiles && profiles.steps) || [], [profiles]);
-  // A record that is itself one cast of a station: /preview draws that cast
-  // when no step is set, so there is no All stop to offer.
-  const current = (profiles && profiles.current) || null;
-  const first = current ? 1 : ALL;
 
   const index = useMemo(() => {
-    const drawn = step || current;
-    if (!drawn) return ALL;
+    if (!step) return ALL;
     // The URL hands the step back as a string; ERDDAP sends numeric profile
     // ids (gliders) as numbers.
-    const at = steps.findIndex((entry) => String(entry.value) === drawn);
+    const at = steps.findIndex((entry) => String(entry.value) === step);
     // A link naming a profile this record does not have falls back to the
     // window rather than to an empty plot.
-    return at < 0 ? first : at + 1;
-  }, [step, current, first, steps]);
+    return at < 0 ? ALL : at + 1;
+  }, [step, steps]);
 
   // Where the handle sits mid-drag; the plot only refetches on release.
   const [draftIndex, setDraftIndex] = useState(null);
   const shownIndex = draftIndex ?? index;
 
   const clampIndex = useCallback(
-    (next) => Math.max(first, Math.min(steps.length, Math.round(next))),
-    [steps, first],
+    (next) => Math.max(ALL, Math.min(steps.length, Math.round(next))),
+    [steps],
   );
 
   const commit = useCallback(
@@ -72,14 +67,14 @@ export default function ProfileSlice({ profiles, drawnCount, step, setStep }) {
   );
 
   const axis = useMemo(() => {
-    const span = steps.length - first;
+    const span = steps.length - ALL;
     return {
-      min: first,
+      min: ALL,
       max: steps.length,
-      toPos: (value) => (span > 0 ? (value - first) / span : 0),
-      toValue: (position) => first + position * span,
+      toPos: (value) => (span > 0 ? (value - ALL) / span : 0),
+      toValue: (position) => ALL + position * span,
     };
-  }, [steps, first]);
+  }, [steps]);
 
   // One profile and the "All" stop draw the same rows, so there is nothing to
   // step through — which is what hides this for Profile, TimeSeries, Trajectory
@@ -138,7 +133,7 @@ export default function ProfileSlice({ profiles, drawnCount, step, setStep }) {
           className="railStep"
           title={t("previewProfileSlicePrevious")}
           aria-label={t("previewProfileSlicePrevious")}
-          disabled={shownIndex <= first}
+          disabled={shownIndex <= ALL}
           onClick={() => commit(shownIndex - 1)}
         >
           <ChevronLeft size={10} />
@@ -160,7 +155,7 @@ export default function ProfileSlice({ profiles, drawnCount, step, setStep }) {
           bands={[
             {
               key: "elapsed",
-              from: first,
+              from: ALL,
               to: shownIndex,
               className: "previewProfileSliceFill",
             },

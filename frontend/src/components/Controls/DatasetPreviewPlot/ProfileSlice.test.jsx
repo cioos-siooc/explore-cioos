@@ -182,24 +182,6 @@ describe("ProfileSlice", () => {
     );
   });
 
-  it("opens on a cast record's own cast, with no All stop to step back to", () => {
-    // A TimeSeriesProfile harvested per cast: /preview draws that cast.
-    show(profilesOf(10, { current: "AZMP-ESG-cast-0" }));
-    expect(screen.getByText("1 / 10")).toBeInTheDocument();
-    expect(screen.queryByText("All recent profiles")).toBeNull();
-    expect(screen.getByTitle("Previous profile")).toBeDisabled();
-  });
-
-  it("steps from a cast record's own cast by value, never onto the window", () => {
-    const setStep = show(profilesOf(10, { current: "AZMP-ESG-cast-1" }));
-    fireEvent.click(screen.getByTitle("Previous profile"));
-    expect(setStep).toHaveBeenCalledWith("AZMP-ESG-cast-0");
-
-    const home = show(profilesOf(10, { current: "AZMP-ESG-cast-1" }));
-    fireEvent.keyDown(screen.getByRole("slider"), { key: "Home" });
-    expect(home).toHaveBeenCalledWith("AZMP-ESG-cast-0");
-  });
-
   it("calls the All stop a window, not the whole record", () => {
     show(profilesOf(335));
     expect(screen.getByText("All recent profiles")).toHaveAttribute(

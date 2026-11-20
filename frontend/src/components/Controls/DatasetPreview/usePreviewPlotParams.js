@@ -90,14 +90,7 @@ const RESETTABLE_PARAMS = PLOT_PARAMS.filter(
 const sameList = (a, b) =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
-// `currentProfile`: the cast /preview draws when no step is set, for a record
-// that is itself one cast of a station.
-export default function usePreviewPlotParams(
-  inspectDataset,
-  table,
-  data,
-  currentProfile = null,
-) {
+export default function usePreviewPlotParams(inspectDataset, table, data) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
 
@@ -184,7 +177,7 @@ export default function usePreviewPlotParams(
 
   // The type's own plan, then the plan as drawn: `porient` moves the panels to
   // the other axis, so either X or Y can hold several variables, one at a time.
-  const oneProfile = Boolean(searchParams.get(STEP_PARAM) || currentProfile);
+  const oneProfile = Boolean(searchParams.get(STEP_PARAM));
   const typePlan = useMemo(
     () => facetPlanFor(inspectDataset, variables, plotData, { oneProfile }),
     [inspectDataset, variables, plotData, oneProfile],
