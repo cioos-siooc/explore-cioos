@@ -1,13 +1,15 @@
 name: Deploy
 
 # The tag name picks the target (anything else is rejected):
-#   beta*          -> beta        any development*/master commit
-#   vX.Y.Z-rc.N    -> staging     master only
-#   vX.Y.Z         -> production  master only, and only a SHA whose staging
+#   beta*          -> beta        any development*/main/master commit
+#   vX.Y.Z-rc.N    -> staging     main or master only
+#   vX.Y.Z         -> production  main or master only, and only a SHA whose staging
 #                                 deployment succeeded
 # beta and staging share one stack on the Juno host cioos-co-dev-explore
 # (beta.explore.cioos.ca, behind Caddy basic_auth), one deploy at a time, and
-# always keep their volumes: reset the database by hand (README → Deployment).
+# always keep their volumes. Staging is a rehearsal on its own database,
+# cde_staging, refreshed from production; production then ships that tested
+# database (README → Deployment).
 # Wait for the release's Integration Tests (including visual regression) before
 # deploying.
 on:
@@ -19,6 +21,29 @@ on:
         description: Existing release tag to redeploy
         required: true
         type: string
+      staging_db:
+        description: "Staging: cde_staging from a production copy, kept as is, or fresh (empty; needs full_harvest)"
+        type: choice
+        options: [copy-prod, keep, fresh]
+        default: copy-prod
+      full_harvest:
+        description: "Staging: run a full harvest before the tests"
+        type: boolean
+        default: false
+      ship_database:
+        description: "Production: ship cde_staging (off = code-only redeploy, for a rollback)"
+        type: boolean
+        default: true
+
+# Hosts for the database copies, reached over the Juno VPN (internal
+# addresses, not secrets; production's is DB_HOST_EXTERNAL in .env.production).
+env:
+  STAGING: runner@172.16.61.26
+  STAGING_DIR: /srv/services/explore-cioos-staging
+  STAGING_STACK: explore-cioos-staging
+  PROD: runner@172.16.61.22
+  PROD_DIR: /srv/services/explore-cioos
+  PROD_STACK: explore-cioos-production
 
 permissions:
   actions: read
@@ -68,13 +93,15 @@ jobs:
             found=false
             for branch in $(git for-each-ref --format='%(refname)' refs/remotes/origin); do
               case "$branch" in
-                refs/remotes/origin/development*|refs/remotes/origin/master)
+                refs/remotes/origin/development*|refs/remotes/origin/main|refs/remotes/origin/master)
                   if git merge-base --is-ancestor "$sha" "$branch"; then found=true; break; fi ;;
               esac
             done
             test "$found" = true
           else
-            git merge-base --is-ancestor "$sha" refs/remotes/origin/master
+            # master stays accepted until releases have fully moved to main.
+            git merge-base --is-ancestor "$sha" refs/remotes/origin/main 2>/dev/null \
+              || git merge-base --is-ancestor "$sha" refs/remotes/origin/master
           fi
           if [ "$target" = production ]; then
             staged=false
@@ -110,7 +137,9 @@ jobs:
     name: Deploy ${{ needs.release.outputs.target }}
     needs: release
     if: needs.release.outputs.target != 'production'
-    timeout-minutes: 15
+    # A full harvest of production's sources takes hours; 360 is the ceiling
+    # of a GitHub-hosted runner.
+    timeout-minutes: ${{ inputs.full_harvest && 360 || 90 }}
     runs-on: ubuntu-latest
     # beta and staging deploy the same stack, but stay separate GitHub
     # environments so only a staging deployment satisfies the production gate.
@@ -118,47 +147,223 @@ jobs:
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
+    env:
+      # Straight to the stack's nginx over the VPN, past Caddy's basic_auth.
+      STAGING_URL: http://172.16.61.26:8098
+      SHA: ${{ needs.release.outputs.sha }}
+      REHEARSAL: ${{ needs.release.outputs.target == 'staging' }}
+      STAGING_DB: ${{ inputs.staging_db || 'copy-prod' }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - name: Connect to Juno
+        env:
+          WG_CONFIG: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          SSH_KEY: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
+          # Only a rehearsal reaches production, so beta never depends on it.
+          HOSTS: 172.16.61.26 ${{ needs.release.outputs.target == 'staging' && '172.16.61.22' || '' }}
+        run: .github/scripts/connect-juno.sh
+
+      - name: Copy the production database into cde_staging
+        if: env.REHEARSAL == 'true' && env.STAGING_DB == 'copy-prod'
+        run: |
+          set -o pipefail
+          .github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/dump-database.sh \
+            | .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/restore-database.sh cde_staging
+          # Requesters' addresses stay on production (privacy policy); the
+          # promotion takes production's own download_jobs anyway.
+          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
+            -d cde_staging -c 'UPDATE cde.download_jobs SET email = NULL WHERE email IS NOT NULL'
+
+      # The release's own schema, as on a new volume; the harvest fills it.
+      - name: Create an empty cde_staging
+        if: env.REHEARSAL == 'true' && env.STAGING_DB == 'fresh'
+        env:
+          FULL_HARVEST: ${{ inputs.full_harvest }}
+        run: |
+          test "$FULL_HARVEST" = true || { echo "staging_db=fresh needs full_harvest" >&2; exit 1; }
+          psql() { .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh "$@"; }
+          psql -d postgres -c 'DROP DATABASE IF EXISTS cde_staging WITH (FORCE)'
+          psql -d postgres -c 'CREATE DATABASE cde_staging'
+          { echo 'SET client_min_messages = warning;'; cat database/1_schema.sql database/[3-9]_*.sql; } | psql -1 -d cde_staging
+
+      # Unstamped until this run's tests pass, so production can never ship a
+      # cde_staging that a later, failed rehearsal has migrated.
+      - name: Unstamp cde_staging
+        if: env.REHEARSAL == 'true'
+        run: |
+          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
+            -d postgres -c 'COMMENT ON DATABASE cde_staging IS NULL'
+
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
-          wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
-          # cioos-co-dev-explore (not a secret: an internal address, reachable
-          # only over the VPN above).
+          # The tunnel is already up (Connect to Juno).
+          wg_config: ""
           ssh_host: 172.16.61.26
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
-          deploy_path: /srv/services/explore-cioos-staging
-          stack_name: explore-cioos-staging
+          deploy_path: ${{ env.STAGING_DIR }}
+          stack_name: ${{ env.STAGING_STACK }}
           compose_files: docker-compose.yaml docker-compose.production.yaml
           op_secret_files: .env.staging:.env
           # The tag doubles as the Sentry release, shared by web-api and the
-          # frontend's sourcemap upload.
+          # frontend's sourcemap upload. Appended after the 1Password values,
+          # so DB_NAME here wins over the item's (beta keeps the item's).
           env_overrides: |
             SENTRY_RELEASE=${{ needs.release.outputs.tag }}
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
+            ${{ needs.release.outputs.target == 'staging' && 'DB_NAME=cde_staging' || '' }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
+
+      - name: Wait for the staging site
+        if: env.REHEARSAL == 'true'
+        run: curl --fail --silent --retry 60 --retry-all-errors --retry-delay 5 "$STAGING_URL/api/health/ready"
+
+      - name: Full harvest
+        if: env.REHEARSAL == 'true' && inputs.full_harvest
+        run: .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/run-harvest.sh
+
+      - name: Install Node.js
+        if: env.REHEARSAL == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            test/package-lock.json
+            frontend/package-lock.json
+
+      - name: API integration tests
+        if: env.REHEARSAL == 'true'
+        run: |
+          read -r latitude longitude < <(
+            .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging -F ' ' \
+              -c 'SELECT latitude, longitude FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 1'
+          )
+          test -n "${latitude:-}" && test -n "${longitude:-}"
+          npm --prefix test ci --quiet
+          API_URL="$STAGING_URL/api" CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" \
+            npm --prefix test run test:integration
+
+      - name: Frontend smoke test
+        if: env.REHEARSAL == 'true'
+        working-directory: frontend
+        env:
+          CI: "true"
+        run: |
+          npm ci --quiet
+          npx playwright install --with-deps chromium
+          LIVE_BASE_URL="$STAGING_URL" npm run test:e2e:live
+
+      - name: Submit and complete a download request
+        if: env.REHEARSAL == 'true'
+        env:
+          SITE_URL: ${{ env.STAGING_URL }}
+        run: |
+          PSQL=".github/scripts/on-host.sh $STAGING $STAGING_DIR $STAGING_STACK .github/scripts/host-psql.sh -d cde_staging" \
+            .github/scripts/test-download-request.sh
+
+      # Catches a migration or harvest that silently loses data.
+      - name: Dataset count within 10% of production
+        if: env.REHEARSAL == 'true' && env.STAGING_DB != 'fresh'
+        run: |
+          count='SELECT count(*) FROM cde.datasets'
+          staged=$(.github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging -c "$count")
+          live=$(.github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/host-psql.sh -c "$count")
+          echo "cde_staging: $staged datasets, production: $live"
+          test $((staged * 10)) -ge $((live * 9))
+
+      - name: Stamp cde_staging as tested
+        if: env.REHEARSAL == 'true'
+        run: |
+          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
+            -d postgres -c "COMMENT ON DATABASE cde_staging IS '$SHA'"
+
+      - uses: actions/upload-artifact@v7
+        if: failure() && env.REHEARSAL == 'true'
+        with:
+          name: staging-e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
 
   production:
     name: Deploy production
     needs: release
     if: needs.release.outputs.target == 'production'
-    timeout-minutes: 15
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     environment: production
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+    env:
+      SHA: ${{ needs.release.outputs.sha }}
+      SHIP: ${{ github.event_name == 'release' || inputs.ship_database }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - name: Connect to Juno
+        env:
+          WG_CONFIG: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          SSH_KEY: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
+          HOSTS: 172.16.61.26 172.16.61.22
+        run: .github/scripts/connect-juno.sh
+
+      # The deployment-record gate (release job) proves this commit passed a
+      # rehearsal; the stamp proves cde_staging is still that rehearsal's.
+      - name: cde_staging was tested at this commit
+        if: env.SHIP == 'true'
+        run: |
+          stamp=$(.github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d postgres \
+            -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'cde_staging'")
+          test "$stamp" = "$SHA" || { echo "cde_staging is not a passed rehearsal of $SHA (stamp: ${stamp:-none})" >&2; exit 1; }
+
+      # Staging's scheduled harvest keeps cde_staging current; a stale one means
+      # it stopped (or beta took the stack). Any scope: Harvest All records one
+      # 'single' run per source.
+      - name: cde_staging was harvested in the last 7 days
+        if: env.SHIP == 'true'
+        run: |
+          IFS='|' read -r fresh last < <(
+            .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging \
+              -c "SELECT coalesce(max(finished_at) > now() - interval '7 days', false), max(finished_at) FROM cde.harvest_runs WHERE status = 'ok'"
+          )
+          echo "Last successful harvest in cde_staging: ${last:-never}"
+          test "$fresh" = t || {
+            echo "cde_staging is stale. Redeploy the rc with staging_db=keep and full_harvest=true, then release again." >&2
+            exit 1
+          }
+
+      # Dropped first so the host holds at most two copies (live + next).
+      - name: Copy cde_staging to production as cde_next
+        if: env.SHIP == 'true'
+        run: |
+          set -o pipefail
+          .github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/host-psql.sh \
+            -d postgres -c 'DROP DATABASE IF EXISTS cde_previous WITH (FORCE)'
+          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/dump-database.sh cde_staging \
+            | .github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/restore-database.sh cde_next
+
+      - name: Swap in cde_next, keeping the live download_jobs
+        if: env.SHIP == 'true'
+        run: .github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/swap-database.sh
+
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
-          wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          wg_config: ""
           ssh_host: ${{ secrets.SERVER_IP }}
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
-          deploy_path: /srv/services/explore-cioos
-          stack_name: explore-cioos-production
+          deploy_path: ${{ env.PROD_DIR }}
+          stack_name: ${{ env.PROD_STACK }}
           compose_files: docker-compose.yaml docker-compose.production.yaml
           op_secret_files: .env.production:.env
           env_overrides: |
