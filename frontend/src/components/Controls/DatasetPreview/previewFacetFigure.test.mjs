@@ -17,6 +17,8 @@ import {
   gridBoxFor,
   plotBoxFor,
   recordTitleFor,
+  WEBGL_POINTS,
+  CONTOUR_MODE,
 } from "./previewFacetFigure.js";
 import {
   maxCharsFor,
@@ -1591,4 +1593,75 @@ test("a grid fills each colour repeat against its own colour axis", () => {
       ["coloraxis2", "x", "y2"],
     ],
   );
+});
+
+// --- WebGL past WEBGL_POINTS drawn points ----------------------------------
+
+const manyRows = (count) =>
+  Array.from({ length: count }, (_, index) => ({
+    time: new Date(Date.UTC(2024, 0, 1) + index * 60000).toISOString(),
+    depth: index % 50,
+    temperature: 10 + (index % 7),
+    salinity: 30 + (index % 5),
+  }));
+const tracesTypes = (data) =>
+  new Set(
+    data.filter((trace) => trace.type !== "contour").map((trace) => trace.type),
+  );
+const timeseriesOf = (data, panels, extra = {}) =>
+  buildFigure({
+    plan: { orientation: ROWS },
+    variablesByName: sectionVariables,
+    panels,
+    sharedAxis: "time",
+    data,
+    size: { width: 600, height: 400 },
+    ...extra,
+  });
+
+test("a figure stays SVG up to WEBGL_POINTS drawn points", () => {
+  const rows = manyRows(WEBGL_POINTS / 2);
+  const { data } = timeseriesOf(rows, ["temperature", "salinity"]);
+  assert.deepEqual(tracesTypes(data), new Set(["scatter"]));
+});
+
+test("past WEBGL_POINTS drawn points every sample and coloured-line trace is WebGL", () => {
+  const rows = manyRows(WEBGL_POINTS / 2 + 1);
+  const { data } = timeseriesOf(rows, ["temperature", "salinity"], {
+    mode: "lines",
+    colorAxis: "depth",
+  });
+  assert.ok(data.some((trace) => trace.hoverinfo === "skip"));
+  assert.deepEqual(tracesTypes(data), new Set(["scattergl"]));
+});
+
+test("a contour stays SVG under WebGL samples", () => {
+  const rows = manyRows(WEBGL_POINTS + 1);
+  const { data } = timeseriesOf(rows, ["depth"], {
+    mode: CONTOUR_MODE,
+    colorAxis: "temperature",
+  });
+  assert.deepEqual(
+    data.map((trace) => trace.type),
+    ["contour", "scattergl"],
+  );
+});
+
+test("the overlay and the grid count every panel's points too", () => {
+  const rows = manyRows(WEBGL_POINTS / 2 + 1);
+  const overlay = buildOverlayFigure({
+    plan: { orientation: ROWS },
+    variablesByName: sectionVariables,
+    panels: ["temperature", "salinity"],
+    sharedAxis: "time",
+    data: rows,
+  });
+  assert.deepEqual(tracesTypes(overlay.data), new Set(["scattergl"]));
+  const grid = buildGridFigure({
+    variablesByName: sectionVariables,
+    xAxes: ["temperature", "salinity"],
+    yAxes: ["depth"],
+    data: rows,
+  });
+  assert.deepEqual(tracesTypes(grid.data), new Set(["scattergl"]));
 });

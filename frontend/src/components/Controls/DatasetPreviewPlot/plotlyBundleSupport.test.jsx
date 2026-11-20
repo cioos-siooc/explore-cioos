@@ -8,6 +8,7 @@ import { facetPlanFor, COLUMNS } from "../DatasetPreview/previewFacetPlan.js";
 import {
   buildFigure,
   buildGridFigure,
+  WEBGL_POINTS,
 } from "../DatasetPreview/previewFacetFigure.js";
 import { exportFigureFor } from "../DatasetPreview/previewExportFigure.js";
 import { splitPinnedAxis } from "../DatasetPreview/previewPinnedAxis.js";
@@ -294,5 +295,42 @@ describe("the shipped plotly bundle and the contour plot type", () => {
         });
     });
     expect(known.contours.coloring.values).toContain("heatmap");
+  });
+});
+
+describe("the shipped plotly bundle and WebGL", () => {
+  it("understands every key a WebGL trace of the figure sets", async () => {
+    const schema = await plotlySchema();
+    const { attributes } = schema.traces.scattergl;
+    const rows = Array.from({ length: WEBGL_POINTS }, (_, index) => ({
+      ...DATA[index % DATA.length],
+      depth: index,
+    }));
+    const dataset = { cdm_data_type: "Profile", first_eov_column: "TE90_01" };
+    const variables = variablesFrom(TABLE, dataset);
+    const { data } = buildFigure({
+      plan: facetPlanFor(dataset, variables, rows),
+      variablesByName: byColumnName(variables),
+      panels: ["TE90_01", "PSAL_01"],
+      sharedAxis: "depth",
+      data: rows,
+      colorAxis: "time",
+      mode: "lines",
+      size: { width: 900, height: 600 },
+      uirevision: "test",
+    });
+
+    expect(data.length).toBeGreaterThan(2); // the panels and their line bins
+    data.forEach((trace) => {
+      expect(trace.type).toBe("scattergl");
+      Object.keys(trace).forEach((key) => {
+        expect(attributes, `scattergl.${key}`).toHaveProperty(key);
+      });
+      Object.keys(trace.marker || {}).forEach((key) => {
+        expect(attributes.marker, `scattergl.marker.${key}`).toHaveProperty(
+          key,
+        );
+      });
+    });
   });
 });

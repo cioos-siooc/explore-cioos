@@ -426,6 +426,12 @@ export const CONTOUR_MODE = "contour";
 
 const spanOf = (domain) => domain[1] - domain[0];
 
+// SVG draws a DOM node per point: 121k points held the main thread ~8 s (#469).
+// Under this, SVG keeps its crisper markers and the recorded baselines.
+export const WEBGL_POINTS = 10000;
+export const scatterTypeFor = (rows, panelCount) =>
+  (rows?.length ?? 0) * panelCount > WEBGL_POINTS ? "scattergl" : "scatter";
+
 // A grid's cells along an axis not measured yet.
 const UNMEASURED_CELLS = 200;
 const cellsAlong = (pixels) =>
@@ -619,6 +625,7 @@ export function buildFigure({
       ),
       maxLines,
     );
+  const scatterType = scatterTypeFor(data, panels.length);
   const binLimit = coloredLine
     ? lineBinLimitFor({
         panelCount: panels.length,
@@ -770,7 +777,7 @@ export function buildFigure({
         fallbackColor: color,
       }).forEach((bin) =>
         lineTraces.push({
-          type: "scatter",
+          type: scatterType,
           mode: "lines",
           hoverinfo: "skip", // the panel's own trace answers the hover
           [panelLetter]: bin.panelValues,
@@ -783,7 +790,7 @@ export function buildFigure({
     }
 
     return {
-      type: "scatter",
+      type: scatterType,
       mode: (shade && coloredLine) || mode === CONTOUR_MODE ? "markers" : mode,
       // Never drawn — <extra></extra> drops the box Plotly keeps it in — but
       // plain rather than wrapped: a <br> belongs to the panel that needed it.
@@ -879,6 +886,7 @@ export function buildOverlayFigure({
   const arrangement = ARRANGEMENTS[plan.orientation] || ROWS_LAYOUT;
   const { shared: sharedLetter, panel: valueLetter } = arrangement;
   const lineColors = distinctColorsFor(panels, variablesByName, colors);
+  const scatterType = scatterTypeFor(data, panels.length);
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
@@ -1002,7 +1010,7 @@ export function buildOverlayFigure({
       title: axisTitle(valueLabelFor(columnName, plottingHeight), labelFont),
     };
     return {
-      type: "scatter",
+      type: scatterType,
       mode,
       name: titleFor(columnName),
       [valueLetter]: (data || []).map((row) => row[columnName]),
@@ -1097,6 +1105,7 @@ export function buildGridFigure({
   const wrapAlong = (text, pixels, maxLines) =>
     wrapLabel(text, maxCharsFor(pixels, labelFont), maxLines);
   const coloredLine = mode.includes("lines");
+  const scatterType = scatterTypeFor(data, columnCount * rowCount);
   const binLimit = lineBinLimitFor({
     panelCount: columnCount * rowCount,
     axisPixels: plottingWidth / Math.max(columnCount, 1),
@@ -1275,7 +1284,7 @@ export function buildGridFigure({
           fallbackColor: color,
         }).forEach((bin) =>
           lineTraces.push({
-            type: "scatter",
+            type: scatterType,
             mode: "lines",
             hoverinfo: "skip",
             x: bin.sharedValues,
@@ -1292,7 +1301,7 @@ export function buildGridFigure({
       const colorInHover =
         shade && shade.columnName !== xAxis && shade.columnName !== yAxis;
       traces.push({
-        type: "scatter",
+        type: scatterType,
         mode:
           (shade && coloredLine) || mode === CONTOUR_MODE ? "markers" : mode,
         name: `${titleFor(yAxis)} / ${titleFor(xAxis)}`,
