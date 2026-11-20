@@ -1,0 +1,171 @@
+name: Verify staging
+
+# Tests a staging rehearsal (deploy.yml) once cde_staging is ready, then stamps
+# it with the commit so the matching production release can ship it.
+#
+# deploy.yml leaves cde_staging commented "pending <sha> <since> <mode>"
+# (<since> = epoch the full harvest was started, 0 without one). Without a
+# harvest it calls this straight away; with one, the schedule polls until a
+# full harvest that started after <since> finishes. A failed harvest, one
+# unfinished after 4 days, or failed tests leave "failed <sha> <reason>",
+# which production refuses and later polls ignore.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+# Same hosts as deploy.yml (a called workflow doesn't inherit its env).
+env:
+  STAGING: runner@172.16.61.26
+  STAGING_DIR: /srv/services/explore-cioos-staging
+  STAGING_STACK: explore-cioos-staging
+  STAGING_URL: http://172.16.61.26:8098
+  PROD: runner@172.16.61.22
+  PROD_DIR: /srv/services/explore-cioos
+  PROD_STACK: explore-cioos-production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-staging
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify staging
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Connect to Juno
+        env:
+          WG_CONFIG: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          SSH_KEY: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
+          HOSTS: 172.16.61.26 172.16.61.22
+        run: .github/scripts/connect-juno.sh
+
+      - name: Is a rehearsal ready to test?
+        id: state
+        run: |
+          psql() { .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh "$@"; }
+          fail() {
+            psql -d postgres -c "COMMENT ON DATABASE cde_staging IS 'failed $sha $1'"
+            echo "Rehearsal of $sha failed: $1" >&2
+            exit 1
+          }
+          read -r state sha since mode < <(
+            psql -d postgres -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'cde_staging'"
+          ) || true
+          if [ "${state:-}" != pending ]; then
+            echo "Nothing to verify (cde_staging: ${state:-no stamp} ${sha:-})"
+            exit 0
+          fi
+          # The stack's own database; a beta deploy since would point it at beta's.
+          serving=$(psql -c 'SELECT current_database()')
+          if [ "$serving" != cde_staging ]; then fail "stack-now-serves-$serving"; fi
+          if [ "$since" != 0 ]; then
+            harvest=$(psql -d cde_staging -c "SELECT status FROM cde.harvest_runs WHERE scope = 'full' AND started_at >= to_timestamp($since) ORDER BY started_at DESC LIMIT 1")
+            case "$harvest" in
+              ok) ;;
+              failed) fail harvest-failed ;;
+              *)
+                if [ $(( $(date +%s) - since )) -gt $(( 4 * 86400 )) ]; then fail harvest-unfinished-after-4-days; fi
+                echo "Full harvest for $sha: ${harvest:-not started}; checking again later."
+                exit 0
+                ;;
+            esac
+          fi
+          {
+            echo "ready=true"
+            echo "sha=$sha"
+            echo "mode=$mode"
+          } >> "$GITHUB_OUTPUT"
+
+      # The release's own tests and scripts, not this workflow's ref.
+      - uses: actions/checkout@v7
+        if: steps.state.outputs.ready == 'true'
+        with:
+          ref: ${{ steps.state.outputs.sha }}
+
+      - name: Wait for the staging site
+        if: steps.state.outputs.ready == 'true'
+        run: curl --fail --silent --retry 60 --retry-all-errors --retry-delay 5 "$STAGING_URL/api/health/ready"
+
+      - name: Install Node.js
+        if: steps.state.outputs.ready == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            test/package-lock.json
+            frontend/package-lock.json
+
+      - name: API integration tests
+        if: steps.state.outputs.ready == 'true'
+        run: |
+          read -r latitude longitude < <(
+            .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging -F ' ' \
+              -c 'SELECT latitude, longitude FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 1'
+          )
+          test -n "${latitude:-}" && test -n "${longitude:-}"
+          npm --prefix test ci --quiet
+          API_URL="$STAGING_URL/api" CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" \
+            npm --prefix test run test:integration
+
+      - name: Frontend smoke test
+        if: steps.state.outputs.ready == 'true'
+        working-directory: frontend
+        env:
+          CI: "true"
+        run: |
+          npm ci --quiet
+          npx playwright install --with-deps chromium
+          LIVE_BASE_URL="$STAGING_URL" npm run test:e2e:live
+
+      - name: Submit and complete a download request
+        if: steps.state.outputs.ready == 'true'
+        env:
+          SITE_URL: ${{ env.STAGING_URL }}
+        run: |
+          PSQL=".github/scripts/on-host.sh $STAGING $STAGING_DIR $STAGING_STACK .github/scripts/host-psql.sh -d cde_staging" \
+            .github/scripts/test-download-request.sh
+
+      # Catches a migration or harvest that silently loses data. A fresh
+      # database has no production baseline worth comparing.
+      - name: Dataset count within 10% of production
+        if: steps.state.outputs.ready == 'true' && steps.state.outputs.mode != 'fresh'
+        run: |
+          count='SELECT count(*) FROM cde.datasets'
+          staged=$(.github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh -d cde_staging -c "$count")
+          live=$(.github/scripts/on-host.sh "$PROD" "$PROD_DIR" "$PROD_STACK" .github/scripts/host-psql.sh -c "$count")
+          echo "cde_staging: $staged datasets, production: $live"
+          test $((staged * 10)) -ge $((live * 9))
+
+      - name: Stamp cde_staging as tested
+        if: steps.state.outputs.ready == 'true'
+        env:
+          SHA: ${{ steps.state.outputs.sha }}
+        run: |
+          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
+            -d postgres -c "COMMENT ON DATABASE cde_staging IS '$SHA'"
+
+      - name: Mark the rehearsal failed
+        if: failure() && steps.state.outputs.ready == 'true'
+        env:
+          SHA: ${{ steps.state.outputs.sha }}
+        run: |
+          .github/scripts/on-host.sh "$STAGING" "$STAGING_DIR" "$STAGING_STACK" .github/scripts/host-psql.sh \
+            -d postgres -c "COMMENT ON DATABASE cde_staging IS 'failed $SHA tests'"
+
+      - uses: actions/upload-artifact@v7
+        if: failure() && steps.state.outputs.ready == 'true'
+        with:
+          name: staging-e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7

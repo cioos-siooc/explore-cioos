@@ -262,9 +262,9 @@ name picks the target and any other name is rejected:
 
 | Tag | Release type | Target | Commit must be on |
 |---|---|---|---|
-| `beta*` | prerelease | beta | `development*` or `master` |
-| `vX.Y.Z-rc.N` | prerelease | staging | `master` |
-| `vX.Y.Z` | full release | production | `master`, with a successful staging deployment of the same commit |
+| `beta*` | prerelease | beta | `development*`, `main` or `master` |
+| `vX.Y.Z-rc.N` | prerelease | staging | `main` or `master` |
+| `vX.Y.Z` | full release | production | `main` or `master`, with a successful staging deployment of the same commit |
 
 Before any deploy, `release` also requires a non-draft release and the
 release-triggered Integration Tests (including visual regression) to pass.
@@ -281,8 +281,59 @@ gh release create v1.2.0 --target master                               # product
 Beta and staging are one stack on one Juno host (`beta.explore.cioos.ca`) and
 deploy one at a time; production is another host. All run over WireGuard through
 the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
-roll back or redeploy, dispatch Deploy with an existing published release tag;
-the target follows from the tag.
+redeploy, dispatch Deploy with an existing published release tag; the target
+follows from the tag.
+
+#### Staging rehearsal and database promotion
+
+A staging deploy rehearses the production release on a copy of production's
+data, in its own `cde_staging` database (beta keeps the stack's usual one):
+
+1. Production's database is copied into `cde_staging` (or, with
+   `staging_db=fresh`, it starts empty).
+2. The release deploys against it, so `db_migrate` applies the migrations to
+   real data.
+3. Optionally a full harvest is **started**; the deploy doesn't wait for it.
+4. [Verify staging](.github/workflows/staging-verify.yml) runs the API,
+   frontend smoke and download tests against the stack, plus a check that
+   `cde_staging` holds at least 90% of production's datasets. Without a harvest
+   the deploy calls it straight away; with one, its 6-hourly schedule waits for
+   that harvest to finish.
+5. On success `cde_staging` is stamped with the commit.
+
+Until then `cde_staging` is marked `pending <sha> …`. A failed harvest, one
+still unfinished after 4 days, failed tests, or a beta deploy taking the stack
+mark it `failed <sha> <reason>` and fail the Verify staging run. Rerun Verify
+staging by hand to check sooner than the schedule. On the staging host,
+`COMMENT ON DATABASE cde_staging` shows the state.
+
+A production deploy then **ships that database**. It is copied to production as
+`cde_next`, the app services stop, production's live `download_jobs` (usage
+reporting) replace the copy's, and `cde_next` is renamed into place. Everything
+else, harvest history included, comes from staging. The old database stays as
+`cde_previous` until the next promotion. Production refuses a `cde_staging`
+whose stamp isn't the release's commit, so a later rc must be rehearsed again.
+It also refuses one with no successful harvest in the last 7 days (staging's
+scheduled harvest has stopped, or beta took the stack): redeploy the rc with
+`staging_db=keep` and `full_harvest=true`, then release again. The `production`
+environment requires a reviewer's approval before any of this runs.
+The helper scripts are in `.github/scripts/`.
+
+Dispatch inputs (a published release uses the defaults):
+
+| Input | Default | Effect |
+|---|---|---|
+| `staging_db` | `fresh`* | staging: `copy-prod` refreshes `cde_staging` from production; `keep` reuses it; `fresh` starts it empty from the release's schema (needs `full_harvest`; skips the 90% check) |
+| `full_harvest` | true* | staging: start a full harvest; Verify staging tests once it finishes |
+| `ship_database` | true | production: ship `cde_staging`; false deploys code only |
+
+\* Temporary (#471), while production still runs the old stack: every rehearsal
+builds `cde_staging` from scratch and harvests it. The intended defaults are
+`copy-prod` and `false`.
+
+To roll back a promotion, on the production host stop the stack, rename the
+live database to `cde_failed` and `cde_previous` back to the live name, then
+dispatch Deploy with the previous tag and `ship_database=false`.
 
 `.env.production` in this repo **is** the production configuration: `op://`
 references name 1Password items, everything else ships as written. Change
@@ -292,7 +343,7 @@ production settings there, not on the box.
 `explore-cioos-staging` 1Password item with the listed fields.
 Deploys always keep the stack's volumes (`explore-cioos-staging_postgres18-data`,
 `_harvest_data`, `_harvester_cache`, `_obis_cache`); nothing resets them
-automatically. For a schema change, run **Rebuild Database**, or on the host
+automatically. For a schema change on beta, run **Rebuild Database**, or on the host
 `docker compose -p explore-cioos-staging down`, `docker volume rm` those
 volumes and redeploy: `RUN_ON_DEPLOY` then initialises the schema and
 harvests into the empty database. The host has 2 CPU / 8 GB, so
