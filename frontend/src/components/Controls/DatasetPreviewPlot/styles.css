@@ -335,6 +335,36 @@
   border-top: 1px solid var(--cioos-hairline);
 }
 
+/* Touch only (VariablePicker): drawn as the field it turns into, and pinned
+   while the options scroll under it. */
+.variableSelectSearchPrompt {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  width: calc(100% - 2 * var(--cioos-space-sm));
+  min-height: 44px;
+  margin: 0 var(--cioos-space-sm) var(--cioos-space-xs);
+  padding: 0 var(--cioos-space-md);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  box-shadow: 0 0 0 var(--cioos-space-sm) var(--cioos-white);
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+  text-align: left;
+  cursor: text;
+}
+
+.variableSelectSearchPrompt:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 var(--cioos-space-sm) var(--cioos-white),
+    var(--cioos-focus);
+}
+
 /* Sits in the menu where the options would be, so it takes their inset
    (.dropdown-item, ui/dropdownStyles.css) — a shade less height, since there
    is nothing here to click. */
@@ -1009,5 +1039,12 @@
   .previewProfileSlice .railStep svg {
     width: 14px;
     height: 14px;
+  }
+}
+
+/* Options at a fingertip's height, as the pane's own dropdown rows are. */
+@media (pointer: coarse) {
+  .variableSelect__menu-portal .variableSelect__option {
+    padding: 12px;
   }
 }

@@ -1,10 +1,13 @@
 import * as React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import Select, { components } from "react-select";
 import {
   CaretDownFill,
   GripVertical,
   PlusLg,
+  Search,
   SlashCircle,
 } from "react-bootstrap-icons";
 import {
@@ -31,8 +34,46 @@ import {
   shortLabelFor,
 } from "../DatasetPreview/previewVariables.js";
 import topLayer from "../../ui/topLayer.js";
+import useMediaQuery, { TOUCH_QUERY } from "../../../state/ui/useMediaQuery.js";
 
 const columnNameOf = (variable) => variable.columnName;
+
+const MENU_MAX_PX = 300;
+const MENU_MIN_PX = 120;
+const MENU_GAP_PX = 8;
+
+// The menu opens on whichever side of the control has room on screen. Measured
+// against the visual viewport, which shrinks under a phone's browser bars and
+// on-screen keyboard while the fixed menu's own viewport does not; and again
+// whenever that viewport moves, as it does when the keyboard comes up.
+export function menuRoomFor(rect, viewport) {
+  const below =
+    viewport.offsetTop + viewport.height - rect.bottom - MENU_GAP_PX;
+  const above = rect.top - viewport.offsetTop - MENU_GAP_PX;
+  return below >= Math.min(above, MENU_MAX_PX)
+    ? { placement: "bottom", height: below }
+    : { placement: "top", height: above };
+}
+
+function useRoomOnScreen(active, anchorOf) {
+  const [room, setRoom] = useState(null);
+  const measure = useCallback(() => {
+    const viewport = window.visualViewport;
+    const rect = anchorOf()?.getBoundingClientRect();
+    if (viewport && rect) setRoom(menuRoomFor(rect, viewport));
+  }, [anchorOf]);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!active || !viewport) return undefined;
+    viewport.addEventListener("resize", measure);
+    viewport.addEventListener("scroll", measure);
+    return () => {
+      viewport.removeEventListener("resize", measure);
+      viewport.removeEventListener("scroll", measure);
+    };
+  }, [active, measure]);
+  return [active ? room : null, measure];
+}
 
 // The columns the preview leaves empty sink below a rule, as a second group
 // headed by why, so the drawable ones are what the list leads with.
@@ -64,9 +105,22 @@ const STYLES = {
 // The cap note and Select all / Clear all ride along the option list, reading
 // what they need from the extra props react-select hands through selectProps.
 function MenuList(props) {
-  const { capNote, bulkAction } = props.selectProps;
+  const { capNote, bulkAction, searchPrompt } = props.selectProps;
   return (
     <components.MenuList {...props}>
+      {searchPrompt && (
+        // Inside the list, not above it: react-select blurs on a touch that
+        // ends outside its list.
+        <button
+          type="button"
+          className="variableSelectSearchPrompt"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={searchPrompt.run}
+        >
+          <Search size={14} aria-hidden="true" />
+          {searchPrompt.label}
+        </button>
+      )}
       {capNote && <span className="dropdownEmptyNote">{capNote}</span>}
       {props.children}
       {bulkAction && (
@@ -246,7 +300,24 @@ export default function VariablePicker({
   maxSelected = Infinity,
 }) {
   const { t } = useTranslation();
-  const menuOpen = React.useRef(false);
+  const touch = useMediaQuery(TOUCH_QUERY);
+  const selectRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // On a touch screen a tap opens the list without summoning the keyboard,
+  // which would cover it; typing is a second, deliberate tap.
+  const [searching, setSearching] = useState(false);
+  const swappingInput = useRef(false);
+  const anchorOf = useCallback(() => selectRef.current?.controlRef, []);
+  const [room, measureRoom] = useRoomOnScreen(menuOpen, anchorOf);
+  const startSearch = () => {
+    // Searchable swaps react-select's input element, and the blur of the old
+    // one must not close the menu. Focus lands inside the tap, so iOS shows
+    // the keyboard.
+    swappingInput.current = true;
+    flushSync(() => setSearching(true));
+    selectRef.current?.focus();
+    swappingInput.current = false;
+  };
   const { ordered, options: grouped } = withDataFirst(
     choices,
     t("datasetPreviewPlotEmptyGroup"),
@@ -313,7 +384,10 @@ export default function VariablePicker({
       <SortableContext items={selected} strategy={rectSortingStrategy}>
         {/* Always react-select's multi mode, so a lone pick is a pill too. */}
         <Select
+          ref={selectRef}
           isMulti
+          isSearchable={!touch || searching}
+          menuIsOpen={menuOpen}
           canAdd={isMulti && !atCap}
           className="variableSelect"
           classNamePrefix="variableSelect"
@@ -338,6 +412,9 @@ export default function VariablePicker({
           }
           isOptionDisabled={() => atCap}
           closeMenuOnSelect={!isMulti}
+          // react-select blurs after every pick on touch, which would close a
+          // multi-pick list after its first variable.
+          blurInputOnSelect={!isMulti}
           backspaceRemovesValue={!locked}
           isClearable={isMulti}
           placeholder={placeholder ?? t("datasetPreviewPlotSearchVariables")}
@@ -353,12 +430,27 @@ export default function VariablePicker({
           }
           menuPortalTarget={topLayer()}
           menuPosition="fixed"
+          menuPlacement={room?.placement ?? "bottom"}
+          maxMenuHeight={
+            room
+              ? Math.max(MENU_MIN_PX, Math.min(room.height, MENU_MAX_PX))
+              : MENU_MAX_PX
+          }
           styles={STYLES}
+          // Measured in the same update that opens it, so it never draws on
+          // the cramped side first.
+          onMenuOpen={() => {
+            measureRoom();
+            setMenuOpen(true);
+          }}
+          onMenuClose={() => {
+            if (swappingInput.current) return;
+            setMenuOpen(false);
+            setSearching(false);
+          }}
           // react-select skips its own handling of a key it sees prevented, which
           // leaves a focused grip's arrows, space and escape to the drag. Tab is
           // spared so focus can still leave the grip.
-          onMenuOpen={() => (menuOpen.current = true)}
-          onMenuClose={() => (menuOpen.current = false)}
           onKeyDown={(event) => {
             if (
               event.key !== "Tab" &&
@@ -367,7 +459,7 @@ export default function VariablePicker({
               event.preventDefault();
             }
             // Escape closes the open menu only, not the dialog around it.
-            if (event.key === "Escape" && menuOpen.current) {
+            if (event.key === "Escape" && menuOpen) {
               event.stopPropagation();
             }
           }}
@@ -381,6 +473,13 @@ export default function VariablePicker({
             IndicatorSeparator: null,
             ...(locked && { MultiValueRemove: () => null }),
           }}
+          searchPrompt={
+            touch &&
+            !searching && {
+              label: t("datasetPreviewPlotSearchVariables"),
+              run: startSearch,
+            }
+          }
           capNote={
             choices.length > maxSelected &&
             t("datasetPreviewPlotMaxVariables", { count: maxSelected })

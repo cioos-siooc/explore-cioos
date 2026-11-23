@@ -476,6 +476,46 @@ describe("DatasetPreviewPlot", () => {
     expect(gear.closest(".previewPlotTools")).not.toBeNull();
   });
 
+  it("opens a variable list on touch without the keyboard, and searches only when asked", async () => {
+    setTouchScreen(true);
+    const user = open();
+    await plotted();
+    await user.click(variableSearch());
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(variableSearch()).toHaveAttribute("inputmode", "none");
+
+    await user.click(screen.getByRole("button", { name: "Search variables" }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(variableSearch()).toHaveFocus();
+    expect(variableSearch()).not.toHaveAttribute("inputmode", "none");
+    expect(
+      screen.queryByRole("button", { name: "Search variables" }),
+    ).toBeNull();
+
+    await user.keyboard("sal");
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("option")).toHaveTextContent("salinity");
+  });
+
+  it("keeps the touch list open while several variables are picked", async () => {
+    setTouchScreen(true);
+    const user = open();
+    await plotted();
+    await user.click(variableSearch());
+    await user.click(screen.getByRole("option", { name: /salinity/ }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
+
+  it("offers no search button with a mouse, where typing is the search", async () => {
+    const user = open();
+    await plotted();
+    await user.click(variableSearch());
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Search variables" }),
+    ).toBeNull();
+  });
+
   it("has no gear beside the settings pane", async () => {
     open();
     await plotted();
