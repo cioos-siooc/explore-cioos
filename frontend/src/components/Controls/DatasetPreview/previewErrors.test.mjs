@@ -37,6 +37,16 @@ test("the upstream status rides along when the route reports one", () => {
   );
 });
 
+test("the failed ERDDAP request rides along so it can be linked", () => {
+  const url = "https://erddap.example.com/erddap/tabledap/d1.json?&id=~%22a%22";
+  assert.equal(
+    previewErrorFrom(502, { error: "ERDDAP_UNAVAILABLE", erddapQuery: url })
+      .erddapQuery,
+    url,
+  );
+  assert.equal(previewErrorFrom(503, null).erddapQuery, null);
+});
+
 test("a 5xx nobody wrote a body for is still an outage", () => {
   // A proxy in front of the API answers in HTML, so nothing parses.
   assert.equal(

@@ -33,48 +33,21 @@ describe("the datasets sidebar default", () => {
     installMockFetch();
   });
 
-  it("starts open on a wide screen", async () => {
-    setViewportWidth(DESKTOP_WIDTH);
-    renderWithProviders(<SidebarProbe />, { providers: "app" });
-    await waitFor(() => expect(state()).toBe("open"));
-  });
-
-  it("starts closed on anything narrower, where it would take too much map", async () => {
-    setViewportWidth(TABLET_WIDTH);
+  it.each([
+    ["wide screen", DESKTOP_WIDTH],
+    ["tablet", TABLET_WIDTH],
+    ["phone", MOBILE_WIDTH],
+  ])("starts closed on a %s", async (_, width) => {
+    setViewportWidth(width);
     renderWithProviders(<SidebarProbe />, { providers: "app" });
     await waitFor(() => expect(state()).toBe("closed"));
   });
 
-  it("starts closed on a phone", async () => {
-    setViewportWidth(MOBILE_WIDTH);
-    renderWithProviders(<SidebarProbe />, { providers: "app" });
-    await waitFor(() => expect(state()).toBe("closed"));
-  });
-
-  it("follows the breakpoint until the user makes their own call", async () => {
-    // A window resized, or a tablet rotated, into a wide screen should get the
-    // default for the size it is now rather than the one it booted at.
+  it("stays closed when the window is resized into a wide screen", async () => {
     setViewportWidth(TABLET_WIDTH);
     renderWithProviders(<SidebarProbe />, { providers: "app" });
     await waitFor(() => expect(state()).toBe("closed"));
 
-    act(() => setViewportWidth(DESKTOP_WIDTH));
-    await waitFor(() => expect(state()).toBe("open"));
-  });
-
-  it("stops following it once the user has chosen", async () => {
-    // The subtle rule: after an explicit toggle a resize must not reopen a list
-    // the user put away.
-    setViewportWidth(DESKTOP_WIDTH);
-    const { user } = renderWithProviders(<SidebarProbe />, {
-      providers: "app",
-    });
-    await waitFor(() => expect(state()).toBe("open"));
-
-    await user.click(screen.getByRole("button", { name: "toggle" }));
-    expect(state()).toBe("closed");
-
-    act(() => setViewportWidth(TABLET_WIDTH));
     act(() => setViewportWidth(DESKTOP_WIDTH));
     expect(state()).toBe("closed");
   });
@@ -105,11 +78,10 @@ describe("revealing the sidebar for a drawn shape", () => {
     );
   }
 
-  it("reopens a closed list on a wide screen", async () => {
+  it("opens a closed list on a wide screen", async () => {
     setViewportWidth(DESKTOP_WIDTH);
     const { user } = renderWithProviders(<DrawProbe />, { providers: "app" });
-    await waitFor(() => expect(state()).toBe("open"));
-    await user.click(screen.getByRole("button", { name: "toggle" }));
+    await waitFor(() => expect(state()).toBe("closed"));
 
     await user.click(screen.getByRole("button", { name: "draw" }));
     expect(state()).toBe("open");
@@ -151,8 +123,7 @@ describe("revealing the sidebar for a dataset page", () => {
     const { user, i18n } = renderWithProviders(<PageProbe />, {
       providers: "app",
     });
-    await waitFor(() => expect(state()).toBe("open"));
-    await user.click(screen.getByRole("button", { name: "toggle" }));
+    await waitFor(() => expect(state()).toBe("closed"));
 
     await user.click(screen.getByRole("button", { name: "open" }));
     await waitFor(() => expect(state()).toBe("open"));

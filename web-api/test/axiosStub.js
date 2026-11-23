@@ -11,6 +11,7 @@ function install() {
   stub.filename = axiosPath;
   stub.loaded = true;
   stub.exports = {
+    defaults: { headers: { common: {} } },
     async get(url, config) {
       calls.push({ url, config });
       if (!queue.length) {

@@ -38,8 +38,22 @@ export const toggleOptionExcluded = (option) => ({
 
 // Sizes come from /downloadEstimate, never a measured file, so every figure
 // carries its own tilde. A null size (no estimate, e.g. OBIS) is a dash, not 0.
-export function formatSizeEstimate(size) {
-  return Number.isFinite(size) ? `~${bytes(size)}` : "—";
+// French writes octets (Go, not GB) and a decimal comma.
+const FRENCH_BYTE_UNITS = { B: "o", KB: "Ko", MB: "Mo", GB: "Go", TB: "To" };
+function localizedBytes(size, language, unitSeparator) {
+  const text = bytes(size, { unitSeparator });
+  if (!language?.startsWith("fr")) return text;
+  return text
+    .replace(".", ",")
+    .replace(/[KMGT]?B$/, (unit) => FRENCH_BYTE_UNITS[unit]);
+}
+
+export function formatSize(size, language) {
+  return localizedBytes(size, language, " ");
+}
+
+export function formatSizeEstimate(size, language) {
+  return Number.isFinite(size) ? `~${localizedBytes(size, language, "")}` : "—";
 }
 
 // Sums sizes, leaving out the ones with no estimate and flagging that it did,
@@ -309,6 +323,9 @@ export function createDataFilterQueryString(query) {
 // log instead of linear.
 const LOG_SCALE_MIN_RATIO = 100;
 
+// A narrow range keeps to the darker two thirds of the ramp.
+const NARROW_RAMP_START = 1 / 3;
+
 export function generateColorStops(colorScale, range) {
   // Absent while /legend is in flight, [null, null] when filters match nothing.
   if (!range || !Number.isFinite(range[1]) || range[1] <= 0) return [];
@@ -327,10 +344,12 @@ export function generateColorStops(colorScale, range) {
       .range([0, colors.length - 1]);
     scale = (index) => logScale.invert(index);
   } else {
-    // Fewer values than colors: sample across the whole ramp, not a prefix,
-    // or a 1..3 range would sit entirely in the pale end and read as nothing.
-    // A one-value range takes the middle of the ramp.
+    // Fewer values than colors: sample the upper part of the ramp, not a
+    // prefix, or a 1..3 range would sit entirely in the pale end and read as
+    // nothing. A one-value range takes the top colour.
     const span = Math.floor(hi) - Math.floor(lo) + 1;
+    const last = colorScale.length - 1;
+    const first = Math.round(last * NARROW_RAMP_START);
     colors =
       span < colorScale.length
         ? Array.from(
@@ -338,7 +357,7 @@ export function generateColorStops(colorScale, range) {
             (_, i) =>
               colorScale[
                 Math.round(
-                  (span === 1 ? 0.5 : i / (span - 1)) * (colorScale.length - 1),
+                  first + (span === 1 ? 1 : i / (span - 1)) * (last - first),
                 )
               ],
           )
@@ -347,22 +366,24 @@ export function generateColorStops(colorScale, range) {
       .domain([0, colors.length - 1])
       .range([lo, hi]);
   }
-  const colorStops = colors.map((color, index) => {
-    return {
-      // Not floored: log invert() lands a hair under the max (499.999... for 500).
-      stop: index === colors.length - 1 ? hi : Math.floor(scale(index)),
-      color,
-    };
+  // Counts are whole, so stops are floored; flooring the bottom of a log ramp
+  // lands two stops on the same integer (1, 1.9 -> 1, 1), so each stop is held
+  // one above the last rather than dropping a colour. Both branches leave room:
+  // log needs hi >= 100 * lo, and linear only fills every colour when the
+  // range has at least that many integers.
+  let previous = -Infinity;
+  return colors.map((color, index) => {
+    // The ends are taken as given: log invert() lands a hair under each
+    // (2.999... for 3, 499.999... for 500), which floors a whole step short.
+    const stop =
+      index === colors.length - 1
+        ? hi
+        : index === 0
+          ? Math.floor(lo)
+          : Math.max(Math.floor(scale(index)), previous + 1);
+    previous = stop;
+    return { stop, color };
   });
-  const result = [];
-  const map = new Map();
-  colorStops.forEach((colorStop) => {
-    if (!map.has(colorStop.stop)) {
-      map.set(colorStop.stop, true);
-      result.push(colorStop);
-    }
-  });
-  return result;
 }
 
 export function formatDatasetCount(filtered, total, locale) {
@@ -407,6 +428,18 @@ export function formatRange(min, max, unit = "") {
     return `${min}${suffix}`;
   }
   return `${min} – ${max}${suffix}`;
+}
+
+// Depths arrive with float noise (0.079366 m): tenths of a metre near the
+// surface, whole metres below 10 m.
+export function formatDepthRange(min, max) {
+  const round = (value) =>
+    value === null || value === undefined
+      ? value
+      : Math.abs(value) < 10
+        ? Math.round(value * 10) / 10
+        : Math.round(value);
+  return formatRange(round(min), round(max), "m");
 }
 
 export function useDebounce(value, delay) {
@@ -523,6 +556,21 @@ export function quantizeCountRange(range) {
   if (!hi) return undefined;
   const lo = snapCount(Math.max(Number(range[0]) || 1, 1), "down") || 1;
   return [Math.min(lo, hi), hi];
+}
+
+// Same clamp as /legend (RAMP_MAX_PERCENTILE in web-api/routes/legend.js):
+// one runaway cell in view would otherwise push every neighbour into the pale
+// end. [min, rampMax, trueMax], so the legend can still mark the top "+".
+const VIEWPORT_RAMP_PERCENTILE = 0.99;
+
+export function viewportCountRange(counts) {
+  if (!counts.length) return undefined;
+  const sorted = Float64Array.from(counts).sort();
+  // percentile_disc, so the top is always a count some cell really has.
+  const rampMax =
+    sorted[Math.ceil(VIEWPORT_RAMP_PERCENTILE * sorted.length) - 1];
+  const range = quantizeCountRange([sorted[0], rampMax]);
+  return range && [...range, sorted[sorted.length - 1]];
 }
 
 export function rangesEqual(a, b) {
@@ -849,21 +897,6 @@ export function useChanged(...values) {
   }
   setPrevious(values);
   return true;
-}
-
-// https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
-export function useOutsideAlerter(ref, callback, value) {
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (ref.current && !ref.current.contains(event.target)) {
-        callback(value);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [ref, callback, value]);
 }
 
 export function getCookieValue(cookieName) {

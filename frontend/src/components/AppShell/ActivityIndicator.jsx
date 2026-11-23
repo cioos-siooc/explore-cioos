@@ -5,6 +5,7 @@ import ActivityList from "../ui/ActivityList.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { useActivity } from "../../state/activity/ActivityProvider.jsx";
 import { useMapView } from "../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import "./activityIndicatorStyles.css";
 
 // Comes and goes with the work; the brand logo's mark is the standing
@@ -15,12 +16,15 @@ export default function ActivityIndicator() {
   // The splash names the same waits, so the panel stands down until it has
   // gone. The spoken commentary carries on either way.
   const { firstPaintPending } = useMapView();
+  // Likewise the preview modal's own loading screen, which names its request.
+  const { showPreviewModal, recordLoading } = useSelection();
+  const previewLoading = showPreviewModal && recordLoading;
 
   return (
     <div className="activityIndicator">
       {/* `announced` rather than `busy`: a cached filter change resolves inside
           the registry's delay and never flashes the panel open. */}
-      {announced && !firstPaintPending && (
+      {announced && !firstPaintPending && !previewLoading && (
         <div className="activityStatus">
           <p className="activityStatusHeading">{t("activityStatusHeading")}</p>
           {/* One mark for the whole panel; `presentation` because the heading

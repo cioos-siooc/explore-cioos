@@ -3,6 +3,7 @@ get_metadata() call in __init__ makes no HTTP request."""
 
 import pandas as pd
 import pytest
+from cde_harvester.core.errors import EmptyVariableError
 from conftest import (
     DATASET_ID,
     ERDDAP_INFO_CSV,
@@ -260,6 +261,12 @@ class TestTableVariables:
         by_name = {v["name"]: v for v in ds.table_variables}
         assert by_name["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
+    def test_eovs_mark_the_variables_mapped_to_an_eov(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        by_name = {v["name"]: v for v in ds.table_variables}
+        assert by_name["temperature"]["eovs"] == ds.get_eov_variables()["temperature"]
+        assert by_name["latitude"]["eovs"] == []
+
     def test_entries_are_json_serialisable(self, mock_erddap_server):
         # It lands in a jsonb column via a Python-repr CSV round trip, so a
         # numpy scalar leaking in here fails far downstream in the loader.
@@ -354,6 +361,52 @@ class TestGetProfileIds:
         assert len(profile_ids) == 1
         assert profile_ids.loc[0, "time_min"] == "2020-01-01T00:00:00Z"
         assert profile_ids.loc[0, "time_max"] == "2021-01-01T00:00:00Z"
+
+    def test_byte_container_cf_role_is_one_feature_without_a_query(self, mock_erddap_server):
+        """seagull-erddap's IOOS `platform` container is a dataless byte: one
+        feature per dataset, no full-dataset scan to discover it."""
+        from io import StringIO
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "variable,station_id,,String,", "variable,station_id,,byte,"
+        )
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            queries.append(url)
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
+
+        assert queries == []
+        assert list(profile_ids.columns) == ["station_id"]
+        assert len(profile_ids) == 1
+
+    def test_timeseries_id_on_time_is_refused_without_a_query(self, mock_erddap_server):
+        """distinct() of a timeseries_id on time enumerates every record."""
+        from io import StringIO
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "attribute,station_id,cf_role,,timeseries_id",
+            "attribute,time,cf_role,,timeseries_id",
+        )
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            queries.append(url)
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        dataset = Dataset(mock_erddap_server, DATASET_ID)
+
+        assert len(dataset.get_profile_ids()) == 0
+        assert queries == []
+        assert "timeseries_id is on time" in dataset.no_features_reason
 
     def test_no_cf_role_explains_the_empty_result(self, mock_erddap_server):
         from io import StringIO
@@ -460,6 +513,20 @@ class TestGetProfileIds:
         profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
 
         assert len(profile_ids) == 1
+
+    def test_never_filled_ids_are_an_error(self, mock_erddap_server):
+        from io import StringIO
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(ERDDAP_INFO_CSV)).fillna("")
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+
+        with pytest.raises(EmptyVariableError, match="distinct\\(\\) of the cf_role"):
+            Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
 
 
 class TestGetCount:

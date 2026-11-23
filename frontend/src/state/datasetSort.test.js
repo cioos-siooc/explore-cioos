@@ -16,10 +16,10 @@ const rows = [
 const pks = (sorted) => sorted.map((row) => row.pk);
 
 describe("sortDatasets", () => {
-  it("sorts strings case-insensitively and numbers numerically", () => {
+  it("sorts strings case-insensitively and numbers numerically, grids first", () => {
     expect(
       pks(sortDatasets(rows, DEFAULT_SORT, { t, language: "en" })),
-    ).toEqual([2, 1, 3]);
+    ).toEqual([3, 2, 1]);
     expect(
       pks(
         sortDatasets(
@@ -28,7 +28,7 @@ describe("sortDatasets", () => {
           { t, language: "en" },
         ),
       ),
-    ).toEqual([2, 1, 3]);
+    ).toEqual([3, 2, 1]);
     expect(
       pks(
         sortDatasets(
@@ -43,20 +43,28 @@ describe("sortDatasets", () => {
   it("orders rows by title while the sort is the group size", () => {
     expect(
       pks(sortDatasets(rows, GROUP_SIZE_SORT, { t, language: "en" })),
-    ).toEqual([2, 1, 3]);
+    ).toEqual([3, 2, 1]);
   });
 
-  it("puts map-click datasets first, then grids when asked, each block sorted", () => {
+  it("puts grids first, map-click datasets first within each, each block sorted", () => {
     expect(
       pks(
         sortDatasets(rows, DEFAULT_SORT, {
-          pinnedPks: pinnedPksOf({ datasetPks: ["1"] }),
-          gridFirst: true,
+          pinnedPks: pinnedPksOf({ datasetPks: ["1", "3"] }),
           t,
           language: "en",
         }),
       ),
-    ).toEqual([1, 3, 2]);
+    ).toEqual([3, 1, 2]);
+    expect(
+      pks(
+        sortDatasets(
+          rows,
+          { field: "days", dir: "desc" },
+          { pinnedPks: pinnedPksOf({ datasetPks: ["2"] }), t, language: "en" },
+        ),
+      ),
+    ).toEqual([3, 2, 1]);
   });
 
   it("does not reorder its input", () => {

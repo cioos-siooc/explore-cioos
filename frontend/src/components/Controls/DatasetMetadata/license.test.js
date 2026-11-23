@@ -40,13 +40,13 @@ describe("licenseLabel", () => {
       },
       "OGL Canada",
     ],
-    [{ url: "https://example.org/licence" }, undefined],
+    [{ url: "https://example.org/licence" }, "https://example.org/licence"],
     [
       {
         title:
           "The data may be used and redistributed for free but is not intended\nfor legal use.",
       },
-      undefined,
+      "The data may be used and redistributed for free but is not intended\nfor legal use.",
     ],
   ])("%j -> %s", (license, label) => {
     expect(licenseLabel(license)).toBe(label);

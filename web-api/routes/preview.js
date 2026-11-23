@@ -9,7 +9,7 @@ const Sentry = require("@sentry/node");
  *     summary: Preview sample records for a dataset record
  *     tags: [Preview]
  *     description: >
- *       Returns up to 1000 representative rows for one record of an ERDDAP
+ *       Returns up to `limit` (default 5000) representative rows for one record of an ERDDAP
  *       dataset. A "record" is the dataset's CF discrete-sampling feature: a
  *       station for TimeSeries/TimeSeriesProfile, a cast for Profile, a
  *       mission/deployment for Trajectory/TrajectoryProfile.
@@ -33,6 +33,16 @@ const Sentry = require("@sentry/node");
  *         name: timeMax
  *         schema: { type: string, format: date-time }
  *       - in: query
+ *         name: before
+ *         schema: { type: string, format: date-time }
+ *         description: >
+ *           Ends the record's window here instead of at its newest row, to page
+ *           back through it. Ignored with `at` or timeMin/timeMax.
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 50000, default: 5000 }
+ *         description: How many rows to draw at most.
+ *       - in: query
  *         name: allProfiles
  *         schema: { type: boolean }
  *         description: >
@@ -51,6 +61,8 @@ const Sentry = require("@sentry/node");
  *           cdm_altitude_proxy says stands in for depth; absent when none.
  *           `sample` is { rowCount, totalRowCount }: the rows sent and the rows
  *           the request covers, which differ when only part of it is sent.
+ *           `startOfRecord` is true when a window's rows reach back to the
+ *           record's first row, so there is nothing earlier to page to.
  *       400:
  *         description: Missing or invalid parameters.
  *       404:
@@ -70,10 +82,13 @@ const { ALL_TRAJECTORY_TYPES } = require("../utils/dataTypes");
 const { trimPreviewRows } = require("../utils/previewRows");
 
 // ERDDAP regex constraints match the whole value, so escaping metacharacters
-// turns `=~` back into exact equality.
-const REGEX_METACHARACTERS = /[.\\+*?[\]^$(){}|]/g;
+// turns `=~` back into exact equality. Bracketing rather than backslashing,
+// because erddap.ogsl.ca's Cloudflare WAF 403s any query holding a `%5C`; only
+// the characters a bracket class can't hold keep the backslash.
 const escapeErddapRegex = (value) =>
-  String(value).replace(REGEX_METACHARACTERS, "\\$&");
+  String(value).replace(/[.\\+*?[\]^$(){}|]/g, (char) =>
+    "[]^\\".includes(char) ? `\\${char}` : `[${char}]`,
+  );
 
 // The destination name ERDDAP gives the T axis. Assumed rather than looked up,
 // which is the same assumption the time-window constraint below already makes.
@@ -94,9 +109,10 @@ const constraintFor = (column, value) =>
 const steppedRecord = (recordColumn, stepColumn) =>
   Boolean(stepColumn) && stepColumn !== recordColumn;
 
-// How many rows one preview draws. Module level because both handlers bind it
-// into FEATURE_SQL, which sizes its time window against it.
-const PREVIEW_ROW_LIMIT = 1000;
+// How many rows one preview draws unless it asks for more. Module level because
+// both handlers bind it into FEATURE_SQL, which sizes its time window against it.
+const PREVIEW_ROW_LIMIT = 5000;
+const MAX_PREVIEW_ROW_LIMIT = 50000;
 
 // Every profile of a record, past this, is more than a slider can address and
 // more than is worth sending: mpoSgdoADCP's longest record has 48166 of them,
@@ -121,7 +137,11 @@ const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(
 
 // Trajectories never get a cde.profiles row, hence the two branches.
 const FEATURE_SQL = `
-WITH ds AS (
+WITH params AS (
+  SELECT CAST(:BEFORE AS timestamptz) AS before,
+         (CAST(:BEFORE AS timestamptz) AT TIME ZONE 'UTC')::date AS before_day
+),
+ds AS (
   SELECT pk, dataset_id, erddap_url, cdm_data_type, table_variables,
          timeseries_id_variable, profile_id_variable, trajectory_id_variable,
          cdm_altitude_proxy
@@ -136,7 +156,9 @@ profile_feature AS (
          p.n_records,
          p.records_per_day,
          p.profile_id AS cast_id,
-         p.timeseries_id AS station_id
+         p.timeseries_id AS station_id,
+         (SELECT MAX(upper(r)) FROM unnest(p.day_ranges) r, params
+          WHERE  lower(r) < params.before_day) AS data_end
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
   WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
@@ -156,7 +178,9 @@ station_feature AS (
            / GREATEST(EXTRACT(EPOCH FROM MAX(p.time_max) - MIN(p.time_min))
                         / 86400, 1) AS records_per_day,
          NULL::text AS cast_id,
-         f.station_id
+         f.station_id,
+         MAX((SELECT MAX(upper(r)) FROM unnest(p.day_ranges) r, params
+              WHERE  lower(r) < params.before_day)) AS data_end
   FROM   profile_feature f
   JOIN   ds ON ds.pk = f.dataset_pk
   JOIN   cde.profiles p
@@ -176,12 +200,14 @@ trajectory_feature AS (
          SUM(td.n_records)::double precision
            / GREATEST(COUNT(DISTINCT td.day), 1) AS records_per_day,
          NULL::text AS cast_id,
-         NULL::text AS station_id
+         NULL::text AS station_id,
+         MAX(td.day) FILTER (WHERE td.day < params.before_day) + 1 AS data_end
   FROM   cde.trajectory_track_stats s
   JOIN   ds ON ds.pk = s.dataset_pk
   JOIN   cde.trajectory_days td
          ON  td.dataset_pk    = s.dataset_pk
          AND td.trajectory_id = s.trajectory_id
+  CROSS JOIN params
   WHERE  s.trajectory_id = :profile
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
 ),
@@ -232,16 +258,123 @@ CROSS JOIN LATERAL (
          AND f.cast_id IS NOT NULL
          AND f.station_id IS NOT NULL AS is_cast
 ) cast_record
+CROSS JOIN params
+CROSS JOIN LATERAL (
+  -- Where the window is sized back from: the newest row, or the requested
+  -- bound pulled back to the end of the data on the days before its own, so a
+  -- page that would land in a gap in the record lands on the data before the
+  -- gap. Only the lower bound moves; ERDDAP is still asked for everything
+  -- before the requested bound. LEAST skips NULLs, so no bound (or no
+  -- harvested day set) leaves the other two.
+  SELECT LEAST(f.time_max, params.before,
+               f.data_end::timestamp AT TIME ZONE 'UTC') AS window_end
+) anchor
 CROSS JOIN LATERAL (
   -- A zero or NULL cadence cannot size a window; it falls through to
   -- fetching the whole record.
   SELECT CASE WHEN COALESCE(f.records_per_day, 0) > 0
-                THEN f.time_max
+                THEN anchor.window_end
                      - (interval '1 hour'
                         * CEIL(:NUM_RECORDS / (f.records_per_day / 24)))
          END AS new_start_time
 ) win
 LIMIT 1`;
+
+const PREVIEW_CHECKS = [
+  check(["dataset", "profile", "at"]).isLength({ max: 256 }),
+  check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
+  check("before").optional().isISO8601({ strict: true }),
+  check("limit").optional().isInt({ min: 1, max: MAX_PREVIEW_ROW_LIMIT }),
+  check("allProfiles").optional().isIn(["true", "false"]),
+];
+
+const rowLimitOf = (query) => Number(query.limit) || PREVIEW_ROW_LIMIT;
+
+// The ERDDAP request /preview makes for this record, or the refusal it sends
+// instead. Shared with /preview/query, so the link the UI shows while waiting
+// is the request actually running.
+async function resolvePreview(query) {
+  const { dataset, profile, at, timeMin, timeMax, before } = query;
+  const allProfiles = query.allProfiles === "true";
+
+  // NOTE: filtered by dataset_id alone, so a dataset_id published on two
+  // ERDDAP servers resolves to whichever row sorts first.
+  const rows = await db.raw(FEATURE_SQL, {
+    profile,
+    dataset,
+    NUM_RECORDS: rowLimitOf(query),
+    WHOLE_STATION: allProfiles,
+    BEFORE: before ?? null,
+  });
+
+  if (!rows.rows?.length) {
+    return {
+      refusal: {
+        status: 404,
+        body: { error: "RECORD_NOT_FOUND", dataset, profile },
+      },
+    };
+  }
+
+  const record = rows.rows[0];
+  const {
+    profile_variable,
+    step_variable,
+    dataset_id,
+    cdm_data_type,
+    erddap_url,
+    profile_id,
+    new_start_time,
+    use_whole_profile,
+    record_step,
+  } = record;
+
+  if (!profile_variable) {
+    return {
+      refusal: {
+        status: 422,
+        body: {
+          error: "NO_RECORD_ID_VARIABLE",
+          dataset: dataset_id,
+          cdm_data_type,
+        },
+      },
+    };
+  }
+
+  const constraint = constraintFor(profile_variable, profile_id);
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
+  // `at` names one profile inside the record, to reach one OUTSIDE the tail
+  // window below, so the two are exclusive. A cast record with no `at` draws
+  // its own cast.
+  const step =
+    steppedRecord(profile_variable, step_variable) && !allProfiles
+      ? at || record_step
+      : null;
+  const tailWindow = !step && !timeMin && !timeMax;
+  const windowed = tailWindow && (!use_whole_profile || Boolean(before));
+  if (step) {
+    erddapQuery += `&${constraintFor(step_variable, step)}`;
+  } else if (timeMin || timeMax) {
+    if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
+    if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
+  } else {
+    // Without `before`, lower bound only, so near-real-time records newer
+    // than the last harvest still show. Anchored on this record's own
+    // time_max, not the dataset's, whose newest data usually belongs to
+    // another record.
+    if (!use_whole_profile) erddapQuery += `&time>${new_start_time}`;
+    // Strict, so the row the previous page started on is not drawn twice.
+    if (before) erddapQuery += `&time<${new Date(before).toISOString()}`;
+  }
+
+  return {
+    record,
+    erddapQuery,
+    windowed,
+    reachesBack: tailWindow && use_whole_profile,
+  };
+}
 
 router.get(
   "/",
@@ -250,75 +383,21 @@ router.get(
     // Never cache a live-ERDDAP failure.
     cacheFor: "5 minutes",
     cacheToggle: cache.onlyOk,
-    checks: [
-      check(["dataset", "profile", "at"]).isLength({ max: 256 }),
-      check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
-      check("allProfiles").optional().isIn(["true", "false"]),
-    ],
+    checks: PREVIEW_CHECKS,
   }),
   async (req, res, next) => {
-    const { dataset, profile, at, timeMin, timeMax } = req.query;
-    const allProfiles = req.query.allProfiles === "true";
-
-    // NOTE: filtered by dataset_id alone, so a dataset_id published on two
-    // ERDDAP servers resolves to whichever row sorts first.
-    const rows = await db.raw(FEATURE_SQL, {
-      profile,
-      dataset,
-      NUM_RECORDS: PREVIEW_ROW_LIMIT,
-      WHOLE_STATION: allProfiles,
-    });
-
-    if (!rows.rows?.length) {
-      return res
-        .status(404)
-        .send({ error: "RECORD_NOT_FOUND", dataset, profile });
-    }
+    const { refusal, record, erddapQuery, windowed, reachesBack } =
+      await resolvePreview(req.query);
+    const rowLimit = rowLimitOf(req.query);
+    if (refusal) return res.status(refusal.status).send(refusal.body);
 
     const {
-      profile_variable,
-      step_variable,
       dataset_id,
-      cdm_data_type,
-      erddap_url,
       profile_id,
       n_records,
-      new_start_time,
-      use_whole_profile,
       table_variables,
       cdm_altitude_proxy,
-      record_step,
-    } = rows.rows[0];
-
-    if (!profile_variable) {
-      return res.status(422).send({
-        error: "NO_RECORD_ID_VARIABLE",
-        dataset: dataset_id,
-        cdm_data_type,
-      });
-    }
-
-    const constraint = constraintFor(profile_variable, profile_id);
-    let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
-    // `at` names one profile inside the record, to reach one OUTSIDE the tail
-    // window below, so the two are exclusive. A cast record with no `at` draws
-    // its own cast.
-    const step =
-      steppedRecord(profile_variable, step_variable) && !allProfiles
-        ? at || record_step
-        : null;
-    const windowed = !step && !timeMin && !timeMax && !use_whole_profile;
-    if (step) {
-      erddapQuery += `&${constraintFor(step_variable, step)}`;
-    } else if (timeMin || timeMax) {
-      if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
-      if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
-    } else if (!use_whole_profile) {
-      // Lower bound only, so near-real-time records newer than the last
-      // harvest still show. Anchored on this record's own time_max, not the
-      // dataset's, whose newest data usually belongs to another record.
-      erddapQuery += `&time>${new_start_time}`;
-    }
+    } = record;
 
     console.log("Fetching preview from ", erddapQuery);
     try {
@@ -330,12 +409,15 @@ router.get(
       });
       console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
       if (!data?.table?.rows?.length) {
-        return res
-          .status(404)
-          .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
+        return res.status(404).send({
+          error: "NO_DATA",
+          dataset: dataset_id,
+          profile: profile_id,
+          erddapQuery,
+        });
       }
       const fetchedRowCount = data.table.rows.length;
-      trimPreviewRows(data.table, PREVIEW_ROW_LIMIT);
+      trimPreviewRows(data.table, rowLimit);
       // A window's rows are a part of the record whatever ERDDAP sent, so its
       // whole is the harvested count.
       data.sample = {
@@ -343,6 +425,7 @@ router.get(
         totalRowCount: windowed
           ? Math.max(Number(n_records) || 0, fetchedRowCount)
           : fetchedRowCount,
+        startOfRecord: reachesBack && fetchedRowCount <= rowLimit,
       };
       // Attached here rather than in shapeQuery.js, which would then carry
       // ~15 KB per dataset to /pointQuery. Kept positionally aligned with
@@ -371,9 +454,12 @@ router.get(
         body.includes("Your query produced no matching results");
 
       if (isEmpty) {
-        return res
-          .status(404)
-          .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
+        return res.status(404).send({
+          error: "NO_DATA",
+          dataset: dataset_id,
+          profile: profile_id,
+          erddapQuery,
+        });
       }
 
       console.error("Preview upstream failure", status, error.message);
@@ -385,8 +471,45 @@ router.get(
         error: "ERDDAP_UNAVAILABLE",
         dataset: dataset_id,
         upstreamStatus: status ?? null,
+        erddapQuery,
       });
     }
+  },
+);
+
+/**
+ * @swagger
+ * /preview/query:
+ *   get:
+ *     summary: The ERDDAP request /preview makes for a record, without making it
+ *     tags: [Preview]
+ *     description: >
+ *       Takes the same parameters as /preview and answers from the database
+ *       alone, so a caller can show the request while /preview is waiting on
+ *       ERDDAP.
+ *     responses:
+ *       200:
+ *         description: "{ erddapQuery }"
+ *       400:
+ *         description: Missing or invalid parameters.
+ *       404:
+ *         description: Unknown dataset or unknown record.
+ *       422:
+ *         description: The dataset declares no CF role variable to constrain on.
+ */
+router.get(
+  "/query",
+  ...pipeline({
+    filters: false,
+    // Matches /preview: the query moves with new_start_time.
+    cacheFor: "5 minutes",
+    cacheToggle: cache.onlyOk,
+    checks: PREVIEW_CHECKS,
+  }),
+  async (req, res) => {
+    const { refusal, erddapQuery } = await resolvePreview(req.query);
+    if (refusal) return res.status(refusal.status).send(refusal.body);
+    return res.send({ erddapQuery });
   },
 );
 
@@ -399,7 +522,7 @@ router.get(
  *     description: >
  *       A TimeSeriesProfile record is a station holding many casts, and a
  *       TrajectoryProfile record is a track holding many profiles; /preview
- *       returns a 1000-row window of one, which is the tail of the record and
+ *       returns a row-limited window of one, which is the tail of the record and
  *       may hold a handful of them. This lists what is there, so the preview can
  *       step to any of them with /preview?at=.
  *
@@ -447,6 +570,7 @@ router.get(
       dataset,
       NUM_RECORDS: PREVIEW_ROW_LIMIT,
       WHOLE_STATION: false,
+      BEFORE: null,
     });
 
     if (!rows.rows?.length) {

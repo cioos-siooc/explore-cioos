@@ -61,7 +61,7 @@ export const longitudeOf = (variables) =>
 
 // ERDDAP sends time as an ISO string, but a dataset whose units are epoch
 // seconds sends a number; both are orderable, nothing else is.
-function instantOf(value) {
+export function instantOf(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value !== "string" || !value.trim()) return null;
   const parsed = Date.parse(value);

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   SWATCHES,
   defaultColorFor,
+  distinctColorsFor,
   formatColorsParam,
   normalizeColor,
   parseColorsParam,
@@ -126,4 +127,25 @@ test("the pair separator survives the query string", () => {
     parseColorsParam(new URLSearchParams(written).get("pcolors")),
     { PSAL_01: "#1a5a92", TE90_01: "#a52c60" },
   );
+});
+
+test("columns sharing a palette get distinct colours on one plot", () => {
+  const variablesByName = new Map([
+    ["a", { columnName: "a", palette: "KT_thermal" }],
+    ["b", { columnName: "b", palette: "KT_thermal" }],
+  ]);
+  const colors = distinctColorsFor(["a", "b"], variablesByName, {});
+  assert.notEqual(colors.a, colors.b);
+});
+
+test("a picked colour is kept even when another column has it", () => {
+  const variablesByName = new Map([
+    ["a", { columnName: "a" }],
+    ["b", { columnName: "b" }],
+  ]);
+  const colors = distinctColorsFor(["a", "b"], variablesByName, {
+    b: SWATCHES[0],
+  });
+  assert.equal(colors.a, SWATCHES[0]);
+  assert.equal(colors.b, SWATCHES[0]);
 });

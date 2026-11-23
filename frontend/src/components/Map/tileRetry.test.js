@@ -67,4 +67,59 @@ describe("createTileRetry", () => {
     vi.runAllTimers();
     expect(refresh).toHaveBeenCalledWith("cde-tiles", tile);
   });
+
+  describe("a tile it gave up on", () => {
+    let onChange;
+    const giveUp = (sourceId = "cde-tiles") => {
+      retry.onError(sourceId, tile);
+      vi.runAllTimers();
+      retry.onError(sourceId, tile);
+      vi.runAllTimers();
+      retry.onError(sourceId, tile);
+    };
+
+    beforeEach(() => {
+      onChange = vi.fn();
+      retry = createTileRetry({ refresh, onChange, delays: [100, 300] });
+    });
+
+    it("is reported once, and only once the retries are spent", () => {
+      retry.onError("cde-tiles", tile);
+      expect(retry.hasExhausted(["cde-tiles"])).toBe(false);
+      vi.runAllTimers();
+      retry.onError("cde-tiles", tile);
+      vi.runAllTimers();
+      retry.onError("cde-tiles", tile);
+      retry.onError("cde-tiles", tile);
+      expect(retry.hasExhausted(["cde-tiles"])).toBe(true);
+      expect(retry.hasExhausted(["imagery"])).toBe(false);
+      expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears when the tile loads after all", () => {
+      giveUp();
+      retry.onLoad("cde-tiles", tile);
+      expect(retry.hasExhausted(["cde-tiles"])).toBe(false);
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+
+    it("gets a fresh set of attempts from retryExhausted", () => {
+      giveUp();
+      refresh.mockClear();
+      retry.retryExhausted();
+      expect(refresh).toHaveBeenCalledWith("cde-tiles", tile);
+      expect(retry.hasExhausted(["cde-tiles"])).toBe(false);
+
+      retry.onError("cde-tiles", tile);
+      vi.advanceTimersByTime(100);
+      expect(refresh).toHaveBeenCalledTimes(2);
+    });
+
+    it("is forgotten by reset", () => {
+      giveUp();
+      retry.reset("cde-tiles");
+      expect(retry.hasExhausted(["cde-tiles"])).toBe(false);
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+  });
 });

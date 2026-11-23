@@ -10,7 +10,7 @@
   color: var(--cioos-track-700);
 }
 
-.trajectoryDateInput:focus-visible {
+.trajectoryDateInput[data-focus-within] {
   border-color: var(--cioos-track);
   box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
 }
@@ -59,4 +59,38 @@
 .trajectoryDateRail .railTicks {
   height: 10px;
   font-size: var(--cioos-font-size-2xs);
+}
+
+.trajectoryDateToggle {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  gap: 4px;
+  width: 100%;
+  min-height: var(--legend-row, 24px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-track-700);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trajectoryDateToggle:hover {
+  background-color: var(--cioos-track-surface);
+}
+
+.trajectoryDateToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.trajectorySummaryTrail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--cioos-ink-80);
 }

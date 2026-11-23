@@ -3,6 +3,7 @@ import { cdmDataTypeLabel } from "./dataLayers.js";
 // Offered only while the list is grouped, and its default then.
 export const GROUP_SIZE = "groupSize";
 export const DEFAULT_SORT = { field: "title", dir: "asc" };
+export const DAYS_SORT = { field: "days", dir: "desc" };
 export const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
 
 const NUMERIC_FIELDS = new Set([
@@ -52,24 +53,24 @@ const sortValue = (row, field, t) => {
 };
 
 // The datasets list's row order, which the "what's here" card follows too.
-// Map-click datasets come first, then grids while their coverage layer is on;
-// each block keeps the chosen sort. Group size orders groups, not rows.
+// Grids come first, folded by the list into one row so regional satellite
+// products don't bury the measurements taken in a place; within grids and the
+// rest, map-click datasets lead, and each block keeps the chosen sort. Group
+// size orders groups, not rows.
 export function sortDatasets(
   rows,
   sort,
-  { pinnedPks = EMPTY_SET, gridFirst = false, t, language },
+  { pinnedPks = EMPTY_SET, t, language },
 ) {
   const { field, dir } = sort.field === GROUP_SIZE ? DEFAULT_SORT : sort;
   const factor = dir === "asc" ? 1 : -1;
   return [...(rows || [])].sort((a, b) => {
+    const ga = a.cdm_data_type === "Grid" ? 0 : 1;
+    const gb = b.cdm_data_type === "Grid" ? 0 : 1;
+    if (ga !== gb) return ga - gb;
     const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1;
     const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1;
     if (pa !== pb) return pa - pb;
-    if (gridFirst) {
-      const ga = a.cdm_data_type === "Grid" ? 0 : 1;
-      const gb = b.cdm_data_type === "Grid" ? 0 : 1;
-      if (ga !== gb) return ga - gb;
-    }
     const va = sortValue(a, field, t);
     const vb = sortValue(b, field, t);
     if (NUMERIC_FIELDS.has(field)) return (va - vb) * factor;

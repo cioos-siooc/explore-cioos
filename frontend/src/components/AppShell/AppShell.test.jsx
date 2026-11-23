@@ -48,6 +48,8 @@ describe("AppShell (composition)", () => {
   });
 
   it("states the selection count inside the Download button, not beside it", async () => {
+    // A returning visitor: the intro's modal would hide the page behind it.
+    window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<AppShell />, { providers: "app" });
     const footer = await screen.findByTestId("sidebar-footer");
     const button = screen.getByRole("button", { name: /Download/ });
@@ -141,10 +143,36 @@ describe("AppShell (composition)", () => {
       {},
       { timeout: 3000 },
     );
-    await user.click(screen.getByRole("button", { name: "Back to results" }));
+    // The palette stays open for more picks; the page is behind its backdrop.
+    await user.keyboard("{Escape}{Escape}");
+    await user.click(
+      await screen.findByRole("button", { name: "Back to results" }),
+    );
     await waitFor(() =>
       expect(screen.queryByTestId("sidebar-back")).toBeNull(),
     );
+  });
+
+  it("the Datasets button opens the list with focus on its first card", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("cde.introSeen", "true");
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await user.click(await screen.findByTestId("topbar-datasets-button"));
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getAllByTestId("dataset-card")[0]
+            .querySelector("button.datasetCardTitle"),
+        ).toHaveFocus(),
+      { timeout: 3000 },
+    );
+    await user.keyboard("{ArrowDown}");
+    expect(
+      screen
+        .getAllByTestId("dataset-card")[1]
+        .querySelector("button.datasetCardTitle"),
+    ).toHaveFocus();
   });
 
   it("comes back from a dataset page to the same page of the list", async () => {
@@ -371,5 +399,56 @@ describe("AppShell (composition)", () => {
     expect(
       screen.queryByText("No datasets match your search."),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("AppShell deployment notices", () => {
+  const notice = { id: "beta", en: "This is a beta version.", fr: "Bêta." };
+
+  let served;
+  function serveNotices(notices) {
+    served = 0;
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.endsWith("/notices.json")) {
+        served += 1;
+        return Promise.resolve(Response.json(notices));
+      }
+      return realFetch(input, init);
+    };
+  }
+
+  it("shows the notice in the About window, not as a toast over it", async () => {
+    serveNotices([notice]);
+    renderWithProviders(<AppShell />, { providers: "app" });
+    expect(
+      await screen.findByText(notice.en, { selector: ".introNotices p" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("notice-toast")).not.toBeInTheDocument();
+  });
+
+  it("toasts a returning visitor and remembers when it is closed", async () => {
+    const user = userEvent.setup();
+    serveNotices([notice]);
+    window.localStorage.setItem("cde.introSeen", "true");
+    const { unmount } = renderWithProviders(<AppShell />, {
+      providers: "app",
+    });
+    const toast = await screen.findByTestId("notice-toast");
+    expect(toast).toHaveTextContent(notice.en);
+
+    await user.click(screen.getByRole("button", { name: "Close notice" }));
+    expect(screen.queryByTestId("notice-toast")).not.toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem("cde.dismissedNotices")),
+    ).toEqual(["beta"]);
+
+    unmount();
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await waitFor(() => expect(served).toBe(2));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(screen.queryByTestId("notice-toast")).not.toBeInTheDocument();
   });
 });

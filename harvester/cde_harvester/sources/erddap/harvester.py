@@ -20,7 +20,7 @@ from cde_harvester.core.errors import (
     RESPONSE_TOO_LARGE,
     UNCHANGED,
     UNKNOWN_ERROR,
-    ResponseTooLargeError,
+    DatasetDataError,
 )
 from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.harvest_warnings import FEATURES_HIDDEN, TRACKS_UNAVAILABLE
@@ -193,29 +193,24 @@ class ERDDAPHarvester(BaseHarvester):
 
         unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
         if not unsupported_datasets.empty:
-            unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
-            erddap_logger.warning(
-                f"Skipping datasets because cdm_data_type is not "
-                f"{cdm_data_types_supported}: {unsupported_datasets_list}"
+            erddap_logger.info(
+                "Skipping datasets whose cdm_data_type CDE does not map: %s",
+                unsupported_datasets["datasetID"].to_list(),
             )
             base = self.erddap_url.rstrip("/")
-            for dataset_id in unsupported_datasets_list:
+            for dataset_id, cdm_type in unsupported_datasets[
+                ["datasetID", "cdm_data_type"]
+            ].itertuples(index=False):
                 skipped_datasets_reasons += [
                     [erddap_url, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
                 ]
-                cdm_type = unsupported_datasets.loc[
-                    unsupported_datasets["datasetID"] == dataset_id, "cdm_data_type"
-                ].iloc[0]
                 attempt_records.append(_build_attempt(
                     self.run_id, self.erddap_url, dataset_id,
                     status="skipped",
                     reason_code=CDM_DATA_TYPE_UNSUPPORTED,
                     error_message=(
-                        f"cdm_data_type={cdm_type!r}: CDE harvests only "
-                        f"{', '.join(cdm_data_types_supported)}, the types whose "
-                        "feature structure (cf_role ids, LLAT variables) it can "
-                        "map. Set cdm_data_type in datasets.xml if one of them "
-                        "describes this dataset"
+                        f"Not mapped: cdm_data_type={cdm_type!r}. CDE maps "
+                        f"{', '.join(cdm_data_types_supported)} datasets."
                     ),
                     query_urls=[f"{base}/info/{dataset_id}/index.html"],
                 ))
@@ -385,12 +380,12 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     dataset = None
     progress = f" {idx}/{total}" if idx and total else ""
     try:
-        new_hash, has_files, hash_reason = erddap.get_croissant_fingerprint(
+        new_hash, reliable, hash_reason = erddap.get_croissant_fingerprint(
             erddap_url, dataset_id,
             dap="griddap" if data_structure == "grid" else "tabledap",
         )
         prev_hash = (previous_hashes or {}).get(dataset_id)
-        if skip_unchanged and has_files and new_hash and prev_hash == new_hash:
+        if skip_unchanged and reliable and new_hash and prev_hash == new_hash:
             duration_ms = int((time.monotonic() - t0) * 1000)
             log.info(
                 f"Dataset not updated since last harvest, skipping: "
@@ -519,20 +514,20 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             skipped_reason_code=HTTP_ERROR,
             message=f"{detail} harvesting {dataset_id}",
         ) from e
-    except ResponseTooLargeError as e:
+    except DatasetDataError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
-        log.error("Response too large: %s", e)
+        log.error("%s: %s", e.reason_code, e)
         raise DatasetHarvestError(
             attempt=_build_attempt(
                 run_id, erddap_url, dataset_id,
                 status="error",
-                reason_code=RESPONSE_TOO_LARGE,
+                reason_code=e.reason_code,
                 error_message=str(e),
                 duration_ms=duration_ms,
                 query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
             ),
-            skipped_reason_code=RESPONSE_TOO_LARGE,
-            message=f"Response too large harvesting {dataset_id}: {e}",
+            skipped_reason_code=e.reason_code,
+            message=f"{e.reason_code} harvesting {dataset_id}: {e}",
         ) from e
     except Exception as e:
         duration_ms = int((time.monotonic() - t0) * 1000)

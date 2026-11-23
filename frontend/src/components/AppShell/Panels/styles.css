@@ -68,7 +68,7 @@
   font: inherit;
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
@@ -77,13 +77,13 @@
 }
 
 .filtersPanelDone {
-  border-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-800);
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
 }
 
 .filtersPanelDone:hover {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 .filtersPanelReset:focus-visible,
@@ -194,7 +194,7 @@
   font: inherit;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
@@ -344,7 +344,7 @@
    (same specificity, loaded later), whose 30px line box breaks wrapped labels. */
 .filtersPanel .filterOptionsBody .optionButton {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   line-height: 1.35;
   padding: 6px 8px;
@@ -553,7 +553,7 @@
   .filtersPanel .filterOptionsBody .optionButton {
     min-height: 44px;
     padding: 6px 8px;
-    margin: 0;
+    margin: 0 0 4px;
   }
 
   .filtersPanel .filterOptionsBody {

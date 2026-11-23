@@ -9,8 +9,8 @@ import DatasetMetadata, {
   DatasetAbstract,
   KeywordsCell,
   LicenseCell,
-  MetadataExtentCells,
-  Citation,
+  CitationCard,
+  catalogueExtent,
   NoTranslationNote,
   Organizations,
   localized,
@@ -247,8 +247,7 @@ describe("DatasetMetadata", () => {
 
   it("copies the citation from an icon button", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Citation metadata={METADATA} />);
-    await user.click(screen.getByRole("button", { name: "Citation" }));
+    renderWithProviders(<CitationCard metadata={METADATA} />);
     await user.click(screen.getByRole("button", { name: "Copy citation" }));
     // user-event stands in its own clipboard for the browser's.
     expect(await navigator.clipboard.readText()).toBe(
@@ -329,7 +328,8 @@ describe("Organizations", () => {
         (c) => c.textContent,
       );
     expect(chips()).toEqual(["A", "B", "C", "+2"]);
-    await user.click(screen.getByRole("button", { name: "Show more" }));
+    // Its name carries its visible text (WCAG 2.5.3).
+    await user.click(screen.getByRole("button", { name: "+2" }));
     expect(chips()).toEqual(["A", "B", "C", "D", "E", "Show less"]);
   });
 
@@ -348,43 +348,47 @@ describe("Organizations", () => {
 });
 
 describe("Citation", () => {
-  it("shows the citation in a popup on click, adding a DOI it lacks", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Citation metadata={METADATA} />);
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Citation" }));
-    expect(screen.getByText(/A dataset\./)).toBeInTheDocument();
+  it("shows the citation on the page, adding a DOI it lacks", () => {
+    renderWithProviders(<CitationCard metadata={METADATA} />);
+    expect(screen.getByText(/A dataset\./)).toBeVisible();
     expect(
       screen.getByRole("link", { name: "https://doi.org/10.0000/x" }),
     ).toBeInTheDocument();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
   });
 
-  it("shows the citation on hover", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Citation metadata={METADATA} />);
-    await user.hover(screen.getByRole("button", { name: "Citation" }));
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
-    expect(await screen.findByText(/A dataset\./)).toBeInTheDocument();
-    await user.unhover(screen.getByRole("button", { name: "Citation" }));
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+  it("links a web address written into the citation", () => {
+    renderWithProviders(
+      <CitationCard
+        metadata={{
+          citation: { en: "Someone (2024). A dataset. https://example.org/x." },
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("link", { name: "https://example.org/x" }),
+    ).toHaveAttribute("href", "https://example.org/x");
+    expect(screen.getByText(/A dataset\./).textContent).toMatch(/x\.$/);
   });
 
-  it("does not open when the pointer only passes over", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Citation metadata={METADATA} />);
-    const button = screen.getByRole("button", { name: "Citation" });
-    await user.hover(button);
-    await user.unhover(button);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+  it("does not repeat a DOI the citation already ends with", () => {
+    renderWithProviders(
+      <CitationCard
+        metadata={{
+          ...METADATA,
+          citation: { en: "Someone (2024). https://doi.org/10.0000/x" },
+        }}
+      />,
+    );
+    // The DOI in the text is linked once, not appended again.
+    expect(screen.getAllByRole("link", { name: /doi\.org/ })).toHaveLength(1);
   });
 
-  it("says the source gave no citation or DOI", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<Citation metadata={{}} />);
-    await user.click(screen.getByRole("button", { name: "Citation" }));
+  it("says the source gave no citation or DOI, with nothing to copy", () => {
+    renderWithProviders(
+      <CitationCard
+        metadata={{ ...METADATA, citation: undefined, doi: undefined }}
+      />,
+    );
     expect(
       screen.getByText(/has not supplied a citation or DOI/),
     ).toBeInTheDocument();
@@ -392,12 +396,16 @@ describe("Citation", () => {
       screen.queryByRole("button", { name: "Copy citation" }),
     ).not.toBeInTheDocument();
   });
+});
 
-  it("renders nothing while the metadata loads", () => {
-    const { container } = renderWithProviders(
-      <Citation metadata={undefined} />,
-    );
-    expect(container).toBeEmptyDOMElement();
+describe("CitationCard states", () => {
+  it("holds its place while the metadata loads, and leaves errors to the cards below", () => {
+    const { rerender } = renderWithProviders(<CitationCard loading />);
+    expect(
+      screen.getByRole("heading", { name: "Citation" }),
+    ).toBeInTheDocument();
+    rerender(<CitationCard error />);
+    expect(screen.queryByRole("heading", { name: "Citation" })).toBeNull();
   });
 });
 
@@ -417,20 +425,27 @@ describe("LicenseCell", () => {
 });
 
 describe("facts sheet cells", () => {
-  it("shows the declared period and depth, and only those it has", () => {
+  it("reads the declared period as days and rounds the declared depth", () => {
+    expect(
+      catalogueExtent({
+        temporal_extent: { begin: "2019-04-01T00:00:00Z", end: "2023-10-30" },
+        vertical_extent: { min: 0.079366, max: 9701.095795 },
+      }),
+    ).toEqual({ period: "2019-04-01 – 2023-10-30", depth: "0.1 – 9701 m" });
+    expect(catalogueExtent(undefined)).toEqual({
+      period: undefined,
+      depth: undefined,
+    });
+  });
+
+  it("shows GCMD keyword paths as their last term, the path on hover", () => {
+    const path = "EARTH SCIENCE > BIOLOGICAL CLASSIFICATION > ANIMALS";
     renderWithProviders(
       <dl>
-        <MetadataExtentCells
-          metadata={{
-            temporal_extent: { begin: "2019-04-01", end: "2023-10-30" },
-          }}
-        />
+        <KeywordsCell metadata={{ keywords: { en: [path] } }} />
       </dl>,
     );
-    expect(screen.getByText("Time period").parentElement).toHaveTextContent(
-      "2019-04-01 – 2023-10-30",
-    );
-    expect(screen.queryByText("Depth")).toBeNull();
+    expect(screen.getByText("Animals")).toHaveAttribute("title", path);
   });
 
   it("lists keywords as chips", () => {

@@ -86,17 +86,17 @@ python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache
 
 The harvester is typically run via Docker Compose. See the main [README](../README.md) for details.
 
-The harvest config is **not baked into the image** — it must be provided at
-runtime. It is resolved in priority order (see
+The image bakes every committed `harvest_config.*.yaml` under its own name in
+`/app/harvester/`. The config is resolved in priority order (see
 `cde_harvester/core/config.py:resolve_harvest_config_file`):
 
 1. `HARVEST_CONFIG_B64` env var — the whole YAML file base64-encoded on one
    line (used on Coolify, where raw multi-line env values get mangled).
    Generate it with `base64 < harvest_config.yaml | tr -d '\n'`.
-2. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
-   docker-compose files set this to `/app/harvester/harvest_config.yaml`, so
-   the mounted config is used without needing the `-f` flag.
-3. A file mounted at `/app/harvester/harvest_config.yaml`.
+2. `HARVEST_CONFIG_FILE` env var — a baked or mounted config file. Defaults
+   to `/app/harvester/harvest_config.production.yaml`; set it to
+   `/app/harvester/harvest_config.yaml` when mounting a local file there.
+3. The `-f` flag / `config_file` parameter.
 
 If none exists, startup fails with an error listing these options. See the main
 [README](../README.md#harvest-configuration) for how config changes propagate

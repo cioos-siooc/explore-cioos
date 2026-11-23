@@ -6,7 +6,7 @@ import os
 import shutil
 import sys
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,6 +18,7 @@ from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.client.schemas.objects import ConcurrencyLimitConfig, ConcurrencyLimitStrategy
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
+from sentry_sdk.crons import monitor
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -653,6 +654,29 @@ def _run_lane(sources: list[str], triggered_by: str | None = None, force: bool =
     return [_trigger_source_harvest(src, triggered_by, force) for src in sources]
 
 
+HARVEST_MONITOR_SLUG = "cde-harvest-all"
+
+
+def _harvest_monitor():
+    """Sentry check-ins for the scheduled harvest; the monitor is created from
+    HARVESTER_CRON so Sentry flags a missed, failed or overrunning run."""
+    schedule = _cron_env("HARVESTER_CRON")
+    if not schedule:
+        return nullcontext()
+    return monitor(
+        monitor_slug=HARVEST_MONITOR_SLUG,
+        monitor_config={
+            "schedule": {"type": "crontab", "value": schedule},
+            # Prefect evaluates deployment crons in UTC.
+            "timezone": "UTC",
+            "checkin_margin": 60,
+            "max_runtime": 24 * 60,
+            "failure_issue_threshold": 1,
+            "recovery_threshold": 1,
+        },
+    )
+
+
 @flow(name="Harvest All Sources", log_prints=True)
 def cde_harvest_all_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
@@ -663,6 +687,11 @@ def cde_harvest_all_run(
     """Scheduled fan-out: trigger one independent per-source harvest job per configured source
     (see _plan_lanes for the order), wait for all, and fail red if any did not complete
     (a failure doesn't cancel the others). `sources` narrows it to those configured sources."""
+    with _harvest_monitor():
+        _harvest_all(config_file, triggered_by, force, sources)
+
+
+def _harvest_all(config_file, triggered_by, force, sources):
     logger = _run_logger()
 
     config_file = resolve_harvest_config_file(config_file)

@@ -26,15 +26,12 @@
   height: 36px;
 }
 
-/* Guarded: a touch device leaves :hover latched on the last thing tapped. */
-@media (hover: hover) {
-  .closeButton:hover {
-    background-color: var(--cioos-surface-2);
-    color: var(--cioos-ink);
-  }
+.closeButton[data-hovered] {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
 }
 
-.closeButton:focus-visible {
+.closeButton[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
   color: var(--cioos-ink);

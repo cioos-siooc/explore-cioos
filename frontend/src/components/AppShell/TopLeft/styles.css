@@ -118,10 +118,11 @@
   text-decoration: none;
 }
 
-/* Same fill as .topBarButton.active; icons use currentColor. */
+/* Same fill and outline as .topBarButton.active; icons use currentColor. */
 .brandMinorItem.active {
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
+  box-shadow: inset 0 0 0 3px var(--cioos-primary-800);
 }
 
 .brandMinorItem.active:hover {

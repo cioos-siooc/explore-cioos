@@ -5,6 +5,7 @@ import isEmpty from "lodash-es/isEmpty";
 
 import Tooltip from "../../../ui/Tooltip.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../../ui/Button.jsx";
 
 export default function FilterButton({
   setOptionsSelected,
@@ -21,13 +22,13 @@ export default function FilterButton({
 
   return (
     <Tooltip placement="bottom" delay={150} content={tooltipText}>
-      <button
+      <ToggleButton
         className={`filterButton ${filterOptionSelected && "selected"}`}
         data-testid="filter-option"
         data-option-pk={option.pk}
         data-selected={filterOptionSelected}
-        aria-pressed={filterOptionSelected}
-        onClick={() => {
+        isSelected={filterOptionSelected}
+        onChange={() => {
           setOptionsSelected(
             optionsSelected.map((opt) => {
               if (option.pk === opt.pk) {
@@ -42,7 +43,7 @@ export default function FilterButton({
       >
         {t(option.title)}
         {filterOptionSelected && <X size="25" color="darkgrey" />}
-      </button>
+      </ToggleButton>
     </Tooltip>
   );
 }

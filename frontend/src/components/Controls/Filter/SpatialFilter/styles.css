@@ -150,7 +150,7 @@
   align-items: center;
   gap: 4px;
   font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .spatialFilterPlacesSource {
@@ -241,7 +241,7 @@
   background-color: var(--cioos-surface-2);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
-  font-family: var(--cioos-font-mono, monospace);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: var(--cioos-font-size-xs);
   line-height: 1.5;
   color: var(--cioos-ink);
@@ -262,7 +262,7 @@
   height: 30px;
   margin-left: auto;
   padding: 0 14px;
-  border: 1px solid var(--cioos-primary-700);
+  border: 1px solid var(--cioos-primary-800);
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
@@ -273,7 +273,7 @@
 }
 
 .spatialFilterApply:hover:not(:disabled) {
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
 }
 
 .spatialFilterApply:focus-visible {
@@ -286,4 +286,19 @@
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink-60);
   cursor: default;
+}
+
+/* The draw options are buttons wearing the filter rows' look. */
+.spatialFilterOptions .optionButton {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.spatialFilterOptions .optionButton[data-focus-visible] {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }

@@ -2,7 +2,10 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const { pipeline } = require("../utils/routePipeline");
+const {
+  pipeline,
+  SLOW_ROUTE_CACHE_DURATION,
+} = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
 const {
@@ -112,7 +115,9 @@ function rampRange() {
  *                       type: array
  *                       items: { type: integer }
  */
-router.get("/", ...pipeline(), async (req, res) => {
+const slowRoute = pipeline({ cacheFor: SLOW_ROUTE_CACHE_DURATION });
+
+router.get("/", ...slowRoute, async (req, res) => {
   const filters = await createDBFilter(req.query);
   // Must match the metric the tiles were requested with, or the ramp domain
   // won't match the numbers being ramped.

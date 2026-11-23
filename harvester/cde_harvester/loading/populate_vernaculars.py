@@ -27,6 +27,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from urllib3.util.retry import Retry
 
 from cde_harvester.core.db import create_db_engine, db_host
+from cde_harvester.user_agent import USER_AGENT
 
 logging.basicConfig(
     level=logging.INFO,
@@ -100,7 +101,7 @@ def build_engine(workers: int = DEFAULT_WORKERS):
 
 def build_session(workers: int = DEFAULT_WORKERS):
     s = requests.Session()
-    s.headers["User-Agent"] = "cioos-cde/populate_vernaculars (+https://cioos.ca)"
+    s.headers["User-Agent"] = USER_AGENT
     s.headers["Accept"] = "application/json"
     retry = LoggingRetry(
         total=4,

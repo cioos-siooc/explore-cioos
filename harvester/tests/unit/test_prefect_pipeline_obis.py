@@ -3,6 +3,7 @@ harvester_main, and OBIS must stay scheduled when discovery leaves
 obis_dataset_ids empty at config time."""
 
 import logging
+from contextlib import contextmanager
 
 import pytest
 import yaml
@@ -299,3 +300,34 @@ def test_harvest_all_cannot_overlap(config_file, monkeypatch):
     limit = deployed["cde-harvest-all"]["concurrency_limit"]
     assert (limit.limit, limit.collision_strategy) == (1, "CANCEL_NEW")
     assert all("concurrency_limit" not in kw for n, kw in deployed.items() if n != "cde-harvest-all")
+
+
+class TestHarvestMonitor:
+    def test_no_schedule_sends_no_check_ins(self, config_file, monkeypatch):
+        monkeypatch.delenv("HARVESTER_CRON", raising=False)
+        monkeypatch.setattr(
+            prefect_pipeline, "monitor", lambda **kw: pytest.fail("monitor without a schedule")
+        )
+        with pytest.raises(ValueError, match="No sources configured"):
+            prefect_pipeline.cde_harvest_all_run.fn(config_file({"erddap_urls": []}))
+
+    def test_scheduled_run_checks_in_against_its_cron(self, config_file, monkeypatch):
+        monitored = []
+
+        @contextmanager
+        def fake_monitor(monitor_slug, monitor_config):
+            monitored.append((monitor_slug, monitor_config["schedule"]))
+            try:
+                yield
+            except ValueError:
+                monitored.append("error")
+                raise
+
+        monkeypatch.setenv("HARVESTER_CRON", " 0 0 * * 3,6 ")
+        monkeypatch.setattr(prefect_pipeline, "monitor", fake_monitor)
+        with pytest.raises(ValueError):
+            prefect_pipeline.cde_harvest_all_run.fn(config_file({"erddap_urls": []}))
+        assert monitored == [
+            ("cde-harvest-all", {"type": "crontab", "value": "0 0 * * 3,6"}),
+            "error",
+        ]

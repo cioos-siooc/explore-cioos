@@ -47,13 +47,16 @@ export default function ZoomToDataset() {
   const { t } = useTranslation();
   const { zoomToDataset, canZoom, framed } = useZoomToDataset();
 
+  // Framed is a passing state of the camera, so the button stays focusable
+  // and says why it has nothing to do rather than dropping out of the tab order.
   return (
     <button
       type="button"
       className="zoomToDatasetButton"
-      onClick={zoomToDataset}
-      title={t("zoomToDatasetTitle")}
-      disabled={!canZoom || framed}
+      onClick={framed ? undefined : zoomToDataset}
+      title={t(framed ? "zoomToDatasetFramedTitle" : "zoomToDatasetTitle")}
+      disabled={!canZoom}
+      aria-disabled={framed || undefined}
     >
       <ZoomIn size={15} aria-hidden="true" />
       {t("zoomToDatasetText")}

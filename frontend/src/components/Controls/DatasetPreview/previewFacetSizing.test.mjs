@@ -12,10 +12,12 @@ import {
   plotHeightFor,
   plotWidthFor,
   titleRoomFor,
+  COLUMN_GAP,
   LABEL_LINE_PX,
   MIN_PANEL_PX,
   PINNED_AXIS_LINES,
   PINNED_EDGE_PX,
+  ROW_GAP,
   TICK_ROOM_PX,
 } from "./previewFacetSizing.js";
 
@@ -84,6 +86,11 @@ test("profile width grows past the container once panels hit their floor", () =>
   assert.equal(plotWidthFor(ROWS, 14, 1000), 1000);
 });
 
+test("a zero panel floor fits any panel count to the box", () => {
+  assert.equal(plotWidthFor(COLUMNS, 14, 300, 0), 300);
+  assert.equal(plotHeightFor(ROWS, 14, 600, undefined, 0), 600);
+});
+
 test("each orientation reserves the edge its labels actually use", () => {
   // Without the title, which sits at the top of both.
   const columns = marginFor(COLUMNS, 0);
@@ -101,14 +108,12 @@ test("each orientation reserves the edge its labels actually use", () => {
 });
 
 test("the pinned strip reserves the room the figure gave up", () => {
-  // Its tick labels, then a two-line title running along the axis.
+  // Its tick labels, then the title's two lines, beside a left axis or under a
+  // bottom one.
   assert.equal(PINNED_AXIS_LINES, 2);
-  assert.equal(
-    pinnedAxisSizeFor(COLUMNS),
-    TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
-  );
+  assert.equal(pinnedAxisSizeFor(COLUMNS), TICK_ROOM_PX + 2 * LABEL_LINE_PX);
   assert.equal(pinnedAxisSizeFor(COLUMNS), 88);
-  assert.equal(pinnedAxisSizeFor(ROWS), 72);
+  assert.equal(pinnedAxisSizeFor(ROWS), 68);
 });
 
 test("a profile's top margin pays for every line of its panel titles", () => {
@@ -133,7 +138,7 @@ test("the sizing floors pay for the gaps, so a panel really gets its minimum", (
     const width = plotWidthFor(COLUMNS, n, 100);
     const columns = marginFor(COLUMNS);
     const plotting = width - columns.l - columns.r;
-    const [start, end] = domainsFor(n, 0.22)[0];
+    const [start, end] = domainsFor(n, COLUMN_GAP)[0];
     assert.ok(
       plotting * (end - start) >= MIN_PANEL_PX - 1,
       `n=${n}: ${(plotting * (end - start)).toFixed(0)}px panel`,
@@ -142,7 +147,7 @@ test("the sizing floors pay for the gaps, so a panel really gets its minimum", (
     const height = plotHeightFor(ROWS, n, 100);
     const rows = marginFor(ROWS);
     const stacked = height - rows.t - rows.b;
-    const [low, high] = domainsFor(n, 0.12)[0];
+    const [low, high] = domainsFor(n, ROW_GAP)[0];
     assert.ok(
       stacked * (high - low) >= MIN_PANEL_PX - 1,
       `n=${n}: ${(stacked * (high - low)).toFixed(0)}px panel`,
@@ -202,4 +207,12 @@ test("the height budget can only ever come down — no growth loop", () => {
   // And an empty budget still cannot collapse the figure (see the first-render
   // case above).
   assert.ok(plotHeightFor(COLUMNS, 1, heightBudgetFor(0, 0)) > 0);
+});
+
+test("smaller labels shrink every margin they sit in", () => {
+  const small = 14;
+  assert.ok(pinnedAxisSizeFor(COLUMNS, small) < pinnedAxisSizeFor(COLUMNS));
+  assert.ok(pinnedAxisSizeFor(ROWS, small) < pinnedAxisSizeFor(ROWS));
+  assert.ok(marginFor(COLUMNS, 0, 3, small).t < marginFor(COLUMNS, 0, 3).t);
+  assert.ok(marginFor(ROWS, 0, 3, small).l < marginFor(ROWS, 0, 3).l);
 });

@@ -1,21 +1,34 @@
 import * as React from "react";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Check2, Link45deg } from "react-bootstrap-icons";
+import {
+  Check2,
+  GraphUp,
+  Link45deg,
+  Table as TableIcon,
+} from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
+import SegmentedToggle from "../../ui/SegmentedToggle.jsx";
 import useElementSize from "../../ui/useElementSize.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 
 import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import usePreviewProfiles from "./usePreviewProfiles.js";
-import { previewSampleFor } from "./previewSample.js";
+import { previewSampleFor, previewWindowFor } from "./previewSample.js";
 import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
-import { COLOR_LAYOUT } from "../../../state/selection/previewParams.js";
+import {
+  COLOR_LAYOUT,
+  DEFAULT_ROW_LIMIT,
+} from "../../../state/selection/previewParams.js";
 import "./styles.css";
 
 const NO_CUSTOM_LABELS = {};
+const TITLE_ID = "datasetPreviewTitle";
 // Never equal to a linkKey (which is a query string, and may be ""), so the
 // button starts un-copied and returns there the moment the URL moves on.
 const NO_LINK_COPIED = Symbol("no link copied");
@@ -23,6 +36,8 @@ const NO_LINK_COPIED = Symbol("no link copied");
 export default function DatasetPreview({
   datasetPreview,
   previewError,
+  previewQuery,
+  retryPreview,
   inspectDataset,
   inspectRecordID,
   // {start, end} UTC days when one period of the record is shown (a
@@ -39,22 +54,28 @@ export default function DatasetPreview({
     const columnNames = datasetPreview?.table?.columnNames || [];
     const table = datasetPreview?.table?.rows || [];
     return table.map((row) =>
-      columnNames.reduce(
-        (merged, key, index) => ({ ...merged, [key]: row[index] }),
-        {},
-      ),
+      Object.fromEntries(columnNames.map((key, index) => [key, row[index]])),
     );
   }, [datasetPreview]);
 
   // Plot state lives in the query string so a link reproduces the plot and Back
   // closes it. Only the six the header and the body need are read here; the rest
   // goes to the plot through the provider below.
+  const mobile = useMediaQuery(MOBILE_QUERY);
   const plotParams = usePreviewPlotParams(
     inspectDataset,
     datasetPreview?.table,
     rows,
   );
-  const { selectedVis, setSelectedVis, linkKey, plotLayout, step } = plotParams;
+  const {
+    selectedVis,
+    setSelectedVis,
+    linkKey,
+    plotLayout,
+    step,
+    before,
+    rowLimit,
+  } = plotParams;
 
   // Fetched separately from the rows and independent of them: a record whose
   // list fails simply gets no slider.
@@ -63,6 +84,8 @@ export default function DatasetPreview({
     inspectRecordID,
   );
 
+  const drawsOneProfile =
+    plotLayout !== COLOR_LAYOUT && Boolean(step || profiles.current);
   // Said beside the title, so the table and both plot layouts all say it.
   const sample = useMemo(
     () =>
@@ -70,10 +93,30 @@ export default function DatasetPreview({
         sample: datasetPreview?.sample,
         rows,
         profiles,
-        drawsOneProfile:
-          plotLayout !== COLOR_LAYOUT && Boolean(step || profiles.current),
+        drawsOneProfile,
       }),
-    [datasetPreview, rows, profiles, plotLayout, step],
+    [datasetPreview, rows, profiles, drawsOneProfile],
+  );
+  // Shared by the pager above the plot or table and the row count in the
+  // parameters pane.
+  const previewWindow = useMemo(
+    () =>
+      previewWindowFor({
+        sample: datasetPreview?.sample,
+        rows,
+        drawsOneProfile,
+        hasPeriod: Boolean(inspectRecordPeriod),
+        before,
+        rowLimitChanged: rowLimit !== DEFAULT_ROW_LIMIT,
+      }),
+    [
+      datasetPreview,
+      rows,
+      drawsOneProfile,
+      inspectRecordPeriod,
+      before,
+      rowLimit,
+    ],
   );
   const formatCount = (count) => count.toLocaleString(i18n.language);
 
@@ -92,7 +135,10 @@ export default function DatasetPreview({
   // A viewing preference like the disclosure triangle in the plot, not a view of
   // the data — so not in the URL, and not reset per record.
   const [paneWidth, setPaneWidth] = useState(PANE_DEFAULT_PX);
+  // Two states, not one: the pane beside the plot on larger screens starts
+  // shown, the dialog smaller ones open it in starts closed.
   const [paneCollapsed, setPaneCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // The Table view's scroll container and the ceiling on the plot's height:
   // sized by the modal, not the plot, so it is safe to feed into the plot's
@@ -107,19 +153,38 @@ export default function DatasetPreview({
     setCustomLabels(NO_CUSTOM_LABELS);
   }
 
-  const plotValue = {
-    ...plotParams,
-    inspectDataset,
-    inspectRecordID,
-    profiles,
-    customLabels,
-    setCustomLabels,
-    paneWidth,
-    setPaneWidth,
-    paneCollapsed,
-    setPaneCollapsed,
-    availableHeight: scrollSize.height,
-  };
+  // Memoised: a fresh value would re-render every consumer, the plot included,
+  // on each render of this modal.
+  const plotValue = useMemo(
+    () => ({
+      ...plotParams,
+      inspectDataset,
+      inspectRecordID,
+      profiles,
+      previewWindow,
+      customLabels,
+      setCustomLabels,
+      paneWidth,
+      setPaneWidth,
+      paneCollapsed,
+      setPaneCollapsed,
+      settingsOpen,
+      setSettingsOpen,
+      availableHeight: scrollSize.height,
+    }),
+    [
+      plotParams,
+      inspectDataset,
+      inspectRecordID,
+      profiles,
+      previewWindow,
+      customLabels,
+      paneWidth,
+      paneCollapsed,
+      settingsOpen,
+      scrollSize.height,
+    ],
+  );
 
   const onModalClose = () => {
     // One call clears ?preview= and every plot param: react-router drops one of
@@ -129,6 +194,10 @@ export default function DatasetPreview({
     setRecordLoading(false);
   };
   const dataIsReady = !recordLoading && datasetPreview?.table?.rows;
+  // A desktop plot names the record itself (its title, or the heading above a
+  // profile), so the header keeps it only for a screen reader there. A phone
+  // hides that heading for room, and a table has none.
+  const recordNamedBelow = dataIsReady && selectedVis === "plot" && !mobile;
 
   return (
     <Modal
@@ -137,40 +206,60 @@ export default function DatasetPreview({
       size="xl"
       onHide={onModalClose}
       centered
+      aria-labelledby={TITLE_ID}
     >
       {inspectDataset && inspectRecordID && (
         <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && (
-              <>
-                <button
-                  className={`toggleButton ${
-                    selectedVis === "plot" && "selected"
-                  }`}
-                  onClick={() => setSelectedVis("plot")}
-                >
-                  {t("datasetPreviewPlotText")}
-                </button>
-                <button
-                  className={`toggleButton ${
-                    selectedVis === "table" && "selected"
-                  }`}
-                  onClick={() => setSelectedVis("table")}
-                >
-                  {t("datasetPreviewTableText")}
-                </button>
-              </>
+              <SegmentedToggle
+                className="previewViewToggle"
+                options={[
+                  {
+                    value: "plot",
+                    icon: GraphUp,
+                    label: t("datasetPreviewPlotText"),
+                  },
+                  {
+                    value: "table",
+                    icon: TableIcon,
+                    label: t("datasetPreviewTableText"),
+                  },
+                ]}
+                value={selectedVis}
+                onChange={setSelectedVis}
+              />
             )}
 
-            <h4 className="datasetTitle">
-              {inspectDataset.title}: <i>{inspectRecordID}</i>
+            <h2 className="datasetTitle" id={TITLE_ID}>
+              <span
+                className="datasetPreviewDatasetTitle"
+                title={inspectDataset.title}
+              >
+                {inspectDataset.title}
+                {recordNamedBelow ? <span className="sr-only">:</span> : ":"}
+              </span>{" "}
+              <i
+                className={
+                  recordNamedBelow
+                    ? "datasetPreviewRecord sr-only"
+                    : "datasetPreviewRecord"
+                }
+              >
+                {inspectRecordID}
+              </i>
               {inspectRecordPeriod && (
                 <span className="datasetPreviewPeriod">
                   {t("datasetPreviewPeriodText", inspectRecordPeriod)}
                 </span>
               )}
               {dataIsReady && sample && (
-                <span className="datasetPreviewSample">
+                <span
+                  className="datasetPreviewSample"
+                  title={t("datasetPreviewSampleHelp", {
+                    rows: formatCount(sample.rowCount),
+                  })}
+                >
                   {t(
                     sample.profileCount === null
                       ? "datasetPreviewSampleRows"
@@ -186,7 +275,7 @@ export default function DatasetPreview({
                   )}
                 </span>
               )}
-            </h4>
+            </h2>
 
             {dataIsReady && (
               // The URL mirrors the whole app state, so it is the share link.
@@ -215,6 +304,8 @@ export default function DatasetPreview({
                 datasetPreview={datasetPreview}
                 rows={rows}
                 previewError={previewError}
+                previewQuery={previewQuery}
+                retryPreview={retryPreview}
               />
             </div>
           </Modal.Body>

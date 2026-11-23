@@ -25,6 +25,7 @@ import useMediaQuery, {
 } from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
+import { Notice } from "../../AppShell/NoticeToast.jsx";
 import {
   findGridded,
   findTrajectory,
@@ -32,7 +33,7 @@ import {
   showNonna,
   showTrajectory,
 } from "../../../state/tips/scenes.js";
-import "../../ui/switchStyles.css";
+import Switch from "../../ui/Switch.jsx";
 import "./styles.css";
 
 function TrajectoryIcon({ size }) {
@@ -134,7 +135,7 @@ function Stat({ value, label, language }) {
   );
 }
 
-export default function IntroModal({ showModal, setShowModal }) {
+export default function IntroModal({ showModal, setShowModal, notices = [] }) {
   const { t, i18n } = useTranslation();
   const { setShowSelectionHelpModal, setShowPrivacyModal } = useUI();
   const { tipsEnabled, setTipsEnabled, startTour } = useTips();
@@ -187,6 +188,15 @@ export default function IntroModal({ showModal, setShowModal }) {
         </p>
       </Modal.Header>
       <Modal.Body>
+        {notices.length > 0 && (
+          <ul className="introNotices">
+            {notices.map((notice) => (
+              <li key={notice.id}>
+                <Notice notice={notice} />
+              </li>
+            ))}
+          </ul>
+        )}
         <section className="introHero">
           <svg
             className="introHeroWaves"
@@ -290,10 +300,13 @@ export default function IntroModal({ showModal, setShowModal }) {
 
         <footer className="introFooter">
           <div className="introFooterCards">
-            <label
+            <Switch
               className="introFooterCard"
-              htmlFor="introTipsToggle"
               data-testid="intro-tips"
+              aria-labelledby="introTipsHeading"
+              aria-describedby="introTipsText"
+              checked={tipsEnabled}
+              onChange={setTipsEnabled}
             >
               <Lightbulb size={20} aria-hidden="true" />
               <span className="introFooterText">
@@ -316,19 +329,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                   />
                 </span>
               </span>
-              <span className="form-switch">
-                <input
-                  id="introTipsToggle"
-                  className="form-check-input"
-                  type="checkbox"
-                  role="switch"
-                  aria-labelledby="introTipsHeading"
-                  aria-describedby="introTipsText"
-                  checked={tipsEnabled}
-                  onChange={() => setTipsEnabled(!tipsEnabled)}
-                />
-              </span>
-            </label>
+            </Switch>
             <FeedbackButton
               className="introFooterCard"
               size={20}

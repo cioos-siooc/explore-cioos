@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
+import eovs from "../eovs.json";
 import {
+  closestOption,
+  eovAliasText,
+  exactNameFirst,
   matchFilterOptions,
   parseFilterQuery,
   parsePartialRangeQuery,
@@ -155,6 +159,79 @@ describe("matchFilterOptions", () => {
     const result = matchFilterOptions(groups, "e", 1);
     expect(result).toHaveLength(1);
     expect(result[0].options).toHaveLength(1);
+  });
+});
+
+const eovOptions = eovs.map((eov) => ({
+  id: eov.value,
+  label: eov["label EN"],
+  matchText: `${eov["label EN"]} ${eov["label FR"]}`,
+  aliasText: eovAliasText(eov),
+}));
+const variables = [{ key: "eovs", options: eovOptions }];
+const ids = (term) =>
+  matchFilterOptions(variables, term, 8)[0]?.options.map((o) => o.id) ?? [];
+
+describe("matchFilterOptions, on definitions and aliases", () => {
+  it("finds a variable by the words of its definition, in either language", () => {
+    expect(ids("dissolved oxygen")).toEqual(["oxygen"]);
+    expect(ids("oxygène dissous")).toEqual(["oxygen"]);
+  });
+
+  it("finds a variable by its shorthand, a short one only whole", () => {
+    expect(ids("DO")).toEqual(["oxygen"]);
+    expect(ids("O2")).toEqual(["oxygen"]);
+    expect(ids("SST")).toEqual(["seaSurfaceTemperature"]);
+    expect(ids("chl")).toEqual(["phytoplanktonBiomassAndDiversity"]);
+    expect(ids("chlorophylle")).toEqual(["phytoplanktonBiomassAndDiversity"]);
+    expect(ids("pH")).toContain("inorganicCarbon");
+  });
+
+  it("ranks a variable named by the term before one only defined by it", () => {
+    const found = ids("oxygen");
+    expect(found[0]).toBe("oxygen");
+    expect(found).toContain("oceanSurfaceStress");
+  });
+
+  it("ranks a group that names the term before one found by definition", () => {
+    const platforms = {
+      key: "platforms",
+      options: [{ id: "glider", label: "Ocean glider", aliasText: "" }],
+    };
+    expect(
+      matchFilterOptions([variables[0], platforms], "glider").map((g) => g.key),
+    ).toEqual(["platforms"]);
+    const both = matchFilterOptions(
+      [
+        variables[0],
+        { key: "orgs", options: [{ id: "o", label: "Oxygen Labs" }] },
+      ],
+      "dissolved oxygen",
+    );
+    expect(both.map((g) => g.key)).toEqual(["eovs"]);
+  });
+
+  it("does not fuzzily match a definition", () => {
+    expect(ids("disolved oxigen")).toEqual([]);
+  });
+});
+
+describe("closestOption", () => {
+  it("picks the option most of the words point to, typos allowed", () => {
+    expect(closestOption(eovOptions, "dissolved oxygen levels")?.id).toBe(
+      "oxygen",
+    );
+    expect(closestOption(eovOptions, "disolved oxigen")?.id).toBe("oxygen");
+    expect(closestOption(eovOptions, "oxygen data")?.id).toBe("oxygen");
+  });
+
+  it("prefers the option whose label names the word", () => {
+    expect(closestOption(eovOptions, "oxygen measurements")?.id).toBe("oxygen");
+  });
+
+  it("offers nothing when under half the words turn up", () => {
+    expect(closestOption(eovOptions, "argo float profiles")).toBeUndefined();
+    expect(closestOption(eovOptions, "zz")).toBeUndefined();
   });
 });
 
@@ -334,4 +411,38 @@ describe("parsePartialRangeQuery", () => {
       expect(parse(term)).toBeUndefined();
     },
   );
+});
+
+describe("exactNameFirst", () => {
+  const orgs = {
+    key: "orgs",
+    options: [{ label: "Southern Gulf of St. Lawrence Coalition" }],
+  };
+  const places = {
+    key: "region",
+    options: [{ label: "Gulf of St. Lawrence" }],
+  };
+  const text = { key: "text", options: [{ label: "Gulf of St. Lawrence" }] };
+
+  it("leads with the place named exactly what was typed", () => {
+    expect(
+      exactNameFirst([orgs, places, text], "gulf of st. lawrence ", "region"),
+    ).toEqual([places, orgs, text]);
+  });
+
+  it("keeps the order when the place only resembles the term", () => {
+    const groups = [orgs, places, text];
+    expect(exactNameFirst(groups, "gulf", "region")).toBe(groups);
+  });
+
+  it("keeps the order when a filter value is named the same", () => {
+    const sameOrg = {
+      key: "orgs",
+      options: [{ label: "Gulf of St. Lawrence" }],
+    };
+    const groups = [sameOrg, places];
+    expect(exactNameFirst(groups, "Gulf of St. Lawrence", "region")).toBe(
+      groups,
+    );
+  });
 });

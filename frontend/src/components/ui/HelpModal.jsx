@@ -33,7 +33,7 @@ export default function HelpModal({
             {icon}
           </span>
           <span className="helpModalTitleText">
-            <span className="helpModalTitleHeading">{title}</span>
+            <h2 className="helpModalTitleHeading">{title}</h2>
             {subtitle && (
               <span className="helpModalTitleSubtitle">{subtitle}</span>
             )}

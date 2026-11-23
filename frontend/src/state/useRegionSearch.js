@@ -16,21 +16,36 @@ import reportError from "./reportError.js";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 
 export const REGION_MIN_LENGTH = 3;
+// GeoNames sometimes hangs without answering; past this the search gives up
+// so the spinner does not run forever.
+export const REGION_TIMEOUT_MS = 8000;
 
 // Places from NRCan GeoNames, kept with the term they answer so a stale reply
 // is simply not shown, rather than cleared by an effect. Matched as typed
 // first, then as written when that finds nothing. `loading` holds from the
-// keystroke, through the debounce, to the reply.
+// keystroke, through the debounce, to the reply; `failed` when the reply was
+// an error or never came.
 export function useRegionMatches(term) {
   const { i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const query = useDebounce(term, 300);
-  const [result, setResult] = useState({ query: "", items: [] });
+  const [result, setResult] = useState({
+    query: "",
+    items: [],
+    failed: false,
+  });
   const wanted = query.length >= REGION_MIN_LENGTH;
 
   useEffect(() => {
     if (!wanted) return undefined;
     const controller = new AbortController();
+    const timer = setTimeout(
+      () =>
+        controller.abort(
+          new DOMException("NRCan GeoNames did not answer", "TimeoutError"),
+        ),
+      REGION_TIMEOUT_MS,
+    );
     const search = (q) =>
       fetchJson(regionSearchUrl(q, lang), { signal: controller.signal }).then(
         parseRegions,
@@ -40,19 +55,24 @@ export function useRegionMatches(term) {
       .then((items) =>
         items.length || prefixed === query ? items : search(query),
       )
-      .then((items) => setResult({ query, items }))
+      .then((items) => setResult({ query, items, failed: false }))
       .catch((error) => {
         if (error.name === "AbortError") return;
         reportError("region search failed", error);
-        setResult({ query, items: [] });
+        setResult({ query, items: [], failed: true });
       });
-    return () => controller.abort();
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [wanted, query, lang]);
 
+  const searched = term.length >= REGION_MIN_LENGTH;
   const answered = result.query === term;
   return {
-    places: term.length >= REGION_MIN_LENGTH && answered ? result.items : [],
-    loading: term.length >= REGION_MIN_LENGTH && !answered,
+    places: searched && answered ? result.items : [],
+    loading: searched && !answered,
+    failed: searched && answered && result.failed,
   };
 }
 

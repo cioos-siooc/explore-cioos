@@ -9,6 +9,7 @@ import { useLocation, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import {
+  BoxArrowUpRight,
   CheckCircleFill,
   PlusCircle,
   FileEarmarkText,
@@ -20,19 +21,21 @@ import {
 } from "react-bootstrap-icons";
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import DatasetMetadata, {
-  Citation,
+  CitationCard,
   DatasetAbstract,
   KeywordsCell,
   LicenseCell,
-  MetadataExtentCells,
   NoTranslationNote,
   Organizations,
-  SourceLinksCell,
+  catalogueExtent,
+  datasetSource,
+  hostOf,
 } from "../DatasetMetadata/DatasetMetadata.jsx";
 import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
 import TaxonomyChart from "../TaxonomyChart/TaxonomyChart.jsx";
 import TimeDistribution from "../TimeDistribution/TimeDistribution.jsx";
 import { server } from "../../../config";
+import { localizedCkanUrl } from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
@@ -48,12 +51,16 @@ import {
 } from "../../../state/dataLayers.js";
 import { gridNodeFactors, totalGridNodes } from "../../../wmsUtilities";
 import {
+  formatDepthRange,
   formatInstant,
   formatInstantRange,
   formatRange,
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
-import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
+import {
+  DatasetPlatformIcon,
+  locationsText,
+} from "../DatasetsTable/DatasetCard.jsx";
 import { platformLabel } from "../../../platformVocab.js";
 import ListCard, {
   CardField,
@@ -62,12 +69,15 @@ import ListCard, {
   useExpandableList,
 } from "./ListCard.jsx";
 import useTrajectoryPasses from "./useTrajectoryPasses.js";
-import { SkeletonGroup } from "../../ui/Skeleton.jsx";
-import Tooltip from "../../ui/Tooltip.jsx";
+import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
+import Tooltip, { TooltipTarget } from "../../ui/Tooltip.jsx";
 import ZoomToDataset, {
   useZoomToDataset,
 } from "../../AppShell/ZoomToDataset/ZoomToDataset.jsx";
 import "./styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
+import { Tab, TabList, TabPanel, Tabs } from "../../ui/Tabs.jsx";
+import ShowMoreButton from "../../ui/ShowMoreButton.jsx";
 
 function GridNodeCount({ dimensions }) {
   const factors = gridNodeFactors(dimensions);
@@ -127,6 +137,112 @@ function IdCaption({ label, variable }) {
 
 const EOV_VISIBLE_LIMIT = 3;
 
+const day = (value) => value?.slice(0, 10);
+
+// The harvest stores an OBIS occurrence without a depth as 0 m, so an all-zero
+// OBIS range means "not recorded", not "at the surface".
+function measuredDepth(dataset, footprint) {
+  if (!footprint) return undefined;
+  const { depth_min: min, depth_max: max } = footprint;
+  if (dataset.source_type === "obis" && !max) return undefined;
+  return formatDepthRange(min, max);
+}
+
+// A fact the harvested features measured, else the catalogue record's claim,
+// labelled as such: the two can disagree, and the page leads with the data.
+function FootprintCell({ label, measured, declared, loading, children }) {
+  const { t } = useTranslation();
+  const value = measured ?? declared;
+  if (!loading && !value) return null;
+  return (
+    <div className="metaCell">
+      <dt className="metadataLabel">{label}</dt>
+      <dd className="metadataValue metadataValueCentered">
+        {loading && !value ? (
+          <Skeleton text width="9rem" />
+        ) : (
+          <>
+            <span className="metadataFact">{value}</span>
+            {measured === undefined && (
+              <span className="metadataProvenance">
+                {t("datasetInspectorCatalogueValueText")}
+              </span>
+            )}
+            {children}
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+// Every way to act on the dataset, as one row of matching buttons. Adding to
+// the download and opening the source come first: equal exits (PRODUCT.md).
+function DatasetActions({
+  dataset,
+  isGrid,
+  inSelection,
+  selectedCount,
+  onAdd,
+}) {
+  const { t, i18n } = useTranslation();
+  const source = datasetSource(dataset, t, i18n.language);
+  // The source already is the catalogue when there's no server.
+  const catalogueUrl =
+    dataset.ckan_url &&
+    (dataset.source_type === "obis" || dataset.erddap_url) &&
+    localizedCkanUrl(dataset.ckan_url, i18n.language);
+  return (
+    <div className="datasetTitleActions">
+      <ToggleButton
+        className={classNames("datasetAction", { active: inSelection })}
+        onChange={() => onAdd()}
+        isDisabled={isGrid}
+        isSelected={inSelection}
+        title={
+          isGrid
+            ? t("griddapNotDownloadableTooltip")
+            : inSelection
+              ? t("datasetExitAddedHint", { count: selectedCount })
+              : t("datasetExitAddHint")
+        }
+      >
+        {inSelection ? (
+          <CheckCircleFill size={14} aria-hidden="true" />
+        ) : (
+          <PlusCircle size={14} aria-hidden="true" />
+        )}
+        {t(inSelection ? "datasetExitAddedText" : "datasetExitAddText")}
+      </ToggleButton>
+      {source && (
+        <a
+          className="datasetAction"
+          href={source.url}
+          target="_blank"
+          rel="noreferrer"
+          title={t("datasetExitSourceTitle", { host: hostOf(source.url) })}
+        >
+          <BoxArrowUpRight size={13} aria-hidden="true" />
+          {t("datasetExitSourceText", { source: source.name })}
+        </a>
+      )}
+      {catalogueUrl && (
+        <a
+          className="datasetAction"
+          href={catalogueUrl}
+          target="_blank"
+          rel="noreferrer"
+          title={t("datasetCatalogueLinkTitle")}
+        >
+          <BoxArrowUpRight size={13} aria-hidden="true" />
+          {t("datasetCatalogueLinkText")}
+        </a>
+      )}
+      <ZoomToDataset />
+    </div>
+  );
+}
+
 // Stable identity so CardList's sort memo is not rebuilt on every render of
 // this page.
 const recordKeyOf = (row) => row.profile_id;
@@ -160,16 +276,7 @@ function PassButtons({ recordId, passes, onPlot }) {
           </button>
         );
       })}
-      {(hidden > 0 || expanded) && (
-        <button
-          type="button"
-          className="listCardTagsMore"
-          onClick={toggle}
-          aria-expanded={expanded}
-        >
-          {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
-        </button>
-      )}
+      <ShowMoreButton expanded={expanded} hidden={hidden} onToggle={toggle} />
     </span>
   );
 }
@@ -205,6 +312,7 @@ export default function DatasetInspector({
   );
   const isRealtime = Boolean(dataset.is_realtime);
   const metadata = useDatasetMetadata(dataset.pk);
+  const declared = catalogueExtent(metadata.metadata);
   const [datasetRecords, setDatasetRecords] = useState();
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
   const [recordsError, setRecordsError] = useState(false);
@@ -217,6 +325,8 @@ export default function DatasetInspector({
     ? t(DATA_LAYER_LABEL_KEYS[geometryKey])
     : dataset.cdm_data_type;
   const hasRecordList = dataset.source_type !== "obis" && !isGrid;
+  // Every type is fetched: the response also carries the measured footprint
+  // the facts sheet leads with.
   useEffect(
     () =>
       offerTip([
@@ -228,7 +338,7 @@ export default function DatasetInspector({
   );
   // Starting false would paint one frame of an empty table before the effect
   // fires the fetch.
-  const [loading, setLoading] = useState(hasRecordList);
+  const [loading, setLoading] = useState(true);
   useActivityTask("activityRecordListText", loading);
 
   const isTrajectoryDataset =
@@ -249,12 +359,8 @@ export default function DatasetInspector({
   );
 
   useEffect(() => {
-    if (!hasRecordList) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const queryParams = new URLSearchParams(query);
     queryParams.set("datasetPKs", dataset.pk);
@@ -285,7 +391,7 @@ export default function DatasetInspector({
     // `query` omitted on purpose: refetching the whole list on every filter
     // change is too costly; reopening the page refreshes it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset, hasRecordList, recordsAttempt]);
+  }, [dataset, recordsAttempt]);
 
   // Trajectory datasets: /trajectories/platforms is the only source for how many
   // fixes a track holds. It used to back a second card list of its own, whose
@@ -306,6 +412,14 @@ export default function DatasetInspector({
         setTrajectoryPlatforms([]);
       });
   }, [dataset, isTrajectoryDataset]);
+
+  // While a fetch runs, the previous response may belong to another dataset.
+  const footprint = loading || recordsError ? undefined : datasetRecords;
+  // A dataset without a cf_role id is one unnamed series: its record has
+  // nothing to preview or point out.
+  const singleSeries =
+    datasetRecords?.profiles?.length === 1 &&
+    !datasetRecords.profiles[0].profile_id;
 
   const trackFixesById = useMemo(
     () =>
@@ -330,7 +444,7 @@ export default function DatasetInspector({
       returnToList();
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- a page-wide shortcut, not part of any control
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [returnToList]);
 
@@ -538,19 +652,23 @@ export default function DatasetInspector({
   }, [tab]);
 
   // A tab panel normally; widened, a labelled column with its own scroll.
+  // Both are the same TabPanel, so widening keeps what each view holds.
   const viewProps = (key) => ({
+    id: key,
+    shouldForceMount: true,
     className: classNames(`datasetPanel-${key}`, { datasetView: wide }),
-    ...(wide
-      ? {
-          role: "region",
-          "aria-labelledby": `datasetViewHeading-${key}`,
-        }
-      : {
-          role: "tabpanel",
-          id: `datasetPanel-${key}`,
-          "aria-labelledby": `datasetTab-${key}`,
-          hidden: tab !== key,
-        }),
+    render: wide
+      ? ({ ref, className, children }) => (
+          <div
+            ref={ref}
+            className={className}
+            role="region"
+            aria-labelledby={`datasetViewHeading-${key}`}
+          >
+            {children}
+          </div>
+        )
+      : undefined,
   });
   const viewHeading = (key, label, Icon) =>
     wide && (
@@ -568,7 +686,7 @@ export default function DatasetInspector({
       onMouseLeave={() => setHoveredDataset()}
     >
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
-        <h2 className="datasetTitle">
+        <h2 className="datasetTitle" title={dataset.title}>
           <FileEarmarkText
             className="datasetTitleIcon"
             size={20}
@@ -580,37 +698,13 @@ export default function DatasetInspector({
           values={[dataset.title_translated, metadata?.abstract]}
         />
         <Organizations {...metadata} />
-        <div className="datasetTitleActions">
-          <button
-            type="button"
-            className={classNames("datasetTitleAction", {
-              active: inSelection,
-            })}
-            onClick={() => handleSelectDataset(dataset)}
-            disabled={isGrid}
-            aria-pressed={inSelection}
-            title={t(
-              isGrid
-                ? "griddapNotDownloadableTooltip"
-                : inSelection
-                  ? "datasetInspectorRemoveTitle"
-                  : "featureCardAddOne",
-            )}
-          >
-            {inSelection ? (
-              <CheckCircleFill size={15} aria-hidden="true" />
-            ) : (
-              <PlusCircle size={15} aria-hidden="true" />
-            )}
-            {t(
-              inSelection
-                ? "datasetInspectorAddedText"
-                : "datasetInspectorAddText",
-            )}
-          </button>
-          <ZoomToDataset />
-          <Citation {...metadata} />
-        </div>
+        <DatasetActions
+          dataset={dataset}
+          isGrid={isGrid}
+          inSelection={inSelection}
+          selectedCount={selectedPks.size}
+          onAdd={() => handleSelectDataset(dataset)}
+        />
         {/* A filter can exclude a dataset whose page is already open; the page
             stays, but its records now follow filters it no longer meets. */}
         {inspectDatasetExcluded && (
@@ -627,328 +721,365 @@ export default function DatasetInspector({
           </div>
         )}
       </div>
-      {/* Widened, both views sit side by side and need no tabs. */}
-      {!wide && (
-        <div className="datasetTabs" role="tablist">
+      <Tabs
+        className="datasetTabsRoot"
+        selectedKey={tab}
+        onSelectionChange={setTab}
+      >
+        {/* Widened, both views sit side by side and need no tabs; the list
+            stays mounted (hidden) because the panels take their ids from it. */}
+        <TabList
+          hidden={wide}
+          className="datasetTabs"
+          aria-label={t("datasetInspectorTabsLabel")}
+        >
           {[
             ["metadata", "datasetInspectorMetadataTab", InfoCircle],
             ["data", "datasetInspectorDataTab", Table],
           ].map(([key, label, Icon]) => (
-            <button
+            <Tab
               key={key}
-              type="button"
-              role="tab"
-              id={`datasetTab-${key}`}
-              aria-selected={tab === key}
-              aria-controls={`datasetPanel-${key}`}
+              id={key}
               className="datasetTab"
               data-tip-highlight={
                 key === "data" ? tipHighlight("showData") : undefined
               }
-              onClick={() => setTab(key)}
             >
               <Icon size={14} aria-hidden="true" />
               {t(label)}
-            </button>
+            </Tab>
           ))}
-        </div>
-      )}
-      <div className="datasetInspectorBody" ref={bodyRef}>
-        <div {...viewProps("metadata")}>
-          {viewHeading("metadata", "datasetInspectorMetadataTab", InfoCircle)}
-          <DatasetAbstract {...metadata} />
-          <dl className="datasetMetaSheet">
-            <div className="metaCell">
-              <dt className="metadataLabel">
-                {t("datasetInspectorGeometryText")}
-              </dt>
-              <dd className="metadataValue">
-                <span className="metadataFact">{geometryLabel}</span>
-              </dd>
-            </div>
-            <div className="metaCell">
-              <dt className="metadataLabel">
-                {t("datasetInspectorPlatformText")}
-              </dt>
-              <dd className="metadataValue">
-                {dataset.platform ? (
-                  <span className="metadataFact">
-                    <span className="metadataPlatformGlyph" aria-hidden="true">
-                      <DatasetPlatformIcon
-                        platform={dataset.platform}
-                        cdmDataType={dataset.cdm_data_type}
-                        sourceType={dataset.source_type}
-                        t={t}
-                        decorative
-                      />
-                    </span>
-                    {platformLabel(dataset.platform, i18n.language)}
-                  </span>
-                ) : (
-                  <span className="metadataEmpty">—</span>
-                )}
-              </dd>
-            </div>
-            <div className="metaCell">
-              <dt className="metadataLabel">
-                {isGrid
-                  ? t("griddapNodesText")
-                  : t("datasetInspectorRecordsText")}
-              </dt>
-              <dd className="metadataValue">
-                {isGrid ? (
-                  <GridNodeCount dimensions={dataset.grid_dimensions} />
-                ) : (
-                  <span className="metadataFact">
-                    {dataset.profiles_count !== dataset.n_profiles
-                      ? `${dataset.profiles_count} / ${dataset.n_profiles}`
-                      : dataset.profiles_count}
-                  </span>
-                )}
-              </dd>
-            </div>
-            {/* coverage_time_max spans every record, so it is not the end of any
-                one record's range. */}
-            {dataset.coverage_time_max && (
+        </TabList>
+        <div className="datasetInspectorBody" ref={bodyRef}>
+          <TabPanel {...viewProps("metadata")}>
+            {viewHeading("metadata", "datasetInspectorMetadataTab", InfoCircle)}
+            <CitationCard {...metadata} />
+            <DatasetAbstract {...metadata} />
+            <dl className="datasetMetaSheet">
               <div className="metaCell">
                 <dt className="metadataLabel">
-                  {t("datasetInspectorLatestDataText")}
+                  {t("datasetsTableHeaderTypeText")}
                 </dt>
-                <dd className="metadataValue metadataValueCentered">
-                  <span className="metadataFact">
-                    {formatInstant(dataset.coverage_time_max)}
-                  </span>
-                  {dataset.is_realtime && (
-                    <span
-                      className="datasetTitleLive"
-                      title={t("datasetRealtimeBadgeTitle")}
-                    >
-                      {t("datasetRealtimeBadgeText")}
+                <dd className="metadataValue">
+                  <span className="metadataFact">{geometryLabel}</span>
+                </dd>
+              </div>
+              <div className="metaCell">
+                <dt className="metadataLabel">
+                  {t("datasetInspectorPlatformText")}
+                </dt>
+                <dd className="metadataValue">
+                  {dataset.platform && dataset.platform !== "unknown" ? (
+                    <span className="metadataFact">
+                      <span
+                        className="metadataPlatformGlyph"
+                        aria-hidden="true"
+                      >
+                        <DatasetPlatformIcon
+                          platform={dataset.platform}
+                          cdmDataType={dataset.cdm_data_type}
+                          sourceType={dataset.source_type}
+                          t={t}
+                          decorative
+                        />
+                      </span>
+                      {platformLabel(dataset.platform, i18n.language)}
+                    </span>
+                  ) : (
+                    <span className="metadataEmpty">—</span>
+                  )}
+                </dd>
+              </div>
+              <div className="metaCell">
+                <dt className="metadataLabel">
+                  {t(
+                    isGrid
+                      ? "griddapNodesText"
+                      : isTrajectoryDataset
+                        ? "datasetInspectorTracksText"
+                        : "datasetsTableHeaderLocationsText",
+                  )}
+                </dt>
+                <dd className="metadataValue">
+                  {isGrid ? (
+                    <GridNodeCount dimensions={dataset.grid_dimensions} />
+                  ) : (
+                    <span className="metadataFact">
+                      {locationsText(dataset, t)}
                     </span>
                   )}
                 </dd>
               </div>
-            )}
-            <MetadataExtentCells {...metadata} />
-            <div className="metaCell">
-              <dt className="metadataLabel">
-                {t("datasetInspectorOceanVariablesText")}
-              </dt>
-              <dd className="metadataValue">
-                {!dataset.eovs?.length && (
-                  <span className="metadataEmpty">—</span>
-                )}
-                {shownEovs.map((eov) => (
-                  <Tooltip
-                    key={eov}
-                    placement="bottom"
-                    delay={150}
-                    content={eovDefinitions.get(eov)?.[i18n.language]}
-                  >
-                    <span className="metadataChip">{t(eov)}</span>
-                  </Tooltip>
-                ))}
-                {(hiddenEovCount > 0 || eovsExpanded) && (
-                  <button
-                    type="button"
-                    className="listCardTagsMore"
-                    onClick={toggleEovsExpanded}
-                    aria-expanded={eovsExpanded}
-                    title={
-                      eovsExpanded
-                        ? t("listCardTagsFewerText")
-                        : t("listCardTagsMoreTitle", {
-                            total: dataset.eovs.length,
-                          })
-                    }
-                  >
-                    {eovsExpanded
-                      ? t("listCardTagsFewerText")
-                      : `+${hiddenEovCount}`}
-                  </button>
-                )}
-              </dd>
-            </div>
-            <KeywordsCell {...metadata} />
-            <LicenseCell {...metadata} />
-            <SourceLinksCell dataset={dataset} />
-          </dl>
-          <DatasetMetadata dataset={dataset} {...metadata} />
-        </div>
-        <div {...viewProps("data")}>
-          {viewHeading("data", "datasetInspectorDataTab", Table)}
-          {/* Mounted only while shown, so a page left on Metadata never loads
-              the Plotly chunk. */}
-          {(wide || tab === "data") && (
-            <TimeDistribution datasetPk={dataset.pk} query={query} />
-          )}
-          {isGrid && (
-            <GriddapDetails
-              dataset={dataset}
-              activeWmsOverlay={activeWmsOverlay}
-              setActiveWmsOverlay={setActiveWmsOverlay}
-            />
-          )}
-          {dataset.source_type === "obis" && (
-            <TaxonomyChart datasetId={dataset.dataset_id} />
-          )}
-          {hasRecordList && (
-            <div className="recordSection">
-              <div
-                className="recordSectionHeader"
-                data-tip-highlight={tipHighlight("showData")}
+              {dataset.days != null && (
+                <div className="metaCell">
+                  <dt className="metadataLabel">
+                    {t("datasetsCardSortDaysText")}
+                  </dt>
+                  <dd className="metadataValue">
+                    <span className="metadataFact">
+                      {t("datasetCardDays", { count: Number(dataset.days) })}
+                    </span>
+                  </dd>
+                </div>
+              )}
+              <FootprintCell
+                label={t("metadataTemporalExtentText")}
+                measured={
+                  footprint &&
+                  formatRange(day(footprint.time_min), day(footprint.time_max))
+                }
+                declared={declared.period}
+                loading={loading}
               >
-                <strong>{t("datasetInspectorRecordTable")}</strong>
-                <span className="recordHint">
-                  {t(
-                    isTrajectoryDataset
-                      ? "trajectoryClickPreviewText"
-                      : "datasetInspectorClickPreviewText",
+                {isRealtime && (
+                  <span
+                    className="datasetTitleLive"
+                    title={t("datasetRealtimeBadgeTitle")}
+                  >
+                    {t("datasetRealtimeBadgeText")}
+                  </span>
+                )}
+              </FootprintCell>
+              {/* Down to the minute only matters while the data still arrives. */}
+              {isRealtime && dataset.coverage_time_max && (
+                <div className="metaCell">
+                  <dt className="metadataLabel">
+                    {t("datasetInspectorLatestDataText")}
+                  </dt>
+                  <dd className="metadataValue">
+                    <span className="metadataFact">
+                      {formatInstant(dataset.coverage_time_max)}
+                    </span>
+                  </dd>
+                </div>
+              )}
+              <FootprintCell
+                label={t("metadataVerticalExtentText")}
+                measured={measuredDepth(dataset, footprint)}
+                declared={declared.depth}
+                loading={loading}
+              />
+              <div className="metaCell">
+                <dt className="metadataLabel">
+                  {t("datasetInspectorOceanVariablesText")}
+                </dt>
+                <dd className="metadataValue">
+                  {!dataset.eovs?.length && (
+                    <span className="metadataEmpty">—</span>
                   )}
-                </span>
-                <IdCaption {...recordIdField} />
-              </div>
-              {markerRecordPinned && (
-                <div className="recordMapClickHint">
-                  <span className="recordMapClickSwatch" aria-hidden="true" />
-                  {t("datasetInspectorMapClickHint")}
-                  <button
-                    type="button"
-                    className="recordShowAll"
-                    onClick={() => setHighlightedRecord(undefined)}
-                  >
-                    {t("datasetInspectorClearMapRecordText")}
-                  </button>
-                </div>
-              )}
-              {passes.size > 0 && (
-                <div className="recordMapClickHint">
-                  <span className="recordMapClickSwatch" aria-hidden="true" />
-                  {t("datasetInspectorPassesHint", { count: passes.size })}
-                </div>
-              )}
-              {loading ? (
-                <SkeletonGroup className="cardList">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <ListCardSkeleton key={i} />
-                  ))}
-                </SkeletonGroup>
-              ) : recordsError ? (
-                <div className="cardListEmpty" role="alert">
-                  {t("datasetInspectorRecordsLoadFailedText")}{" "}
-                  <button
-                    type="button"
-                    className="recordShowAll"
-                    onClick={() => setRecordsAttempt((attempt) => attempt + 1)}
-                  >
-                    {t("apiErrorRetryButton")}
-                  </button>
-                </div>
-              ) : (
-                <CardList
-                  items={datasetRecords?.profiles}
-                  keyOf={recordKeyOf}
-                  sortFields={recordSortFields}
-                  defaultSort={{ field: "id", dir: "desc" }}
-                  filterPlaceholder={t("datasetInspectorFilterText")}
-                  emptyText={t("datasetInspectorNoRecordsText")}
-                  pinnedKeys={pinnedKeys}
-                  focusKey={onMapId}
-                  pagerLabel={t("datasetInspectorRecordsPagerLabel")}
-                  perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
-                  renderItem={(row) => {
-                    const eovs = (row.eovs ?? dataset.eovs)?.map((eov) =>
-                      t(eov),
-                    );
-                    const onMap = onMapId === row.profile_id;
-                    return (
-                      <ListCard
-                        id={row.profile_id || "—"}
-                        pinned={pinnedKeys.has(row.profile_id)}
-                        selected={onMap}
-                        actions={
-                          <>
-                            {row.profile_id && (
-                              <button
-                                type="button"
-                                className="listCardButton"
-                                title={t("datasetInspectorShowDataTitle")}
-                                onClick={() =>
-                                  setInspectRecordID(row.profile_id)
-                                }
-                              >
-                                <GraphUp size={13} aria-hidden="true" />
-                                {t("datasetInspectorShowDataText")}
-                              </button>
-                            )}
-                            {(isTrajectoryDataset || row.profile_id) && (
-                              <button
-                                type="button"
-                                className="listCardButton"
-                                aria-pressed={onMap}
-                                title={t(
-                                  onMap
-                                    ? "datasetInspectorHideFromMapTitle"
-                                    : isTrajectoryDataset
-                                      ? "trajectoryTrackShowTitle"
-                                      : "datasetInspectorShowOnMapTitle",
-                                )}
-                                onClick={() => toggleOnMap(row.profile_id)}
-                              >
-                                {onMap ? (
-                                  <PinMapFill size={13} aria-hidden="true" />
-                                ) : (
-                                  <PinMap size={13} aria-hidden="true" />
-                                )}
-                                {t("datasetInspectorShowOnMapText")}
-                              </button>
-                            )}
-                          </>
-                        }
+                  {shownEovs.map((eov) => {
+                    const definition = eovDefinitions.get(eov)?.[i18n.language];
+                    return definition ? (
+                      <Tooltip
+                        key={eov}
+                        placement="bottom"
+                        delay={150}
+                        content={definition}
                       >
-                        <CardField
-                          label={t("datasetInspectorTimeframeText")}
-                          nowrap
-                        >
-                          {formatInstantRange(row.time_min, row.time_max)}
-                        </CardField>
-                        <CardField label={t("datasetInspectorPassesText")}>
-                          {passes.get(row.profile_id) && (
-                            <PassButtons
-                              recordId={row.profile_id}
-                              passes={passes.get(row.profile_id)}
-                              onPlot={(period) =>
-                                setInspectRecordID(row.profile_id, { period })
-                              }
-                            />
-                          )}
-                        </CardField>
-                        <CardField label={t("datasetInspectorDepthRangeText")}>
-                          {formatRange(row.depth_min, row.depth_max, "m")}
-                        </CardField>
-                        {isTrajectoryDataset && (
-                          <CardField label={t("trajectoryPlatformFixesText")}>
-                            {trackFixesById
-                              .get(row.profile_id)
-                              ?.toLocaleString()}
-                          </CardField>
-                        )}
-                        {eovs?.length > 0 && (
-                          <CardField
-                            label={t("datasetInspectorOceanVariablesText")}
-                          >
-                            <CardTags values={eovs} />
-                          </CardField>
-                        )}
-                      </ListCard>
+                        {/* A target so keyboard users reach the definition too. */}
+                        <TooltipTarget className="metadataChip">
+                          {t(eov)}
+                        </TooltipTarget>
+                      </Tooltip>
+                    ) : (
+                      <span key={eov} className="metadataChip">
+                        {t(eov)}
+                      </span>
                     );
-                  }}
-                />
-              )}
-            </div>
-          )}
+                  })}
+                  <ShowMoreButton
+                    expanded={eovsExpanded}
+                    hidden={hiddenEovCount}
+                    total={dataset.eovs.length}
+                    onToggle={toggleEovsExpanded}
+                  />
+                </dd>
+              </div>
+              <KeywordsCell {...metadata} />
+              <LicenseCell {...metadata} />
+            </dl>
+            <DatasetMetadata dataset={dataset} {...metadata} />
+          </TabPanel>
+          <TabPanel {...viewProps("data")}>
+            {viewHeading("data", "datasetInspectorDataTab", Table)}
+            {/* Mounted only while shown, so a page left on Metadata never loads
+              the Plotly chunk. */}
+            {(wide || tab === "data") && (
+              <TimeDistribution datasetPk={dataset.pk} query={query} />
+            )}
+            {isGrid && (
+              <GriddapDetails
+                dataset={dataset}
+                activeWmsOverlay={activeWmsOverlay}
+                setActiveWmsOverlay={setActiveWmsOverlay}
+              />
+            )}
+            {dataset.source_type === "obis" && (
+              <TaxonomyChart datasetId={dataset.dataset_id} />
+            )}
+            {hasRecordList && (
+              <div className="recordSection">
+                <div
+                  className="recordSectionHeader"
+                  data-tip-highlight={tipHighlight("showData")}
+                >
+                  <strong>{t("datasetInspectorRecordTable")}</strong>
+                  <span className="recordHint">
+                    {t(
+                      singleSeries
+                        ? "datasetInspectorSingleSeriesText"
+                        : isTrajectoryDataset
+                          ? "trajectoryClickPreviewText"
+                          : "datasetInspectorClickPreviewText",
+                    )}
+                  </span>
+                  {!singleSeries && <IdCaption {...recordIdField} />}
+                </div>
+                {markerRecordPinned && (
+                  <div className="recordMapClickHint">
+                    <span className="recordMapClickSwatch" aria-hidden="true" />
+                    {t("datasetInspectorMapClickHint")}
+                    <button
+                      type="button"
+                      className="recordShowAll"
+                      onClick={() => setHighlightedRecord(undefined)}
+                    >
+                      {t("datasetInspectorClearMapRecordText")}
+                    </button>
+                  </div>
+                )}
+                {passes.size > 0 && (
+                  <div className="recordMapClickHint">
+                    <span className="recordMapClickSwatch" aria-hidden="true" />
+                    {t("datasetInspectorPassesHint", { count: passes.size })}
+                  </div>
+                )}
+                {loading ? (
+                  <SkeletonGroup className="cardList">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <ListCardSkeleton key={i} />
+                    ))}
+                  </SkeletonGroup>
+                ) : recordsError ? (
+                  <div className="cardListEmpty" role="alert">
+                    {t("datasetInspectorRecordsLoadFailedText")}{" "}
+                    <button
+                      type="button"
+                      className="recordShowAll"
+                      onClick={() =>
+                        setRecordsAttempt((attempt) => attempt + 1)
+                      }
+                    >
+                      {t("apiErrorRetryButton")}
+                    </button>
+                  </div>
+                ) : singleSeries ? null : (
+                  <CardList
+                    items={datasetRecords?.profiles}
+                    keyOf={recordKeyOf}
+                    sortFields={recordSortFields}
+                    defaultSort={{ field: "id", dir: "desc" }}
+                    filterPlaceholder={t("datasetInspectorFilterText")}
+                    emptyText={t("datasetInspectorNoRecordsText")}
+                    pinnedKeys={pinnedKeys}
+                    focusKey={onMapId}
+                    pagerLabel={t("datasetInspectorRecordsPagerLabel")}
+                    perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
+                    renderItem={(row) => {
+                      const eovs = (row.eovs ?? dataset.eovs)?.map((eov) =>
+                        t(eov),
+                      );
+                      const onMap = onMapId === row.profile_id;
+                      return (
+                        <ListCard
+                          id={row.profile_id || "—"}
+                          pinned={pinnedKeys.has(row.profile_id)}
+                          selected={onMap}
+                          actions={
+                            <>
+                              {row.profile_id && (
+                                <button
+                                  type="button"
+                                  className="listCardButton"
+                                  title={t("datasetInspectorShowDataTitle")}
+                                  onClick={() =>
+                                    setInspectRecordID(row.profile_id)
+                                  }
+                                >
+                                  <GraphUp size={13} aria-hidden="true" />
+                                  {t("datasetInspectorShowDataText")}
+                                </button>
+                              )}
+                              {(isTrajectoryDataset || row.profile_id) && (
+                                <ToggleButton
+                                  className="listCardButton"
+                                  isSelected={onMap}
+                                  title={t(
+                                    onMap
+                                      ? "datasetInspectorHideFromMapTitle"
+                                      : isTrajectoryDataset
+                                        ? "trajectoryTrackShowTitle"
+                                        : "datasetInspectorShowOnMapTitle",
+                                  )}
+                                  onChange={() => toggleOnMap(row.profile_id)}
+                                >
+                                  {onMap ? (
+                                    <PinMapFill size={13} aria-hidden="true" />
+                                  ) : (
+                                    <PinMap size={13} aria-hidden="true" />
+                                  )}
+                                  {t("datasetInspectorShowOnMapText")}
+                                </ToggleButton>
+                              )}
+                            </>
+                          }
+                        >
+                          <CardField
+                            label={t("datasetInspectorTimeframeText")}
+                            nowrap
+                          >
+                            {formatInstantRange(row.time_min, row.time_max)}
+                          </CardField>
+                          <CardField label={t("datasetInspectorPassesText")}>
+                            {passes.get(row.profile_id) && (
+                              <PassButtons
+                                recordId={row.profile_id}
+                                passes={passes.get(row.profile_id)}
+                                onPlot={(period) =>
+                                  setInspectRecordID(row.profile_id, { period })
+                                }
+                              />
+                            )}
+                          </CardField>
+                          <CardField
+                            label={t("datasetInspectorDepthRangeText")}
+                          >
+                            {formatDepthRange(row.depth_min, row.depth_max)}
+                          </CardField>
+                          {isTrajectoryDataset && (
+                            <CardField label={t("trajectoryPlatformFixesText")}>
+                              {trackFixesById
+                                .get(row.profile_id)
+                                ?.toLocaleString()}
+                            </CardField>
+                          )}
+                          {eovs?.length > 0 && (
+                            <CardField
+                              label={t("datasetInspectorOceanVariablesText")}
+                            >
+                              <CardTags values={eovs} />
+                            </CardField>
+                          )}
+                        </ListCard>
+                      );
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </TabPanel>
         </div>
-      </div>
+      </Tabs>
     </div>
   );
 }

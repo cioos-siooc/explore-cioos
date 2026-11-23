@@ -21,13 +21,3 @@
   background-color: var(--cioos-track-bg);
   pointer-events: none;
 }
-
-/* Chrome draws the picker button at full contrast; dim it to match the rest. */
-.timeRailDateInput::-webkit-calendar-picker-indicator {
-  opacity: 0.45;
-  cursor: pointer;
-}
-
-.timeRailDateInput:hover::-webkit-calendar-picker-indicator {
-  opacity: 0.8;
-}

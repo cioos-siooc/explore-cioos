@@ -1,66 +1,38 @@
 version: 2
 updates:
-  # Grouped so a week's updates arrive as at most three PRs per service rather
-  # than a dozen: minor/patch, majors (they need a human either way), and
-  # security, since security updates ignore version-update groups.
-  # Root holds the shared lint/format toolchain (ESLint, Prettier, stylelint).
+  # Grouped so updates arrive as at most three PRs per block rather than a
+  # dozen: minor/patch, majors (they need a human either way), and security,
+  # since security updates ignore version-update groups. Cooldown only delays
+  # version updates; security updates still open immediately.
+  # One block for every npm project (root lint/format toolchain, frontend,
+  # web-api, e2e tests) so a shared dependency lands as a single PR.
   - package-ecosystem: npm
-    directory: /
+    directories: [/, /frontend, /web-api, /test]
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
     groups:
-      tooling-minor-patch:
+      npm-minor-patch:
         update-types: [minor, patch]
-      tooling-major:
+      npm-major:
         update-types: [major]
-      tooling-security:
+      npm-security:
         applies-to: security-updates
         patterns: ["*"]
 
-  - package-ecosystem: npm
-    directory: /frontend
-    schedule: { interval: weekly, day: monday }
-    open-pull-requests-limit: 5
-    groups:
-      frontend-minor-patch:
-        update-types: [minor, patch]
-      frontend-major:
-        update-types: [major]
-      frontend-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
-  - package-ecosystem: npm
-    directory: /web-api
-    schedule: { interval: weekly, day: monday }
-    open-pull-requests-limit: 5
-    groups:
-      web-api-minor-patch:
-        update-types: [minor, patch]
-      web-api-major:
-        update-types: [major]
-      web-api-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
-  - package-ecosystem: npm
-    directory: /test
-    schedule: { interval: monthly }
-    open-pull-requests-limit: 2
-    groups:
-      test-minor-patch:
-        update-types: [minor, patch]
-      test-major:
-        update-types: [major]
-      test-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
-  # One entry per uv project — each has its own pyproject.toml and uv.lock.
+  # All uv projects (each with its own pyproject.toml and uv.lock) share one
+  # block. lockfile-only keeps pyproject ranges as written, so majors outside
+  # them are bumped by hand.
   - package-ecosystem: uv
-    directory: /
-    schedule: { interval: weekly, day: monday }
+    directories: [/, /harvester, /downloader, /download_scheduler]
+    schedule: { interval: monthly }
     open-pull-requests-limit: 5
+    versioning-strategy: lockfile-only
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
     groups:
       python-minor-patch:
         update-types: [minor, patch]
@@ -69,43 +41,11 @@ updates:
       python-security:
         applies-to: security-updates
         patterns: ["*"]
-  - package-ecosystem: uv
-    directory: /harvester
-    schedule: { interval: weekly, day: monday }
-    groups:
-      harvester-minor-patch:
-        update-types: [minor, patch]
-      harvester-major:
-        update-types: [major]
-      harvester-security:
-        applies-to: security-updates
-        patterns: ["*"]
-  - package-ecosystem: uv
-    directory: /downloader
-    schedule: { interval: weekly, day: monday }
-    groups:
-      downloader-minor-patch:
-        update-types: [minor, patch]
-      downloader-major:
-        update-types: [major]
-      downloader-security:
-        applies-to: security-updates
-        patterns: ["*"]
-  - package-ecosystem: uv
-    directory: /download_scheduler
-    schedule: { interval: weekly, day: monday }
-    groups:
-      scheduler-minor-patch:
-        update-types: [minor, patch]
-      scheduler-major:
-        update-types: [major]
-      scheduler-security:
-        applies-to: security-updates
-        patterns: ["*"]
 
   - package-ecosystem: docker
     directories: [/frontend, /web-api, /nginx, /database, /harvester, /download_scheduler]
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     groups:
       base-images:
         patterns: ["*"]
@@ -113,6 +53,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     groups:
       compose-images:
         patterns: ["*"]
@@ -120,6 +61,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     groups:
       actions:
         patterns: ["*"]

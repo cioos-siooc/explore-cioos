@@ -2,30 +2,20 @@ import * as React from "react";
 import { Suspense, lazy, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
 import { usePreviewPlot } from "./PreviewPlotProvider.jsx";
+import PreviewWindowPager from "./PreviewWindowPager.jsx";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
 import { PREVIEW_ERROR } from "./previewErrors.js";
+import {
+  PlotErrorBoundary,
+  PreviewFailure,
+  PreviewLoading,
+} from "./PreviewStatus.jsx";
 
 // Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
 const DatasetPreviewPlot = lazy(
   () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
-);
-
-const plotSkeleton = (
-  <SkeletonGroup className="datasetPreviewPlotLoading">
-    <Skeleton radius="var(--cioos-radius)" />
-  </SkeletonGroup>
-);
-
-// A header row and a few body rows, four columns wide.
-const tableSkeleton = (
-  <SkeletonGroup className="datasetPreviewTableSkeleton">
-    {Array.from({ length: 36 }, (_, i) => (
-      <Skeleton key={i} height={i < 4 ? "1.2em" : undefined} />
-    ))}
-  </SkeletonGroup>
 );
 
 // What each refusal reads as, and what the axis search was looking for. The
@@ -43,8 +33,12 @@ const WANTED_LABELS = {
   track: "datasetPreviewPlotWantedTrack",
   measurement: "datasetPreviewPlotWantedMeasurement",
 };
-// Only the outage suggests trying again — the other three do not get better by
-// waiting.
+// Only the outage and a lost connection suggest trying again, so only they get
+// a Retry — the others do not get better by waiting.
+const RETRYABLE = new Set([
+  PREVIEW_ERROR.ERDDAP_UNAVAILABLE,
+  PREVIEW_ERROR.NETWORK,
+]);
 const PREVIEW_ERROR_MESSAGES = {
   [PREVIEW_ERROR.NO_DATA]: "datasetPreviewErrorNoData",
   [PREVIEW_ERROR.ERDDAP_UNAVAILABLE]: "datasetPreviewErrorUnavailable",
@@ -88,10 +82,20 @@ export default function PreviewBody({
   datasetPreview,
   rows,
   previewError,
+  previewQuery,
+  retryPreview,
 }) {
   const { t } = useTranslation();
-  const { selectedVis, plan, inspectDataset, variables, plotData } =
-    usePreviewPlot();
+  const {
+    selectedVis,
+    plan,
+    inspectDataset,
+    inspectRecordID,
+    variables,
+    plotData,
+    profiles,
+    availableHeight,
+  } = usePreviewPlot();
 
   // Two records of the same cdm_data_type genuinely differ here — one publisher
   // declares the coordinate metadata and the next does not — so the message has
@@ -101,34 +105,74 @@ export default function PreviewBody({
     [plan, inspectDataset, variables, plotData],
   );
 
+  const profileStep = profiles.pending ? ["previewStepProfiles"] : [];
+
   if (recordLoading) {
-    return selectedVis === "table" ? tableSkeleton : plotSkeleton;
+    return (
+      <PreviewLoading
+        labelKeys={["previewStepRecord", ...profileStep]}
+        query={previewQuery}
+      />
+    );
   }
 
   if (!datasetPreview?.table?.rows) {
     return (
-      <div className="datasetPreviewPlotBlocked">
-        <p>
-          {t(
-            (previewError && PREVIEW_ERROR_MESSAGES[previewError.code]) ||
-              "datasetPreviewNoData",
-          )}
-        </p>
-      </div>
+      <PreviewFailure
+        query={previewError?.erddapQuery}
+        onRetry={
+          previewError && RETRYABLE.has(previewError.code)
+            ? retryPreview
+            : undefined
+        }
+        message={t(
+          (previewError && PREVIEW_ERROR_MESSAGES[previewError.code]) ||
+            "datasetPreviewNoData",
+        )}
+        detail={
+          previewError &&
+          t(
+            previewError.upstreamStatus
+              ? "datasetPreviewErrorDetailUpstream"
+              : "datasetPreviewErrorDetail",
+            {
+              code: previewError.code,
+              status: previewError.upstreamStatus,
+            },
+          )
+        }
+      />
     );
   }
 
   if (selectedVis === "table") {
-    return <DatasetPreviewTable datasetPreview={datasetPreview} data={rows} />;
+    return (
+      <>
+        <PreviewWindowPager />
+        <DatasetPreviewTable
+          datasetPreview={datasetPreview}
+          data={rows}
+          variables={variables}
+          availableHeight={availableHeight}
+        />
+      </>
+    );
   }
 
   if (!plan) return plotBlocker ? <PlotBlocked blocker={plotBlocker} /> : null;
 
   return (
-    // The fallback reserves height on purpose: without it the plot mounts into
-    // a collapsed box and Plotly measures it at zero.
-    <Suspense fallback={plotSkeleton}>
-      <DatasetPreviewPlot />
-    </Suspense>
+    // Keyed so a failure on one record doesn't stick to the next. The fallback
+    // reserves height on purpose: without it the plot mounts into a collapsed
+    // box and Plotly measures it at zero.
+    <PlotErrorBoundary key={inspectRecordID}>
+      <Suspense
+        fallback={
+          <PreviewLoading labelKeys={["previewStepPlotly", ...profileStep]} />
+        }
+      >
+        <DatasetPreviewPlot />
+      </Suspense>
+    </PlotErrorBoundary>
   );
 }

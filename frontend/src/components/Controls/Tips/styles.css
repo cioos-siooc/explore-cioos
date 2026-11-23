@@ -134,6 +134,7 @@
 .tipCardText {
   margin: 0 var(--cioos-space-sm) var(--cioos-space-xs) 0;
   line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .tipGlyph {
@@ -247,16 +248,6 @@
   width: auto;
   margin: 0 var(--cioos-space-md) var(--cioos-space-sm);
   box-shadow: none;
-}
-
-/* Fixed to the viewport: nothing between it and the page is transformed. */
-.tipCard.tipCardInModal.tipCardAnchored {
-  position: fixed;
-  z-index: var(--cioos-z-dock, 35);
-  margin: 0;
-  box-shadow:
-    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
-    var(--cioos-shadow-float);
 }
 
 .tipPointer.tipPointerOverModal {

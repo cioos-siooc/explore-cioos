@@ -247,13 +247,16 @@ test("GET /harvest/warnings/:slug returns the per-code breakdown for one server"
 });
 
 const ckanPage = (count, results) => ({ data: { result: { count, results } } });
+const ATL = "https://erddap.atlantic.example/erddap";
+const PAC = "https://erddap.pacific.example/erddap";
 
 test("GET /harvest/ckan-coverage splits linked records by the catalogue's harvest source", async () => {
   db.queueRaw([
-    { ckan_id: "a1", erddap: true, obis: false },
-    { ckan_id: "a2", erddap: true, obis: true },
-    { ckan_id: "p1", erddap: false, obis: true },
+    { ckan_id: "a1", erddap: true, obis: false, erddap_urls: [ATL] },
+    { ckan_id: "a2", erddap: true, obis: true, erddap_urls: [ATL] },
+    { ckan_id: "p1", erddap: false, obis: true, erddap_urls: [] },
   ]);
+  db.queueRaw([]);
   axios.queueResponse(
     ckanPage(5, [
       { id: "a1", harvest_source_title: "CIOOS Atlantic" },
@@ -272,6 +275,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
     n_linked: 3,
     n_erddap: 2,
     n_obis: 2,
+    erddap_servers: [{ erddap_url: ATL, n_records: 2 }],
     n_linked_stale: 0,
     sources: [
       {
@@ -280,6 +284,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
         n_linked: 2,
         n_erddap: 2,
         n_obis: 1,
+        erddap_servers: [{ erddap_url: ATL, n_records: 2 }],
       },
       {
         source: "CIOOS Pacific",
@@ -287,6 +292,7 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
         n_linked: 1,
         n_erddap: 0,
         n_obis: 1,
+        erddap_servers: [],
       },
       {
         source: "DataStream",
@@ -294,8 +300,10 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
         n_linked: 0,
         n_erddap: 0,
         n_obis: 0,
+        erddap_servers: [],
       },
     ],
+    harvested: [],
   });
   assert.match(
     axios.calls[0].url,
@@ -304,7 +312,38 @@ test("GET /harvest/ckan-coverage splits linked records by the catalogue's harves
   assert.equal(axios.calls[0].config.params.fl, "id,harvest_source_title");
 });
 
+test("GET /harvest/ckan-coverage names the ERDDAP servers each source's records point to", async () => {
+  db.queueRaw([
+    { ckan_id: "p1", erddap: true, obis: false, erddap_urls: [PAC] },
+    { ckan_id: "p2", erddap: true, obis: true, erddap_urls: [PAC, ATL] },
+    { ckan_id: "p3", erddap: true, obis: false, erddap_urls: [PAC] },
+    { ckan_id: "p4", erddap: false, obis: true, erddap_urls: [] },
+  ]);
+  db.queueRaw([]);
+  axios.queueResponse(
+    ckanPage(
+      4,
+      ["p1", "p2", "p3", "p4"].map((id) => ({
+        id,
+        harvest_source_title: "CIOOS Pacific",
+      })),
+    ),
+  );
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.deepEqual(res.body.sources[0].erddap_servers, [
+    { erddap_url: PAC, n_records: 3 },
+    { erddap_url: ATL, n_records: 1 },
+  ]);
+  assert.match(
+    db.queries[0],
+    /array_agg\(DISTINCT erddap_url\)\s+FILTER \(WHERE source_type IS DISTINCT FROM 'obis'/,
+  );
+});
+
 test("GET /harvest/ckan-coverage pages through the whole catalogue", async () => {
+  db.queueRaw([]);
   db.queueRaw([]);
   const page = (from, n) =>
     Array.from({ length: n }, (_, i) => ({
@@ -328,6 +367,7 @@ test("GET /harvest/ckan-coverage keeps links to records the catalogue dropped ou
     { ckan_id: "a1", erddap: true, obis: false },
     { ckan_id: "gone", erddap: true, obis: false },
   ]);
+  db.queueRaw([]);
   axios.queueResponse(ckanPage(1, [{ id: "a1" }]));
 
   const res = await agent.get("/harvest/ckan-coverage");
@@ -335,11 +375,19 @@ test("GET /harvest/ckan-coverage keeps links to records the catalogue dropped ou
   assert.equal(res.body.n_linked, 1);
   assert.equal(res.body.n_linked_stale, 1);
   assert.deepEqual(res.body.sources, [
-    { source: null, n_records: 1, n_linked: 1, n_erddap: 1, n_obis: 0 },
+    {
+      source: null,
+      n_records: 1,
+      n_linked: 1,
+      n_erddap: 1,
+      n_obis: 0,
+      erddap_servers: [],
+    },
   ]);
 });
 
 test("GET /harvest/ckan-coverage counts each CKAN record once, ERDDAP rows by not-OBIS", async () => {
+  db.queueRaw([]);
   db.queueRaw([]);
   axios.queueResponse(ckanPage(0, []));
 
@@ -355,6 +403,7 @@ test("GET /harvest/ckan-coverage keeps the linked counts when CKAN fails mid-lis
     { ckan_id: "a1", erddap: true, obis: false },
     { ckan_id: "p1", erddap: false, obis: true },
   ]);
+  db.queueRaw([]);
   axios.queueResponse(
     ckanPage(
       2000,
@@ -371,7 +420,64 @@ test("GET /harvest/ckan-coverage keeps the linked counts when CKAN fails mid-lis
     n_linked: 2,
     n_erddap: 1,
     n_obis: 1,
+    erddap_servers: [],
     n_linked_stale: null,
     sources: null,
+    harvested: [],
   });
+});
+
+test("GET /harvest/ckan-coverage counts harvested datasets matched to CKAN per source", async () => {
+  db.queueRaw([]);
+  db.queueRaw([
+    {
+      erddap_url: "https://erddap.example.com/erddap",
+      n_datasets: 40,
+      n_matched: 30,
+    },
+    { erddap_url: "https://obis.org", n_datasets: 10, n_matched: 2 },
+  ]);
+  axios.queueError(new Error("connect ECONNREFUSED"));
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.body.sources, null);
+  assert.deepEqual(res.body.harvested, [
+    {
+      erddap_url: "https://erddap.example.com/erddap",
+      n_datasets: 40,
+      n_matched: 30,
+    },
+    { erddap_url: "https://obis.org", n_datasets: 10, n_matched: 2 },
+  ]);
+  assert.match(db.queries[1], /COUNT\(ckan_id\)/);
+  assert.match(db.queries[1], /GROUP BY erddap_url/);
+});
+
+test("GET /harvest/ckan-coverage serves a complete reply from the cache", async () => {
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueResponse(ckanPage(1, [{ id: "a1" }]));
+
+  await agent.get("/harvest/ckan-coverage");
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.body.n_ckan_records, 1);
+  assert.equal(db.queries.length, 2);
+  assert.equal(axios.calls.length, 1);
+});
+
+test("GET /harvest/ckan-coverage does not cache a reply built during a CKAN outage", async () => {
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueError(new Error("connect ECONNREFUSED"));
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueResponse(ckanPage(1, [{ id: "a1" }]));
+
+  const outage = await agent.get("/harvest/ckan-coverage");
+  const recovered = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(outage.body.n_ckan_records, null);
+  assert.equal(recovered.body.n_ckan_records, 1);
 });

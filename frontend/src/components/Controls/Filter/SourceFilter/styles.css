@@ -24,7 +24,7 @@
   cursor: pointer;
 }
 
-.sourceFilter .sourceGroupChevron:hover {
+.sourceFilter .sourceGroupChevron[data-hovered] {
   color: var(--cioos-primary);
 }
 
@@ -36,17 +36,17 @@
   padding: 4px 0;
   border: 0;
   background: none;
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   font-size: var(--cioos-font-size-sm);
   text-decoration: underline;
   cursor: pointer;
 }
 
-.sourceFilter .sourceGroupMore:hover {
+.sourceFilter .sourceGroupMore[data-hovered] {
   color: var(--cioos-primary);
 }
 
-.sourceFilter .sourceGroupMore:focus-visible {
+.sourceFilter .sourceGroupMore[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }

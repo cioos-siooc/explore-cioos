@@ -16,8 +16,10 @@
 
   /* Stops a long key list short of the centred top bar. */
   --legend-top-reserve: 108px;
-  --cioos-font-size-3xs: calc(10px + var(--legend-grow) / 400);
-  --cioos-font-size-2xs: calc(10px + var(--legend-grow) / 400);
+
+  /* 11px floor: the ticks and group labels are what the ramp is read by. */
+  --cioos-font-size-3xs: calc(11px + var(--legend-grow) / 400);
+  --cioos-font-size-2xs: calc(11px + var(--legend-grow) / 400);
   --cioos-font-size-xs: calc(11px + var(--legend-grow) / 400);
 
   position: fixed;
@@ -113,7 +115,7 @@
 }
 
 /* Upper case against sentence-case sub-captions: two uppercase levels read as
-   one at 10px. */
+   one at 11px. */
 .legendGroupLabel {
   /* Shrinks to its words so the ⓘ after it reads as belonging to it. */
   flex: 0 1 auto;
@@ -135,11 +137,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+
+  /* A 24px target (WCAG 2.5.8) that still sits in its row like the icon. */
+  margin: -5px -5px -5px 0;
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-60);
   cursor: pointer;
 }
 
@@ -318,6 +325,11 @@
   transform: translateX(-100%);
 }
 
+/* Separates the two size/value pairs of the marker key. */
+.legendSizeKey .legendItemLabel + .legendSwatch {
+  margin-left: 6px;
+}
+
 /* These stand in their group's label row (see renderGroup), so they shrink to
    their words like a group label does. */
 .legendLayerItems {
@@ -350,7 +362,7 @@
   height: calc(var(--legend-switch) - 4px);
 }
 
-.mapLegend .form-switch .form-check-input:checked::before {
+.mapLegend .form-switch[data-selected] .form-check-input::before {
   transform: translateX(12px);
 }
 
@@ -404,7 +416,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: -4.5px;
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -412,12 +427,12 @@
   cursor: pointer;
 }
 
-.legendCreditsButton:hover {
+.legendCreditsButton[data-hovered] {
   color: var(--cioos-ink);
   background-color: var(--cioos-surface-2);
 }
 
-.legendCreditsButton:focus-visible {
+.legendCreditsButton[data-focus-visible] {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -442,7 +457,7 @@
 }
 
 .legendCredits .maplibregl-ctrl-attrib a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: underline;
 }
 
@@ -471,7 +486,9 @@
   --legend-grow: 0px;
 
   min-width: 96px;
-  max-width: 136px;
+
+  /* Fits "Days of data" at the 11px floor on two lines. */
+  max-width: 152px;
 }
 
 .legendCompact .legendHeader {

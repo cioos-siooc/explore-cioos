@@ -137,6 +137,41 @@ test("route() is a middleware factory that resolves the backend per request", as
   );
 });
 
+test("route() builds apicache's middleware once, not per request", async (t) => {
+  const real = apicache.middleware;
+  let built = 0;
+  t.mock.method(apicache, "middleware", (...args) => {
+    built += 1;
+    return real.apply(apicache, args);
+  });
+  const cache = createCache({ redis: fakeRedis() });
+
+  const app = express();
+  app.get("/t", cache.route("10 minutes"), (_req, res) => res.json({}));
+  const server = app.listen(0);
+  try {
+    for (let i = 0; i < 3; i += 1) {
+      await new Promise((resolve, reject) => {
+        http
+          .get({ port: server.address().port, path: `/t?i=${i}` }, (r) => {
+            r.resume();
+            r.on("end", resolve);
+          })
+          .on("error", reject);
+      });
+    }
+  } finally {
+    server.close();
+    apicache.getIndex().all.forEach((key) => apicache.clear(key));
+  }
+
+  assert.equal(
+    built,
+    1,
+    "each build is kept by apicache forever and re-synced on every later build",
+  );
+});
+
 // End to end through real apicache: whether an entry actually lands, which
 // routePipeline's own unit test cannot see.
 // A bare apicache.clear() leaves each entry's expiry timer armed and the

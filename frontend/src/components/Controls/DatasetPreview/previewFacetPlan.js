@@ -10,8 +10,10 @@ import {
   isDownwardVertical,
   isTimeLike,
   measurementsOf,
+  preferWithData,
 } from "./previewVariables.js";
 import {
+  instantOf,
   POSITION_INDEX_COLUMN,
   timeCoordinateOf,
 } from "./previewTrackIndex.js";
@@ -19,6 +21,10 @@ import {
   EUCLIDEAN_DISTANCE_COLUMN,
   TOTAL_DISTANCE_TRAVELED_COLUMN,
 } from "./previewTrackDistance.js";
+import {
+  COLOR_LAYOUT,
+  PANELS_LAYOUT,
+} from "../../../state/selection/previewParams.js";
 
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
@@ -104,14 +110,16 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // out of pointing the shared axis at a measurement.
 //
 // `colorPlot` marks the records holding many profiles: a filled section needs
-// several of them side by side.
+// several of them side by side, and it is what they open on.
 const CDM_LAYOUTS = {
   Profile: {
+    defaultPanelCount: 3,
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
   },
   TimeSeriesProfile: {
+    defaultPanelCount: 3,
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
@@ -119,6 +127,7 @@ const CDM_LAYOUTS = {
     colorPlot: true,
   },
   TrajectoryProfile: {
+    defaultPanelCount: 3,
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
@@ -126,6 +135,7 @@ const CDM_LAYOUTS = {
     colorPlot: true,
   },
   TimeSeries: {
+    defaultPanelCount: 3,
     orientation: ROWS,
     wanted: "time",
     sharedAxisFor: timeCoordinateOf,
@@ -140,7 +150,7 @@ const CDM_LAYOUTS = {
   Point: {
     orientation: ROWS,
     wanted: "measurement",
-    sharedAxisFor: (variables) => measurementsOf(variables)[0],
+    sharedAxisFor: (variables) => preferWithData(measurementsOf(variables))[0],
   },
 };
 
@@ -197,8 +207,8 @@ export function colorCandidatesFor(variables) {
 
 // The colour plot's X and Y when the link names neither: every panel draws Y
 // against X and is shaded by its own variable, so the two are the record's
-// "where" — time (or the track) across, depth down. A profile's shared axis is
-// already that depth, a stack's is already that time.
+// "where" — time across (the track when there is none), depth down. A
+// profile's shared axis is already that depth, a stack's is already that time.
 export function colorPlotAxesFor(dataset, variables, plan) {
   if (!plan) return { x: null, y: null };
   const layout = layoutFor(dataset);
@@ -208,14 +218,15 @@ export function colorPlotAxesFor(dataset, variables, plan) {
       layout && layout.leadingAxesFor
         ? layout.leadingAxesFor(variables).filter(Boolean)
         : [];
-    const across = leading[0] || timeCoordinateOf(variables);
+    const across = timeCoordinateOf(variables) || leading[0];
     return { x: (across && across.columnName) || null, y: plan.sharedAxis };
   }
   const notTaken = (variable) =>
     variable.columnName !== plan.sharedAxis &&
     !panelDefaults.includes(variable.columnName);
   const down =
-    verticalCoordinate(variables) || measurementsOf(variables).find(notTaken);
+    verticalCoordinate(variables) ||
+    preferWithData(measurementsOf(variables).filter(notTaken))[0];
   return {
     x: plan.sharedAxis,
     y: down && down.columnName !== plan.sharedAxis ? down.columnName : null,
@@ -253,30 +264,122 @@ function defaultPanelCandidatesFor(variables, sharedAxis) {
   const notShared = (variable) =>
     !sharedAxis || variable.columnName !== sharedAxis;
   const measurements = measurementsOf(variables).filter(notShared);
-  if (measurements.length) return measurements;
-  return (variables || []).filter(
-    (variable) =>
-      variable.kind === "coordinate" &&
-      variable.isNumeric &&
-      notShared(variable) &&
-      !isHorizontalPosition(variable),
+  if (measurements.length) return preferWithData(measurements);
+  return preferWithData(
+    (variables || []).filter(
+      (variable) =>
+        variable.kind === "coordinate" &&
+        variable.isNumeric &&
+        notShared(variable) &&
+        !isHorizontalPosition(variable),
+    ),
   );
 }
 
-// The dataset's first EOV column when plottable, else the first candidate.
-function defaultPanelsFor(dataset, variables, shared) {
+// Depth or pressure drawn against the shared axis only restates the vertical
+// coordinate.
+const VERTICAL_NAME = /depth|pressure/i;
+const isVerticalLike = (variable) =>
+  isDownwardVertical(variable) ||
+  VERTICAL_NAME.test(variable.standardName || "");
+
+const numberOf = (value) =>
+  value === null || value === undefined || value === "" ? null : Number(value); // Number() reads these as 0
+
+// Two sensors logging the same values (a primary and its backup) draw one
+// curve twice.
+const sameValuesIn = (data, a, b) =>
+  (data || []).every((row) => row[a.columnName] === row[b.columnName]);
+
+const LINEAR_R = 0.999;
+
+// A column that is a straight line in the shared axis (a counter, a pressure
+// against depth) draws nothing worth opening on. |r| close to 1, from rows
+// where both hold a number; fewer than three such rows say nothing either.
+function isLinearIn(data, variable, shared) {
+  const readShared = isTimeLike(shared) ? instantOf : numberOf;
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  (data || []).forEach((row) => {
+    const x = readShared(row[shared.columnName]);
+    const y = numberOf(row[variable.columnName]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    n += 1;
+    sx += x;
+    sy += y;
+    sxx += x * x;
+    syy += y * y;
+    sxy += x * y;
+  });
+  if (n < 3) return true;
+  const cov = n * sxy - sx * sy;
+  const varX = n * sxx - sx * sx;
+  const varY = n * syy - sy * sy;
+  if (varX <= 0 || varY <= 0) return true;
+  return Math.abs(cov) / Math.sqrt(varX * varY) > LINEAR_R;
+}
+
+// Weather a buoy logs beside the ocean: never mapped to an EOV, so without this a
+// station whose columns start with wind opened on wind, not on the water.
+const ATMOSPHERIC =
+  /^(wind|eastward_wind|northward_wind|air_|surface_air|dew_point|relative_humidity|precipitation|rainfall|visibility)/;
+const isAtmospheric = (variable) =>
+  ATMOSPHERIC.test(variable.standardName || "") ||
+  /\b(wind|air temp|humidity|barometric)/i.test(
+    `${variable.columnName} ${variable.longName || ""}`.replace(/_/g, " "),
+  );
+
+// An EOV first: the dataset's first_eov_column when plottable, else any column
+// mapped to an EOV, else the first candidate that is not weather. Up to `count` of them when the
+// rows show which vary — leaving out depth, pressure, straight lines and a
+// second column of an already-picked standard_name (a backup sensor, a second
+// calibration); otherwise, or when none is left, the single first pick.
+function defaultPanelsFor(dataset, variables, data, shared, count) {
   const candidates = defaultPanelCandidatesFor(
     variables,
     shared && shared.columnName,
   );
   if (!candidates.length) return [];
+  const isEov = (variable) => variable.eovs && variable.eovs.length;
   const preferred =
-    dataset &&
-    dataset.first_eov_column &&
-    candidates.find(
-      (variable) => variable.columnName === dataset.first_eov_column,
-    );
-  return [(preferred || candidates[0]).columnName];
+    (dataset &&
+      dataset.first_eov_column &&
+      candidates.find(
+        (variable) => variable.columnName === dataset.first_eov_column,
+      )) ||
+    candidates.find(isEov) ||
+    candidates.find((variable) => !isAtmospheric(variable)) ||
+    candidates[0];
+  const ordered = uniqueColumns([
+    preferred,
+    ...candidates.filter(isEov),
+    ...candidates.filter((variable) => !isAtmospheric(variable)),
+    ...candidates,
+  ]);
+  const varying = [];
+  for (const variable of ordered) {
+    if (varying.length >= count) break;
+    if (
+      variable.varies &&
+      !isVerticalLike(variable) &&
+      !varying.some(
+        (picked) =>
+          (variable.standardName &&
+            picked.standardName === variable.standardName) ||
+          sameValuesIn(data, picked, variable),
+      ) &&
+      !isLinearIn(data, variable, shared)
+    ) {
+      varying.push(variable);
+    }
+  }
+  return count > 1 && varying.length
+    ? varying.map((variable) => variable.columnName)
+    : [preferred.columnName];
 }
 
 // Why a record has no plan. Four codes rather than one "not plottable", because
@@ -312,7 +415,13 @@ function planOrBlockerFor(dataset, variables, data) {
     return blocked(PLOT_BLOCKED.NO_SHARED_AXIS, { wanted: layout.wanted });
   }
 
-  const panelDefaults = defaultPanelsFor(dataset, variables, shared);
+  const panelDefaults = defaultPanelsFor(
+    dataset,
+    variables,
+    data,
+    shared,
+    layout.defaultPanelCount || 1,
+  );
   if (!panelDefaults.length) return blocked(PLOT_BLOCKED.NO_MEASUREMENTS);
 
   return {
@@ -354,13 +463,15 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
 }
 
 // A column named in a link that this dataset lacks is dropped, not drawn empty.
-export function resolvePanels(panels, variables, sharedAxis) {
+// `excluded` is the shared axis, or every shared axis of a grid.
+export function resolvePanels(panels, variables, excluded) {
   const available = new Set(
     (variables || []).map((variable) => variable.columnName),
   );
+  const taken = new Set([].concat(excluded || []));
   const seen = new Set();
   return (panels || []).filter((columnName) => {
-    if (columnName === sharedAxis) return false;
+    if (taken.has(columnName)) return false;
     if (!available.has(columnName)) return false;
     if (seen.has(columnName)) return false;
     seen.add(columnName);
@@ -379,3 +490,11 @@ export function defaultVisFor(dataset) {
 export function hasColorPlotFor(dataset) {
   return Boolean(layoutFor(dataset)?.colorPlot);
 }
+
+// The arrangement drawn: the link's when this record offers it, else the type's.
+export function plotLayoutFor(dataset, layoutParam) {
+  if (!hasColorPlotFor(dataset)) return PANELS_LAYOUT;
+  return layoutParam === PANELS_LAYOUT ? PANELS_LAYOUT : COLOR_LAYOUT;
+}
+
+export const defaultPlotLayoutFor = (dataset) => plotLayoutFor(dataset, null);

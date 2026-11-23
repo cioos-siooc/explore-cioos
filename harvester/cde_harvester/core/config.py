@@ -143,12 +143,13 @@ def resolve_harvest_config_file(config_file):
        generated .env -> compose dotenv chain can reindent it, eat a `#`
        comment, or split it. Regenerate after editing the file with:
            base64 < harvest_config.yaml | tr -d '\n'
-    2. HARVEST_CONFIG_FILE — path to a config file mounted into the container
-       (a compose mount, or a Coolify Persistent Storage *file* mount).
-    3. `config_file` argument — the mounted/default path.
+    2. HARVEST_CONFIG_FILE — path to a config file: one of the committed
+       harvest_config.*.yaml files baked into the image (the image defaults to
+       harvest_config.production.yaml) or a mounted file.
+    3. `config_file` argument.
 
-    The image no longer bakes a config, so the resolved file MUST exist —
-    fail here with an actionable error rather than deep inside the harvest.
+    The resolved file MUST exist — fail here with an actionable error rather
+    than deep inside the harvest.
     Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set.
     """
     env_config_b64 = os.getenv("HARVEST_CONFIG_B64", "").strip()
@@ -174,13 +175,12 @@ def resolve_harvest_config_file(config_file):
 
     if not config_file or not Path(config_file).is_file():
         raise FileNotFoundError(
-            f"Harvest config not found: {config_file!r}. The image does not bake a "
-            "config; provide one via (1) HARVEST_CONFIG_B64 env var holding the whole "
+            f"Harvest config not found: {config_file!r}. Provide one via "
+            "(1) HARVEST_CONFIG_B64 env var holding the whole "
             "YAML file base64-encoded on one line "
-            "(base64 < harvest_config.yaml | tr -d '\\n'), (2) a file mounted at "
-            "/app/harvester/harvest_config.yaml (docker-compose volume, or a Coolify "
-            "Persistent Storage file mount), or (3) HARVEST_CONFIG_FILE env var "
-            "pointing at a mounted file."
+            "(base64 < harvest_config.yaml | tr -d '\\n'), or (2) HARVEST_CONFIG_FILE "
+            "env var pointing at a baked /app/harvester/harvest_config.*.yaml or a "
+            "mounted file."
         )
 
     env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()

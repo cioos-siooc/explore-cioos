@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Download,
-  FileEarmarkText,
   ListUl,
   PlusCircle,
   QuestionCircle,
@@ -34,13 +33,20 @@ import useMediaQuery, {
 import "./styles.css";
 import "../../ui/sheetHandleStyles.css";
 
+const ADD_ALL_MAX = 50;
+
 // A dataset page swaps the header for a banner so the two surfaces the card
 // hosts can be told apart. Map minimizes the page to a card (DatasetMapCard),
 // keeping the map keyed to it; the X leaves the dataset.
 export default function Sidebar() {
   const { t } = useTranslation();
-  const { pointsToReview, inspectDataset, returnToDatasetList } =
-    useSelection();
+  const {
+    pointsToReview,
+    inspectDataset,
+    returnToDatasetList,
+    filteredDatasets,
+    addDatasetsToSelection,
+  } = useSelection();
   const {
     sidebarOpen,
     setSidebarOpen,
@@ -75,17 +81,28 @@ export default function Sidebar() {
   // minimized window does.
   const [wideParam, setWide] = useWideView();
   const wide = expanded && wideParam;
+  // Escape steps out one level: wide to narrow, then the list closes. A
+  // dataset page is left by ClearMapSelection's Escape.
+  const escapes = wide || (expanded && !inspecting);
   useEffect(() => {
-    if (!wide) return undefined;
+    if (!escapes) return undefined;
     // On window, so anything nearer that answers Escape (a dialog, the filter
     // search, a pinned citation) stops or claims it first.
     const onKeyDown = (event) => {
-      if (event.key === "Escape" && !event.defaultPrevented) setWide(false);
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (wide) setWide(false);
+      else setSidebarOpen(false);
     };
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- keep: Escape narrows or closes the sidebar unless an overlay claimed it first
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [wide, setWide]);
+  }, [escapes, wide, setWide, setSidebarOpen]);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
+  // A short result list can go into the download in one tap; a long one is
+  // built from the cards, so a broad search isn't queued whole by accident.
+  const addable =
+    selectedCount === 0
+      ? (filteredDatasets || []).filter((row) => row.cdm_data_type !== "Grid")
+      : [];
   // Adding to the selection is when download tips start to matter.
   const lastSelectedCount = useRef(selectedCount);
   useEffect(() => {
@@ -157,10 +174,6 @@ export default function Sidebar() {
                 />
                 <span>{t("sidebarBackToDatasetsText")}</span>
               </button>
-              <span className="datasetsBannerMode">
-                <FileEarmarkText size={13} aria-hidden="true" />
-                {t("sidebarDatasetDetailsLabel")}
-              </span>
               <CloseButton
                 label={t("sidebarShowMapTitle")}
                 onClick={() => setSidebarOpen(false)}
@@ -227,7 +240,29 @@ export default function Sidebar() {
                 size={13}
                 aria-hidden="true"
               />
-              <span>{t("sidebarSelectionHintText")}</span>
+              {!inspecting &&
+              addable.length > 0 &&
+              addable.length <= ADD_ALL_MAX ? (
+                <button
+                  type="button"
+                  className="sidebarFooterAddAll"
+                  data-testid="sidebar-add-all"
+                  onClick={() =>
+                    addDatasetsToSelection(addable.map((row) => row.pk))
+                  }
+                  title={t("sidebarAddAllTitle")}
+                >
+                  {t("sidebarAddAllText", { count: addable.length })}
+                </button>
+              ) : (
+                <span>
+                  {t(
+                    inspecting
+                      ? "sidebarDetailsSelectionHintText"
+                      : "sidebarSelectionHintText",
+                  )}
+                </span>
+              )}
               <button
                 type="button"
                 className="sidebarFooterHintMore"

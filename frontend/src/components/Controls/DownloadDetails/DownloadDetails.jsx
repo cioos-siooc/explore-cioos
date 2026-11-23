@@ -2,6 +2,7 @@ import * as React from "react";
 import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
+import { ExclamationCircle } from "react-bootstrap-icons";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DownloadFormat from "./DownloadFormat.jsx";
@@ -10,11 +11,12 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useDownload } from "../../../state/download/DownloadProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
 import {
   applyDatasetPKs,
   createDataFilterQueryString,
-  formatSizeEstimate,
+  formatSize,
   useChanged,
   sumSizeEstimates,
 } from "../../../utilities.jsx";
@@ -31,7 +33,6 @@ import {
 } from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
-import Spinner from "../../ui/Spinner.jsx";
 
 // Note: datasets and points are interchangeable terminology here.
 export default function DownloadDetails({
@@ -52,9 +53,9 @@ export default function DownloadDetails({
   setSubmissionState,
   children,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { areaPlace } = useSelection();
   const { packageFormat } = useDownload();
-  const [selectAll, setSelectAll] = useState(true);
   const [pointsData, setPointsData] = useState(
     pointsToReview
       // Griddap is metadata-only and must never reach the estimate/queue flow.
@@ -231,19 +232,38 @@ export default function DownloadDetails({
     setPointsData(result);
   }
 
+  const selectedCount = pointsData.filter((point) => point.selected).length;
+  const selectableCount = pointsData.filter(
+    (point) => !point.downloadDisabled,
+  ).length;
+  const overLimitCount = pointsData.length - selectableCount;
+  const allSelectableSelected =
+    selectableCount > 0 && selectedCount === selectableCount;
+
   function handleSelectAllDatasets() {
     setPointsData(
-      pointsData.map((p) => {
-        return {
-          ...p,
-          selected: p.downloadDisabled === false ? !selectAll : false,
-        };
-      }),
+      pointsData.map((p) => ({
+        ...p,
+        selected: !p.downloadDisabled && !allSelectableSelected,
+      })),
     );
-    setSelectAll(!selectAll);
   }
 
-  const selectedCount = pointsData.filter((point) => point.selected).length;
+  // Rows stay unticked when the estimate failed: the queue needs a size.
+  const estimatesFailed = !estimatesLoading && !downloadSizeEstimates;
+  const showSize = estimatesLoading || estimatesFailed || selectedCount > 0;
+  // The estimates reach the rows an effect later; until then nothing is ticked.
+  const rowsSized =
+    Boolean(downloadSizeEstimates) &&
+    pointsData.every((point) => point.sizeEstimate);
+  const blockedReason =
+    (estimatesFailed || rowsSized) &&
+    selectedCount === 0 &&
+    (estimatesFailed
+      ? t("downloadBlockedNoEstimate")
+      : selectableCount === 0
+        ? t("downloadBlockedAllOverLimit", { count: overLimitCount })
+        : t("downloadBlockedNoneSelected"));
   // Includes datasets the 1 GB ceiling deselected: the queue refuses them, and
   // the source queries have no ceiling. `!== false` because `selected` is unset until
   // the estimates land.
@@ -284,8 +304,78 @@ export default function DownloadDetails({
     [linkableDatasets, linkByPk],
   );
 
+  // Restates where and when the files are cut to, so the order can be checked
+  // against what was meant before it is sent.
+  const summaryLimits = [
+    polygonFiltered &&
+      t("downloadSummaryPlace", {
+        place: areaPlace?.name ?? t("downloadSummaryAreaUnnamed"),
+      }),
+    timeFilterActive &&
+      filterDownloadByTime &&
+      t("downloadSummaryDates", { start: query.startDate, end: query.endDate }),
+  ].filter(Boolean);
+
+  const sizeFiltered =
+    dataTotal.filteredSize !== dataTotal.unfilteredSize &&
+    Number.isFinite(dataTotal.unfilteredSize);
+
   return (
     <div className="container downloadDetails">
+      <p className="downloadSummary" data-testid="download-summary">
+        <strong>
+          {estimatesLoading || selectedCount === pointsData.length
+            ? t("downloadSummaryDatasets", { count: pointsData.length })
+            : t("downloadSummaryDatasetsOf", {
+                count: selectedCount,
+                total: pointsData.length,
+              })}
+        </strong>
+        {!estimatesLoading && overLimitCount > 0 && (
+          <span className="downloadSummaryOverLimit">
+            {" "}
+            {t("downloadSummaryOverLimit", { count: overLimitCount })}
+          </span>
+        )}
+        {showSize && <span aria-hidden="true">{" · "}</span>}
+        {estimatesLoading ? (
+          <span className="downloadSummaryMuted">
+            {t("downloadSummaryEstimating")}
+          </span>
+        ) : !showSize ? null : Number.isFinite(dataTotal.filteredSize) ? (
+          <>
+            <strong
+              title={
+                dataTotal.filteredPartial || dataTotal.unfilteredPartial
+                  ? t("downloadSizePartialTitle")
+                  : undefined
+              }
+            >
+              {t("downloadSummarySize", {
+                size: `${formatSize(dataTotal.filteredSize, i18n.language)}${dataTotal.filteredPartial ? "+" : ""}`,
+              })}
+            </strong>
+            {sizeFiltered && (
+              <span className="downloadSummaryMuted">
+                {" "}
+                {t("downloadSummarySizeFull", {
+                  size: `${formatSize(dataTotal.unfilteredSize, i18n.language)}${dataTotal.unfilteredPartial ? "+" : ""}`,
+                })}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="downloadSummaryMuted">
+            {t("downloadSizeUnavailableTitle")}
+          </span>
+        )}
+        {summaryLimits.map((limit) => (
+          <React.Fragment key={limit}>
+            <span aria-hidden="true">{" · "}</span>
+            {limit}
+          </React.Fragment>
+        ))}
+      </p>
       <div className="downloadBandRow">
         <FilterDownloadToggles
           query={query}
@@ -315,89 +405,31 @@ export default function DownloadDetails({
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
-            selectAll={selectAll}
+            selectAll={allSelectableSelected}
+            selectAllMixed={selectedCount > 0 && !allSelectableSelected}
+            selectAllDisabled={!estimatesLoading && selectableCount === 0}
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
             downloadLinkByPk={linkByPk}
-            pagerExtra={
-              <div className="downloadSummary">
-                {/* Both stats wait for the estimates, which decide how many
-                    stay selected. */}
-                <div className="downloadSummaryStat">
-                  {estimatesLoading ? (
-                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
-                  ) : (
-                    <span className="downloadSummaryValue">
-                      {selectedCount}
-                      <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
-                    </span>
-                  )}
-                  <span className="downloadSummaryLabel">
-                    {t("downloadDetailsDownloadInfoDatasets")}
-                  </span>
-                </div>
-                <div className="downloadSummaryDivider" aria-hidden="true" />
-                <div className="downloadSummaryStat">
-                  {estimatesLoading ? (
-                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
-                  ) : downloadSizeEstimates ? (
-                    <span
-                      className="downloadSummaryValue"
-                      title={
-                        dataTotal.filteredPartial || dataTotal.unfilteredPartial
-                          ? t("downloadSizePartialTitle")
-                          : undefined
-                      }
-                    >
-                      {formatSizeEstimate(dataTotal.filteredSize)}
-                      {dataTotal.filteredPartial && "+"}
-                      <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
-                        dataTotal.unfilteredSize,
-                      )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
-                    </span>
-                  ) : (
-                    <span
-                      className="downloadSummaryValue downloadSummaryValueMuted"
-                      title={t("downloadSizeUnavailableTitle")}
-                    >
-                      {t("downloadSizeUnavailable")}
-                    </span>
-                  )}
-                  <span className="downloadSummaryLabel">
-                    {t("downloadDetailsDownloadInfoDownloadSize")}
-                  </span>
-                </div>
-              </div>
-            }
           />
         </div>
       </div>
 
       <div className="downloadFooter">
-        {/* Two ways to the data, so they share one section. */}
-        <div className="downloadFooterSection downloadDelivery">
-          <div className="downloadDeliveryHeading">
-            <span className="downloadFooterTitle">
-              {t("downloadDeliveryTitle")}
-            </span>
-            <p className="downloadDeliveryIntro">
-              {t("downloadDeliveryIntro")}
-            </p>
-          </div>
-          <div className="downloadDeliveryOptions">
-            {children}
-            <span className="downloadDeliveryOr" aria-hidden="true">
-              {t("downloadDeliveryOr")}
-            </span>
-            <DownloadLinks
-              count={linkableDatasets.length}
-              links={links}
-              polygonFiltered={polygonFiltered}
-            />
-          </div>
-        </div>
+        {blockedReason && (
+          <p className="downloadBlockedReason" data-testid="download-blocked">
+            <ExclamationCircle size={14} aria-hidden="true" />
+            {blockedReason}
+          </p>
+        )}
+        {children}
+        <DownloadLinks
+          count={linkableDatasets.length}
+          links={links}
+          polygonFiltered={polygonFiltered}
+        />
       </div>
     </div>
   );

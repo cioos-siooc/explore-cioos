@@ -177,6 +177,19 @@ test("queues the chosen format and the filters as sent, without the email", asyn
   assert.doesNotMatch(insert, /"filters":\{[^}]*diver@example\.com/);
 });
 
+test("gives each job a full random UUID, which names its archive", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+
+  await agent.post("/download").query(VALID_QUERY).send(EMAIL);
+
+  assert.match(
+    db.queries[1],
+    /"job_id":"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"/,
+  );
+});
+
 test("links the package back to the selection in the Data Explorer", async () => {
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
   db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);

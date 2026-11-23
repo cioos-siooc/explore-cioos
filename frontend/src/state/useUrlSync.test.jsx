@@ -109,6 +109,54 @@ describe("UrlSync", () => {
     expect(hooks.filters.searchIn).toBe("all");
   });
 
+  it("names a searched place in the link, and drops the name once the area is edited", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    const ring = [
+      [-66, 44],
+      [-64, 44],
+      [-64, 45.5],
+      [-66, 44],
+    ];
+
+    act(() => {
+      hooks.selection.setAreaPlace({
+        name: "Bay of Fundy",
+        cgndbid: "FUNDY",
+        ring,
+      });
+      hooks.selection.setPolygon(ring);
+    });
+    await waitFor(() => expect(params().get("place")).toBe("Bay of Fundy"));
+    expect(params().get("placeId")).toBe("FUNDY");
+
+    act(() => hooks.selection.setPolygon(ring.map(([x, y]) => [x + 0.1, y])));
+    await waitFor(() => expect(params().has("place")).toBe(false));
+    expect(params().has("placeId")).toBe(false);
+  });
+
+  it("seeds a searched place's name from the link", async () => {
+    const ring = JSON.stringify([
+      [-66, 44],
+      [-64, 44],
+      [-64, 45.5],
+      [-66, 44],
+    ]);
+    renderWithProviders(<Probe />, {
+      providers: "app",
+      url: `/?polygon=${encodeURIComponent(ring)}&place=Bay%20of%20Fundy&placeId=FUNDY`,
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(hooks.selection.areaPlace).toMatchObject({
+      name: "Bay of Fundy",
+      cgndbid: "FUNDY",
+    });
+  });
+
   it("writes onlyInView only when true (the unfiltered state carries no param)", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     await waitFor(() =>

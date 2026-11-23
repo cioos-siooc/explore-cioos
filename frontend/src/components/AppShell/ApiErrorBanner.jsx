@@ -17,19 +17,19 @@ function measureBannerSpace({ top }) {
 // Otherwise the filters and dataset list would sit silently empty.
 export default function ApiErrorBanner() {
   const { catalogError, catalogErrorDetail, loadCatalog } = useFilters();
-  const { loadLegend } = useMapState();
+  const { loadLegend, tilesFailed, requestTileRetry } = useMapState();
   const { pointsError, retryPointQuery } = useSelection();
 
-  if (!catalogError && !pointsError) return null;
+  if (!catalogError && !pointsError && !tilesFailed) return null;
+  let text = "apiErrorTilesBannerText";
+  if (catalogError) {
+    text = catalogErrorDetail ? "apiErrorRejectedText" : "apiErrorBannerText";
+  } else if (pointsError) {
+    text = "apiErrorPointsBannerText";
+  }
   return (
     <BannerSurface
-      text={
-        catalogError
-          ? catalogErrorDetail
-            ? "apiErrorRejectedText"
-            : "apiErrorBannerText"
-          : "apiErrorPointsBannerText"
-      }
+      text={text}
       detail={catalogError ? catalogErrorDetail : null}
       onRetry={() => {
         if (catalogError) {
@@ -37,6 +37,7 @@ export default function ApiErrorBanner() {
           loadLegend();
         }
         if (pointsError) retryPointQuery();
+        if (tilesFailed) requestTileRetry();
       }}
     />
   );

@@ -2,6 +2,7 @@ const createError = require("http-errors");
 const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
+require("./utils/upstreamUserAgent");
 
 const swaggerUi = require("swagger-ui-express");
 const downloadRouter = require("./routes/download");

@@ -10,10 +10,10 @@ import {
   toElevation,
 } from "../../../wmsUtilities";
 import Rail from "../Rail/Rail.jsx";
-import { DateField } from "../TimeRail/TimeRail.jsx";
 import { DepthField } from "../DepthRail/DepthRail.jsx";
 import { MS_PER_DAY, msToIso } from "../TimeRail/timeAxis.js";
 import gridTimeTicks from "./gridTimeTicks.js";
+import DateField from "../../ui/DateField.jsx";
 import "./styles.css";
 
 // The harvest can carry a vertical axis with unknown bounds; a NaN node would
@@ -109,8 +109,6 @@ function TimeSlice({ nodes, time, onChange }) {
     () => ({
       min: nodes.min,
       max: nodes.max,
-      minText: new Date(nodes.min).toISOString(),
-      maxText: new Date(nodes.max).toISOString(),
       toPos: (ms) => (ms - nodes.min) / (nodes.max - nodes.min),
       toValue: (pos) => nodes.min + pos * (nodes.max - nodes.min),
     }),

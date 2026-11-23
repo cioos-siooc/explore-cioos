@@ -1,6 +1,6 @@
-"""Harvest config resolution: the image bakes no config, and HARVEST_CONFIG_B64
-exists because Coolify's env editor mangles multi-line YAML, so the round-trip
-tests below are the regression guard."""
+"""Harvest config resolution: HARVEST_CONFIG_B64 overrides the image's baked
+configs, and is base64 because Coolify's env editor mangles multi-line
+YAML, so the round-trip tests below are the regression guard."""
 
 import base64
 from pathlib import Path

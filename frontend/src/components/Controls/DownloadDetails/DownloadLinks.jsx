@@ -52,13 +52,13 @@ export default function DownloadLinks({ count, links, polygonFiltered }) {
       data-testid="download-links"
       data-tip-highlight={tipHighlight("directLinks")}
     >
-      <span className="downloadFooterTitle">
-        {t("directLinksTitle")}
+      <span className="downloadOptionTitle">{t("directLinksTitle")}</span>
+      <p className="directLinksDescription">
+        {t("directLinksDescription")}
         {!count && (
           <span className="directLinksCount">{t("directLinksEmpty")}</span>
         )}
-      </span>
-      <p className="directLinksDescription">{t("directLinksDescription")}</p>
+      </p>
 
       <button
         type="button"

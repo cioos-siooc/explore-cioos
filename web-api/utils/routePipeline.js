@@ -160,6 +160,11 @@ async function errorHandler(req, res, next) {
 // ($api_browser_cache in nginx/nginx.conf).
 const DEFAULT_CACHE_DURATION = "24 hours";
 
+// For routes too slow to recompute on a visitor's request (the unfiltered
+// /legend took 15 s cold on beta): the harvest warms them after each flush,
+// and they then last until the next flush rather than a day.
+const SLOW_ROUTE_CACHE_DURATION = "7 days";
+
 // apicache only stores a response with a body, and Express answers a
 // conditional request with a bodiless 304, so a revalidating miss would never
 // fill the cache (measured 3.2 s every time vs 15 ms once filled). This runs
@@ -201,4 +206,5 @@ module.exports = {
   tileParamValidators,
   errorHandler,
   MAX_TILE_ZOOM,
+  SLOW_ROUTE_CACHE_DURATION,
 };

@@ -579,7 +579,7 @@ DROP TABLE IF EXISTS download_jobs;
 CREATE TABLE download_jobs (
     pk SERIAL PRIMARY KEY,
     time timestamp with time zone DEFAULT now(),
-    job_id text,
+    job_id text UNIQUE,
     email text,                                -- cleared 7 days after the job finishes
     email_domain text,                         -- kept, for usage statistics
     status text DEFAULT 'open'::text,

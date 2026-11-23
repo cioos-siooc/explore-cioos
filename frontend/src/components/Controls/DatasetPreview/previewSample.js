@@ -27,3 +27,40 @@ export function previewSampleFor({ sample, rows, profiles, drawsOneProfile }) {
     totalProfileCount: countsProfiles ? profiles.count : null,
   };
 }
+
+// Where the page before this one ends: the earliest instant among the rows, or
+// null when none has a readable time.
+export function earliestTime(rows) {
+  let earliest = Infinity;
+  rows.forEach((row) => {
+    const time = Date.parse(row.time);
+    if (time < earliest) earliest = time;
+  });
+  return earliest === Infinity ? null : new Date(earliest).toISOString();
+}
+
+/**
+ * Which of the window controls the preview offers. Only a window of the record
+ * gets any: one profile, or a record that came back whole at the default row
+ * count, has nothing earlier to reach and no more rows to ask for. A period
+ * fixes where the window is, so it can hold more rows but not page.
+ */
+export function previewWindowFor({
+  sample,
+  rows,
+  drawsOneProfile,
+  hasPeriod,
+  before,
+  rowLimitChanged,
+}) {
+  const partial = Boolean(sample) && sample.rowCount < sample.totalRowCount;
+  const offersRows =
+    !drawsOneProfile && (partial || Boolean(before) || rowLimitChanged);
+  const earliest = offersRows && !hasPeriod ? earliestTime(rows) : null;
+  return {
+    offersRows,
+    offersPaging: Boolean(earliest),
+    earliest,
+    startOfRecord: Boolean(sample?.startOfRecord),
+  };
+}

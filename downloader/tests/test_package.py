@@ -7,6 +7,7 @@ import time
 import tomllib
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote, unquote
 
@@ -226,6 +227,19 @@ def test_obis_takes_its_own_format_beside_the_erddap_one(tmp_path, monkeypatch):
     assert row["format"] == "parquet" and not row["format_fallback"]
     assert "cde_download_pkg001/data/abc_obis_org/abc_obis_org.parquet" in archive.namelist()
     assert "- OBIS format: Parquet" in read("README.md")
+
+
+def test_an_obis_dataset_over_the_row_limit_ships_partial(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    monkeypatch.setattr(download_erddap, "OBIS_ROW_LIMIT", 1)
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    report, _, read = _run(tmp_path, _query(obis))
+
+    row = report["erddap_report"][0]
+    assert (row["status"], row["reason_code"], row["n_records"]) == ("PARTIAL", "DATASET_SIZE_LIMIT", 1)
+    assert "was cut off at the per-dataset size limit" in read("README.md")
 
 
 def test_feature_ids_replace_the_bounding_box(tmp_path):
@@ -522,7 +536,7 @@ def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
             pool.map(lambda i: formats.write_obis("csv", str(export), {}, regions, tmp_path / str(i)), range(32))
         )
 
-    assert [f["n_rows"] for [f] in written] == [1] * 32
+    assert [f["n_rows"] for [f], _ in written] == [1] * 32
 
 
 @pytest.mark.parametrize(
@@ -541,9 +555,19 @@ def test_obis_occurrences_are_filtered_by_depth_and_time(tmp_path, query, n_rows
     export = tmp_path / "export.parquet"
     _raw_obis(export)
 
-    written = formats.write_obis("csv", str(export), query, [], tmp_path / "out")
+    written, _ = formats.write_obis("csv", str(export), query, [], tmp_path / "out")
 
     assert sum(f["n_rows"] for f in written) == n_rows
+
+
+@pytest.mark.parametrize(("row_limit", "n_rows", "truncated"), [(1, 1, True), (2, 2, False), (None, 2, False)])
+def test_obis_occurrences_stop_at_the_row_limit(tmp_path, row_limit, n_rows, truncated):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+
+    written, cut = formats.write_obis("csv", str(export), {}, [], tmp_path / "out", row_limit)
+
+    assert ([f["n_rows"] for f in written], cut) == ([n_rows], truncated)
 
 
 def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):
@@ -740,3 +764,18 @@ def test_the_readme_explains_each_file_and_how_to_open_the_formats_it_holds(tmp_
         assert f"`{name}`" in files
     assert "(#reproduce-this-download)" in files
     assert "[Files in this package](#files-in-this-package)" in readme[: readme.index("## Files in this package")]
+
+
+def test_a_failed_job_leaves_no_zip_or_working_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    def zip_then_fail(folder, zip_full_path):
+        Path(zip_full_path).write_bytes(b"half a zip")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(downloader_wrapper, "zip_folder", zip_then_fail)
+    with pytest.raises(OSError, match="disk full"):
+        _run(tmp_path, _query(_dataset("Good")))
+
+    assert list((tmp_path / "out").iterdir()) == []
+    assert not (tmp_path / "cde_download_pkg001").exists()

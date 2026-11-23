@@ -10,6 +10,7 @@ import {
 
 import { polygonIsRectangle } from "../../../utilities.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 export default function FilterDownloadToggles({
@@ -27,6 +28,8 @@ export default function FilterDownloadToggles({
 }) {
   const { t } = useTranslation();
   const { tipHighlight } = useTips();
+  const { areaPlace } = useSelection();
+  const isRectangle = Boolean(polygon) && polygonIsRectangle(polygon);
 
   const toggleClassName = (active, enabled) =>
     classNames("filterDownloadToggle", { active }, { disabled: !enabled });
@@ -99,8 +102,9 @@ export default function FilterDownloadToggles({
                 setFilterDownloadByPolygon(!filterDownloadByPolygon)
               }
               disabled={!polygonFilterActive}
+              title={polygonSummary(polygon)}
             >
-              {polygonIsRectangle(polygon) ? (
+              {isRectangle ? (
                 <BoundingBoxCircles
                   className="filterToggleIcon"
                   size={14}
@@ -113,11 +117,19 @@ export default function FilterDownloadToggles({
                   aria-hidden="true"
                 />
               )}
-              <span>{polygonSummary(polygon)}</span>
+              <span>
+                {areaPlace?.name ??
+                  t(
+                    isRectangle
+                      ? "downloadAreaDrawnBox"
+                      : "downloadAreaDrawnPolygon",
+                  )}
+              </span>
             </button>
           </div>
         )}
       </div>
+      <p className="downloadVariablesNote">{t("downloadVariablesNote")}</p>
     </div>
   );
 }

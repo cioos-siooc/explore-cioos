@@ -89,7 +89,9 @@ describe("DownloadDetails", () => {
   it("shows the no-filters-active message when nothing is filtering the download", async () => {
     renderDetails();
     expect(
-      screen.getByText("No Time, Depth, or Space filters currently active"),
+      screen.getByText(
+        "No time, depth or area limits: each dataset comes whole.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -114,8 +116,8 @@ describe("DownloadDetails", () => {
     });
     // Both datasets are well under the 1GB CDE limit.
     await waitFor(() => {
-      expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
-        "2 / 2",
+      expect(screen.getByTestId("download-summary")).toHaveTextContent(
+        "2 datasets · about 1.06 MB",
       );
     });
   });
@@ -153,8 +155,8 @@ describe("DownloadDetails", () => {
       setPointsToDownload,
     });
     await waitFor(() =>
-      expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
-        "2 / 2",
+      expect(screen.getByTestId("download-summary")).toHaveTextContent(
+        "2 datasets · about",
       ),
     );
     const estimateRequests = () =>
@@ -168,8 +170,8 @@ describe("DownloadDetails", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("dataset-card")).toHaveLength(1),
     );
-    expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
-      "1 / 1",
+    expect(screen.getByTestId("download-summary")).toHaveTextContent(
+      "1 dataset · about",
     );
     expect(
       screen.queryByRole("button", {
@@ -194,15 +196,79 @@ describe("DownloadDetails", () => {
     };
     renderDetails();
     await waitFor(() => {
-      expect(
-        document.querySelector(".datasetSizeTotalSpinner"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("download-summary")).toHaveTextContent(
+        "Size estimate unavailable",
+      );
     });
-    // Every card without an estimate carries the same title, so scope to the
-    // order summary's own figure rather than asserting a single match.
-    expect(
-      document.querySelector(".downloadSummaryValue[title]"),
-    ).toHaveAttribute("title", "Size estimate unavailable");
+  });
+
+  describe("when no dataset can be emailed", () => {
+    const sizedAt = (sizes) => {
+      const realFetch = global.fetch;
+      global.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/downloadEstimate")) {
+          return Promise.resolve(
+            Response.json(
+              Object.entries(sizes).map(([pk, size]) => ({
+                pk: Number(pk),
+                size,
+              })),
+            ),
+          );
+        }
+        return realFetch(input, init);
+      };
+    };
+
+    it("says every dataset is over 1 GB and where to go instead", async () => {
+      sizedAt({ [EST_SMALL.pk]: 2e9, [EST_LARGE.pk]: 3e9 });
+      renderDetails();
+      const reason = await screen.findByTestId("download-blocked");
+      expect(reason).toHaveTextContent(
+        "All 2 datasets are over 1 GB after your limits",
+      );
+      expect(reason).toHaveTextContent("Query the sources myself");
+      const summary = screen.getByTestId("download-summary");
+      expect(summary).toHaveTextContent("0 of 2 datasets (2 over 1 GB)");
+      expect(summary).not.toHaveTextContent("Size estimate unavailable");
+      expect(
+        screen.getByTitle("Select all").querySelector("input"),
+      ).toBeDisabled();
+    });
+
+    it("asks for a tick once the user has cleared them all", async () => {
+      sizedAt({ [EST_SMALL.pk]: 1e6, [EST_LARGE.pk]: 3e9 });
+      const { user } = renderDetails();
+      await waitFor(() =>
+        expect(screen.getByTestId("download-summary")).toHaveTextContent(
+          "1 of 2 datasets (1 over 1 GB)",
+        ),
+      );
+      const selectAll = screen.getByTitle("Select all").querySelector("input");
+      expect(selectAll).toBeChecked();
+      expect(selectAll.indeterminate).toBe(false);
+      await user.click(selectAll);
+      expect(await screen.findByTestId("download-blocked")).toHaveTextContent(
+        "Tick at least one dataset to request it.",
+      );
+    });
+
+    it("says the size couldn't be measured when the estimate fails", async () => {
+      installMockFetch();
+      const realFetch = global.fetch;
+      global.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/downloadEstimate")) {
+          return Promise.resolve(new Response(null, { status: 500 }));
+        }
+        return realFetch(input, init);
+      };
+      renderDetails();
+      expect(await screen.findByTestId("download-blocked")).toHaveTextContent(
+        "We couldn't measure these datasets",
+      );
+    });
   });
 
   it("asks /downloadEstimate for the basket once, with no empty parameter, even under a Datasets filter", async () => {
@@ -254,7 +320,7 @@ describe("DownloadDetails", () => {
     const { rerender } = renderDetails({ pointsToReview });
     const csv = () => screen.getByRole("button", { name: /dataset list/i });
     expect(csv()).toBeEnabled();
-    expect(screen.queryByText("Unfiltered")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Ignores/)).not.toBeInTheDocument();
 
     rerender(
       detailsElement({
@@ -264,7 +330,7 @@ describe("DownloadDetails", () => {
       }),
     );
     expect(csv()).toBeEnabled();
-    expect(screen.getByText("Unfiltered").closest("span")).toHaveAttribute(
+    expect(screen.getByText("Ignores polygon").closest("span")).toHaveAttribute(
       "title",
       "This link doesn't apply your polygon filter.",
     );
@@ -392,5 +458,56 @@ describe("DownloadDetails", () => {
     renderDetails();
     expect(screen.getByLabelText("ERDDAP™")).toBeInTheDocument();
     expect(screen.queryByLabelText("OBIS")).not.toBeInTheDocument();
+  });
+
+  it("names a searched place in the download's limits, with the outline in its title", async () => {
+    renderDetails({
+      polygon: [
+        [-65, 44],
+        [-62, 44],
+        [-63, 45],
+        [-65, 44],
+      ],
+      polygonFilterActive: true,
+      filterDownloadByPolygon: true,
+    });
+    const area = await screen.findByRole("button", { name: "Area" });
+    expect(area).toHaveAttribute(
+      "title",
+      expect.stringContaining("[-65.0, 44.0]"),
+    );
+  });
+
+  it("restates the area and dates the files are cut to in its summary", async () => {
+    renderDetails({
+      polygon: [
+        [-65, 44],
+        [-62, 44],
+        [-63, 45],
+        [-65, 44],
+      ],
+      polygonFilterActive: true,
+      filterDownloadByPolygon: true,
+      timeFilterActive: true,
+      filterDownloadByTime: true,
+    });
+    const summary = await screen.findByTestId("download-summary");
+    expect(summary).toHaveTextContent("in your area");
+    expect(summary).toHaveTextContent(`${QUERY.startDate} to ${QUERY.endDate}`);
+  });
+
+  it("says the files carry every variable, whatever the variable filters", () => {
+    renderDetails();
+    expect(
+      screen.getByText(/Files hold every variable in each dataset/),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the dataset list beside the email request, not folded away", () => {
+    renderDetails({ children: <div data-testid="email-request" /> });
+    const footer = screen.getByTestId("download-links").parentElement;
+    expect(footer).toContainElement(screen.getByTestId("email-request"));
+    expect(screen.getByTestId("download-links").closest("details")).toBeNull();
+    expect(screen.getByText("Query the sources myself")).toBeVisible();
   });
 });

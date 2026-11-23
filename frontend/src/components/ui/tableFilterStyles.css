@@ -13,7 +13,7 @@
   cursor: text;
 }
 
-.tableFilterWrap:focus-within {
+.tableFilterWrap[data-focus-within] {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
 }
@@ -30,5 +30,27 @@
   font-size: var(--cioos-font-size-xs);
   outline: none;
   background: transparent;
+  color: var(--cioos-ink);
+}
+
+/* Its native counterpart is hidden: one clear control, ours. */
+.tableFilterInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.tableFilterClear {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+}
+
+.tableFilterWrap[data-empty] .tableFilterClear {
+  visibility: hidden;
+}
+
+.tableFilterClear[data-hovered] {
   color: var(--cioos-ink);
 }

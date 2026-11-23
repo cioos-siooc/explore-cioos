@@ -108,8 +108,8 @@ describe("QuickFilters", () => {
 
     await openArea(user);
 
-    expect(screen.getByTestId(on)).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId(off)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId(on)).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId(off)).toHaveAttribute("aria-checked", "false");
   });
 
   it("offers a zoom to the drawn shape only while there is one", async () => {
@@ -155,11 +155,11 @@ describe("QuickFilters", () => {
 
     await waitFor(() => expect(seen.draw.at(-1)).toBe("box"));
     expect(screen.getByTestId("quick-filter-area-box")).toHaveAttribute(
-      "aria-pressed",
+      "aria-checked",
       "true",
     );
     expect(screen.getByTestId("quick-filter-area-polygon")).toHaveAttribute(
-      "aria-pressed",
+      "aria-checked",
       "false",
     );
   });
@@ -338,6 +338,40 @@ describe("QuickFilters", () => {
     expect(screen.getByTestId("quick-filter-in-view")).toHaveAttribute(
       "aria-pressed",
       "false",
+    );
+  });
+
+  it("captions the area button with the searched place it applied", async () => {
+    const ring = [
+      [-67, 44],
+      [-66, 44],
+      [-66, 45],
+      [-67, 44],
+    ];
+    let selection;
+    function Apply() {
+      selection = useSelection();
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <QuickFilters />
+        <Apply />
+      </>,
+      { providers: "app" },
+    );
+    const button = screen.getByTestId("quick-filter-area");
+    expect(button.querySelector(".quickFilterCaption")).toHaveTextContent(
+      "Draw area",
+    );
+    React.act(() => {
+      selection.setPolygon(ring);
+      selection.setAreaPlace({ name: "Bay of Fundy", cgndbid: "X", ring });
+    });
+    await waitFor(() =>
+      expect(button.querySelector(".quickFilterCaption")).toHaveTextContent(
+        "Bay of Fundy",
+      ),
     );
   });
 });

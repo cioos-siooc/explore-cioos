@@ -28,12 +28,16 @@ import {
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
-import { DEFAULT_SORT, GROUP_SIZE_SORT } from "../datasetSort.js";
+import { GROUP_SIZE_SORT } from "../datasetSort.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
   COLOR_LAYOUT,
   LAYOUT_PARAM,
   PERIOD_PARAM,
+  BEFORE_PARAM,
+  DEFAULT_ROW_LIMIT,
+  ROWS_PARAM,
+  parseRowLimit,
   RECORD_PARAM,
   STEP_PARAM,
   TAB_PARAM,
@@ -46,7 +50,10 @@ import {
   networkPreviewError,
   previewErrorFrom,
 } from "../../components/Controls/DatasetPreview/previewErrors.js";
-import { hasColorPlotFor } from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
+import {
+  hasColorPlotFor,
+  plotLayoutFor,
+} from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
 
 const SelectionContext = createContext();
 
@@ -103,12 +110,20 @@ export default function SelectionProvider({ children }) {
   const [polygon, setPolygon] = useState(() =>
     selectionFromSearchParams(initialParams),
   );
-  // The place an area filter was picked from ({name, cgndbid, ring}). It names
-  // the filter only while the filter is that very ring: any edit or new
-  // drawing sets a new array, and the name goes with it.
-  const [areaPlaceShape, setAreaPlace] = useState();
+  // The place an area filter was picked from ({name, cgndbid, ring}), seeded
+  // from a link's ?place=. It names the filter only while the filter is still
+  // that ring: compared by value, since the draw control hands back copies.
+  const [areaPlaceShape, setAreaPlace] = useState(() => {
+    const name = initialParams.get("place");
+    const ring = name && selectionFromSearchParams(initialParams);
+    return ring
+      ? { name, cgndbid: initialParams.get("placeId") || undefined, ring }
+      : undefined;
+  });
   const areaPlace =
-    polygon && areaPlaceShape?.ring === polygon ? areaPlaceShape : undefined;
+    polygon && String(areaPlaceShape?.ring) === String(polygon)
+      ? areaPlaceShape
+      : undefined;
   const [pointsToDownload, setPointsToDownload] = useState();
   // Debounced so sweeping the cursor across the list doesn't repaint the map
   // highlight per card crossed (and flash "all datasets" in the gaps).
@@ -164,6 +179,13 @@ export default function SelectionProvider({ children }) {
   // Set and cleared in the same tick as datasetPreview, so the modal can never
   // hold one record's rows beside another's excuse.
   const [previewError, setPreviewError] = useState();
+  // The ERDDAP request /preview is waiting on, so the modal can show it running.
+  const [previewQuery, setPreviewQuery] = useState();
+  const [previewAttempt, setPreviewAttempt] = useState(0);
+  const retryPreview = useCallback(
+    () => setPreviewAttempt((attempt) => attempt + 1),
+    [],
+  );
   const [combinedQueries, setCombinedQueries] = useState([]);
   const [onlyInView, setOnlyInView] = useState(
     () => initialParams.get("onlyInView") === "true",
@@ -175,13 +197,11 @@ export default function SelectionProvider({ children }) {
     const initialGroupBy = initialParams.get("groupBy");
     return isGroupDimension(initialGroupBy) ? initialGroupBy : GROUP_NONE;
   });
-  // Here too so the "what's here" card can follow the list's order.
+  // Here too so the "what's here" card can follow the list's order. Null
+  // until picked: useListSort supplies the filter-aware default.
   const grouped = isGroupDimension(groupBy);
-  const [listSort, setListSort] = useState(
-    grouped ? GROUP_SIZE_SORT : DEFAULT_SORT,
-  );
-  if (useChanged(grouped))
-    setListSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  const [listSort, setListSort] = useState(grouped ? GROUP_SIZE_SORT : null);
+  if (useChanged(grouped)) setListSort(grouped ? GROUP_SIZE_SORT : null);
 
   // Falls back to the coverage bbox, the only one grids carry.
   const datasetBounds = useMemo(
@@ -192,22 +212,6 @@ export default function SelectionProvider({ children }) {
           row.filtered_bbox_geojson || row.coverage_bbox_geojson,
         ),
       })),
-    [pointsData],
-  );
-
-  // Platform types the map can draw a platform-coloured marker for under the
-  // active filters; the legend keys off this so it never advertises a colour
-  // that isn't on the map (e.g. 'spacecraft', which only grids carry).
-  const platformsAvailable = useMemo(
-    () =>
-      [
-        ...new Set(
-          pointsData
-            .filter((row) => !isPlatformlessDataset(row))
-            .map((row) => row.platform)
-            .filter(Boolean),
-        ),
-      ].sort(),
     [pointsData],
   );
 
@@ -230,6 +234,25 @@ export default function SelectionProvider({ children }) {
     enabled: catalogLoaded,
   });
   const datasetsInViewPks = exactInViewPks ?? bboxInViewPks;
+
+  // Platform types the map draws a platform-coloured marker for in this view
+  // under the active filters; the legend keys off this so it never advertises
+  // a colour that isn't on screen (e.g. 'spacecraft', which only grids carry).
+  const platformsAvailable = useMemo(
+    () =>
+      [
+        ...new Set(
+          pointsData
+            .filter(
+              (row) =>
+                !isPlatformlessDataset(row) && datasetsInViewPks.has(row.pk),
+            )
+            .map((row) => row.platform)
+            .filter(Boolean),
+        ),
+      ].sort(),
+    [pointsData, datasetsInViewPks],
+  );
 
   // Derived here rather than in DatasetsTable so the counters reflect it too.
   // The data-layer switches narrow it as well, so the list never offers
@@ -387,6 +410,7 @@ export default function SelectionProvider({ children }) {
           // the next station names a cast that station never took, and
           // /preview answers NO_DATA for it.
           next.delete(STEP_PARAM);
+          next.delete(BEFORE_PARAM);
           if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
           else next.delete(PERIOD_PARAM);
           return next;
@@ -679,11 +703,18 @@ export default function SelectionProvider({ children }) {
   // drawn, so they ride this fetch instead of a second one — one request, one
   // previewError, one recordLoading.
   const inspectAllProfiles =
-    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
-    hasColorPlotFor(inspectDataset);
+    hasColorPlotFor(inspectDataset) &&
+    plotLayoutFor(inspectDataset, searchParams.get(LAYOUT_PARAM)) ===
+      COLOR_LAYOUT;
   const inspectRecordStep = inspectAllProfiles
     ? undefined
     : searchParams.get(STEP_PARAM) || undefined;
+  const inspectRowLimit = parseRowLimit(searchParams.get(ROWS_PARAM));
+  // A step or a period already says which rows; /preview would ignore it.
+  const inspectBefore =
+    inspectRecordStep || inspectRecordPeriod
+      ? undefined
+      : searchParams.get(BEFORE_PARAM) || undefined;
 
   useEffect(() => {
     if (!inspectDatasetId || !inspectRecordID) return;
@@ -696,9 +727,26 @@ export default function SelectionProvider({ children }) {
         ? `&at=${encodeURIComponent(inspectRecordStep)}`
         : "") +
       (inspectAllProfiles ? "&allProfiles=true" : "") +
+      (inspectRowLimit !== DEFAULT_ROW_LIMIT
+        ? `&limit=${inspectRowLimit}`
+        : "") +
+      (inspectBefore ? `&before=${encodeURIComponent(inspectBefore)}` : "") +
       (inspectRecordPeriod
         ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
         : "");
+    // A record switched mid-flight must not show the previous one's request.
+    let current = true;
+    setPreviewQuery(undefined);
+    // Answered from the database alone, so it lands while /preview still waits
+    // on ERDDAP. Best effort: without it the modal just names the step.
+    fetch(previewUrl.replace("/preview?", "/preview/query?"))
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null)
+      .then((body) => {
+        if (current && typeof body?.erddapQuery === "string") {
+          setPreviewQuery(body.erddapQuery);
+        }
+      });
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) {
@@ -731,12 +779,18 @@ export default function SelectionProvider({ children }) {
           reportError("preview upstream failure", new Error(previewUrl));
         }
       });
+    return () => {
+      current = false;
+    };
   }, [
     inspectRecordID,
     inspectDatasetId,
     inspectRecordStep,
     inspectAllProfiles,
     inspectRecordPeriod,
+    inspectRowLimit,
+    inspectBefore,
+    previewAttempt,
   ]);
 
   const value = {
@@ -775,6 +829,8 @@ export default function SelectionProvider({ children }) {
     // dataset never resolves.
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
     previewError,
+    previewQuery,
+    retryPreview,
     recordLoading,
     setRecordLoading,
     datasetPreview,

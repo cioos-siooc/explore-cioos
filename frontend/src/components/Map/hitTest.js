@@ -17,10 +17,6 @@ export const loadTurfUnion = () =>
     })
     .catch(() => {});
 
-export const GRIDDAP_PRIORITY_ZOOM = 5;
-
-// Past this zoom someone is working with a specific grid; below it a
-// rectangle over a continent's worth of hexes cannot swallow their hover.
 // A single-point grid's coverage is a Point, drawn by its own circle layer.
 export const griddapHitLayers = [
   "griddap-coverage-fill",
@@ -28,9 +24,6 @@ export const griddapHitLayers = [
 ];
 export const isGriddapHit = (feature) =>
   griddapHitLayers.includes(feature.layer.id);
-
-export const griddapOutranksHexesIn = (hits, zoom) =>
-  zoom >= GRIDDAP_PRIORITY_ZOOM && hits.some(isGriddapHit);
 
 // Clickable track layers, most-deliberate target first: an arrowhead is
 // aimed at (it is what the head tooltip describes), the line is the fallback.
@@ -64,29 +57,6 @@ export const isOnAPointIn = (hits, point, { project, radiusRange }) =>
         (centre.x - point.x) ** 2 + (centre.y - point.y) ** 2 <= radius ** 2
       );
     });
-
-// Ranked by trackClickLayers rather than render order, so overlapping tracks
-// resolve the same way every time.
-export const trackFeatureIn = (hits) =>
-  hits
-    .filter((feature) => trackClickLayers.includes(feature.layer.id))
-    .sort(
-      (a, b) =>
-        trackClickLayers.indexOf(a.layer.id) -
-        trackClickLayers.indexOf(b.layer.id),
-    )[0];
-
-// Griddap rectangles defer to the point/hex layers below
-// GRIDDAP_PRIORITY_ZOOM; griddapOutranksHexesIn holds the other half of this
-// rule.
-export const griddapCoveredIn = (hits, zoom) => {
-  const covering =
-    zoom >= GRIDDAP_PRIORITY_ZOOM ? ["points"] : ["points", "hexes"];
-  return (
-    hits.some((feature) => covering.includes(feature.layer.id)) ||
-    Boolean(trackFeatureIn(hits))
-  );
-};
 
 export function dedupeGriddapByPk(features) {
   const byPk = new Map();
@@ -145,11 +115,22 @@ export function trackItemsIn(hits) {
   return tracks;
 }
 
+// The grids whose box holds the point, from the /griddapCoverage collection.
+// A single-point grid covers no area, so it is only ever clicked on.
+export const gridsCovering = (coverage, lngLat) => {
+  const point = helpers.point([lngLat.lng, lngLat.lat]);
+  return (coverage?.features ?? []).filter(
+    (feature) =>
+      feature.geometry?.type !== "Point" &&
+      turfPointsWithinPolygon(point, feature).features.length > 0,
+  );
+};
+
 // Returns null when the click landed on empty water.
 export const buildFeatureQuery = (
   lngLat,
   hits,
-  { zoom, queryRendered, language, gridGeometry },
+  { zoom, queryRendered, language, gridGeometry, gridsAt = () => [] },
 ) => {
   if (hits.length === 0) return null;
 
@@ -275,27 +256,20 @@ export const buildFeatureQuery = (
 
   const items = [...tracks, ...observations.values(), ...grids];
   if (items.length === 0) return null;
-
-  // Areas are outlined, markers ringed; only areas can be framed. Stacked grid
-  // rectangles would compound the translucent fill, while painting only their
-  // union loses the nested boxes' borders. So the union feeds the fill only
-  // ('fill'), the rectangles the outline/glow only ('outline'), the rest all
-  // ('both').
-  const gridAreas = gridFeatures.filter(
-    (feature) => feature.geometry.type !== "Point",
-  );
-  let mergedGrid = gridAreas[0] || null;
-  for (let i = 1; turfUnion && i < gridAreas.length; i++) {
-    try {
-      // One FeatureCollection per call — see the hex fragment union above.
-      mergedGrid =
-        turfUnion(helpers.featureCollection([mergedGrid, gridAreas[i]])) ||
-        mergedGrid;
-    } catch {
-      // A degenerate polygon fails to union; keep what merged so far.
-    }
+  // With their layer off the grids under a hex or marker still belong to what
+  // is here; listed, but not outlined over a map that doesn't draw them.
+  if (grids.length === 0) {
+    dedupeGriddapByPk(gridsAt(lngLat)).forEach((feature) => {
+      items.push({
+        kind: "grid",
+        pk: Number(feature.properties.pk),
+        title: griddapTitle(feature, language),
+      });
+    });
   }
 
+  // Grids are outlined only: the stacked boxes are many and large, and a
+  // fill buries the hexes beneath them.
   // A GeoJSONFeature's `geometry` is a prototype getter, so spreading a
   // feature silently drops it; hence (feature, role) pairs, not tagged copies.
   const highlightFeature = ({ feature, role }) => ({
@@ -312,7 +286,6 @@ export const buildFeatureQuery = (
   const areaHighlights = [
     ...cellFeatures.map((feature) => ({ feature, role: "both" })),
     ...gridFeatures.map((feature) => ({ feature, role: "outline" })),
-    ...(mergedGrid ? [{ feature: mergedGrid, role: "fill" }] : []),
   ].map(highlightFeature);
 
   const highlight = {

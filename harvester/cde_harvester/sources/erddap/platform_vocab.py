@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from cde_harvester.user_agent import HEADERS
+
 """
 
 CIOOS uses NERC L06 platform vocabulary, see http://vocab.nerc.ac.uk/collection/L06/current/
@@ -32,7 +34,7 @@ def get_l06_codes_and_labels():
 
     url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
     logger.info("Downloading %s", url)
-    platforms = requests.get(url).json()["@graph"]
+    platforms = requests.get(url, headers=HEADERS).json()["@graph"]
 
     platforms_parsed = {}
     l06Lookup = {}
@@ -80,7 +82,7 @@ def get_ioos_to_l06_mapping():
 
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
     logger.info("Downloading %s", url)
-    res = requests.get(url).json()
+    res = requests.get(url, headers=HEADERS).json()
     rows = []
     for k in res["@graph"]:
         try:

@@ -18,7 +18,7 @@ const STACK = {
       tickmode: "array",
       tickvals: [0, 1],
       ticktext: ["start", "end"],
-      title: { text: "Time ( UTC )" },
+      title: { text: "Time (UTC)" },
     },
     yaxis: { domain: [0, 1], title: { text: "Temperature" } },
     coloraxis: {
@@ -33,7 +33,7 @@ const STACK = {
   },
 };
 const LEGEND = {
-  label: "Salinity ( PSU )",
+  label: "Salinity (PSU)",
   stops: STACK.layout.coloraxis.colorscale,
   ticks: [
     { position: 0, text: "10" },
@@ -64,7 +64,7 @@ test("the pinned axis is labelled again, at the range it was zoomed to", () => {
   });
   const { xaxis } = exported.layout;
   assert.equal(xaxis.showticklabels, true);
-  assert.equal(xaxis.title.text, "Time ( UTC )");
+  assert.equal(xaxis.title.text, "Time (UTC)");
   assert.deepEqual(xaxis.ticktext, ["start", "end"]);
   assert.deepEqual(xaxis.range, [0.2, 0.8]);
 });
@@ -109,7 +109,7 @@ test("the colour legend becomes a colourbar with the legend's own ticks", () => 
   assert.equal(coloraxis.showscale, true);
   assert.deepEqual(coloraxis.colorbar.tickvals, [10, 20, 30]);
   assert.deepEqual(coloraxis.colorbar.ticktext, ["10", "20", "30"]);
-  assert.equal(coloraxis.colorbar.title.text, "Salinity ( PSU )");
+  assert.equal(coloraxis.colorbar.title.text, "Salinity (PSU)");
   assert.equal(exported.width, 800 + COLORBAR_ROOM_PX);
   assert.equal(exported.layout.margin.r, MARGIN.r + COLORBAR_ROOM_PX);
 });

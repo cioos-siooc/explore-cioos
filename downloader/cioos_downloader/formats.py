@@ -8,6 +8,7 @@ exact formatting; only latitude/longitude are parsed, for the polygon test.
 
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import urllib.error
@@ -25,8 +26,12 @@ import shapely.wkt
 import xarray as xr
 
 # Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
-# urllib's default User-Agent.
-REQUEST_HEADERS = {"User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"}
+# urllib's default User-Agent. The scheduler's compose env names the deployment
+# and build; a user's reproduce.py run has neither and falls back.
+REQUEST_HEADERS = {
+    "User-Agent": f"CIOOS-CDE-Downloader/{os.environ.get('APP_VERSION') or 'dev'} "
+    f"(+{os.environ.get('APP_URL') or 'https://github.com/cioos-siooc/explore-cioos'})"
+}
 
 
 def polygon_regions(polygon_wkt):
@@ -303,9 +308,9 @@ def _epoch_ms(value):
     return int(pd.to_datetime(value, utc=True).timestamp() * 1000) if value else None
 
 
-def write_obis(format_key, url, user_query, regions, out_base: Path):
+def write_obis(format_key, url, user_query, regions, out_base: Path, row_limit=None):
     """The OBIS occurrences of the parquet export at ``url`` matching the query,
-    as CSV or Parquet; [] when none match."""
+    as CSV or Parquet, and whether ``row_limit`` cut them off; [] when none match."""
     if regions:
         lon_min, lat_min, lon_max, lat_max = shapely.total_bounds(regions)
     else:
@@ -341,13 +346,18 @@ def write_obis(format_key, url, user_query, regions, out_base: Path):
           AND ($time_min IS NULL OR interpreted.date_end >= $time_min)
           AND ($time_max IS NULL OR interpreted.date_start <= $time_max)
     """
+    if row_limit is not None:
+        # One extra row tells a cut-off result from one that fits exactly.
+        query += f"LIMIT {int(row_limit) + 1}"
     # Own connection: the shared default one breaks under concurrent subsets.
     with duckdb.connect() as con:
         df = con.execute(query, params).df()
+    truncated = row_limit is not None and len(df) > row_limit
+    df = df.iloc[:row_limit]
     if regions:
         df = df[inside(df["longitude"], df["latitude"], regions)]
     if df.empty:
-        return []
+        return [], truncated
 
     if format_key == "parquet":
         path = out_base.with_suffix(".parquet")
@@ -356,7 +366,7 @@ def write_obis(format_key, url, user_query, regions, out_base: Path):
         path = out_base.with_suffix(".csv")
         df.to_csv(path, index=False, lineterminator="\n")
     columns = [{"name": c, "unit": ""} for c in df.columns]
-    return [{"path": path, "n_rows": len(df), "columns": columns}]
+    return [{"path": path, "n_rows": len(df), "columns": columns}], truncated
 
 
 def sha256(path):
@@ -380,7 +390,8 @@ def _fetch(url, path):
 def _rebuild(subset, query, regions, out_base: Path, tmp: Path):
     out_base.parent.mkdir(parents=True, exist_ok=True)
     if subset["source_type"] == "obis":
-        return write_obis(subset["format"], subset["request_urls"][0], query, regions, out_base)
+        files, _ = write_obis(subset["format"], subset["request_urls"][0], query, regions, out_base)
+        return files
     parts = []
     for i, url in enumerate(subset["request_urls"]):
         part = tmp / f"{subset['folder']}.part{i}"

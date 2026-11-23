@@ -69,9 +69,9 @@ export default function FiltersModal() {
                   <span>{t("filtersMenuButton")}</span>
                 </button>
               ) : (
-                <span className="filtersModalTitleHeading">
+                <h2 className="filtersModalTitleHeading">
                   {t("filtersMenuButton")}
-                </span>
+                </h2>
               )}
               {activeFilterCount > 0 && (
                 <span

@@ -11,6 +11,7 @@ import {
   CheckSquare,
   ChevronRight,
   Filter,
+  Grid3x3Gap,
   SlashCircle,
   Square,
   ViewList,
@@ -27,6 +28,7 @@ import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
+import useListSort from "../../../state/useListSort.js";
 import {
   GRID_KEY,
   GROUP_NONE,
@@ -46,17 +48,42 @@ import {
 } from "../../../state/datasetSort.js";
 import { useChanged } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
+import GridGroupHeader from "./GridGroupHeader.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
 import "../../Map/ClearMapSelection/styles.css";
+import { ToggleButton } from "../../ui/Button.jsx";
+
+// The list is one Tab stop (roving tabindex): ↑/↓ move between its entries,
+// Tab walks the current entry's own controls, then leaves the list.
+const ENTRY = ".datasetCard, .datasetsCardGroupHeader";
+const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
+
+// Where ↑/↓ land: the title opens the dataset, so it wins over the checkbox.
+const entryStop = (entry) =>
+  entry.querySelector("button.datasetCardTitle") ??
+  [...entry.querySelectorAll(FOCUSABLE)].find((el) => !el.disabled);
+
+const listEntries = (list) =>
+  [...list.querySelectorAll(ENTRY)].filter((entry) => entryStop(entry));
+
+// A list starts on its first dataset, past any group headers above it.
+const firstEntry = (entries) =>
+  entries.find((entry) => entry.matches(".datasetCard")) ?? entries[0] ?? null;
+
+// Focus moved here for the reader shows its ring even after a mouse click.
+const focusEntry = (entry) =>
+  entryStop(entry).focus({ preventScroll: true, focusVisible: true });
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
   datasets,
   selectAll,
+  selectAllMixed,
+  selectAllDisabled,
   setInspectDataset,
   setHoveredDataset = () => {},
   isDownloadModal,
@@ -64,8 +91,6 @@ export default function DatasetsTable({
   estimatesLoading,
   downloadLinkByPk,
   // The format OBIS rows fall back to when the chosen one has no OBIS version.
-  // Beside the pager's range: the download modal's selection totals.
-  pagerExtra,
   // Kept mounted under an open dataset page, so coming back finds the same
   // page and scroll position (see DatasetsPanel).
   hidden = false,
@@ -81,11 +106,16 @@ export default function DatasetsTable({
     // dataset within this batch.
     handleSelectDataset: removeFromSelection,
     pointsError,
-    listSort,
-    setListSort,
   } = useSelection();
-  const { openFilters, showFiltersModal, compactList, setListDensity } =
-    useUI();
+  const [listSort, setListSort] = useListSort();
+  const {
+    openFilters,
+    showFiltersModal,
+    compactList,
+    setListDensity,
+    listFocusPending,
+    setListFocusPending,
+  } = useUI();
   const activeFilterCount = useActiveFilters().length;
   // The "what's here" card's datasets sort to the top, tying the card to the
   // list; the download modal ignores them.
@@ -95,8 +125,6 @@ export default function DatasetsTable({
     () => pinnedPksOf(isDownloadModal ? null : featureQuery),
     [featureQuery, isDownloadModal],
   );
-  // With the gridded coverage layer on, the reader is looking for grids.
-  const gridFirst = griddapCoverageVisible && !isDownloadModal;
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
@@ -107,15 +135,88 @@ export default function DatasetsTable({
   // A display:none list loses its scroll offset, so it is remembered here and
   // put back when the list shows again.
   const scrollTopRef = useRef(0);
+  // The entry whose controls are in the Tab order (see syncTabStops).
+  const activeEntryRef = useRef(null);
   const scrollListToTop = () => {
     scrollTopRef.current = 0;
     if (listRef.current) listRef.current.scrollTop = 0;
+    activeEntryRef.current = null;
   };
+  const wasHiddenRef = useRef(hidden);
   useLayoutEffect(() => {
     if (!hidden && listRef.current) {
       listRef.current.scrollTop = scrollTopRef.current;
     }
   }, [hidden]);
+
+  // Tab stops are set on the DOM: the entries' controls come from several
+  // components, and an entry that unmounts hands the stop to the first card.
+  const syncTabStops = useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const entries = listEntries(list);
+    if (!entries.includes(activeEntryRef.current)) {
+      activeEntryRef.current = firstEntry(entries);
+    }
+    for (const entry of entries) {
+      const active = entry === activeEntryRef.current;
+      for (const el of entry.querySelectorAll(FOCUSABLE)) {
+        const parked = "rovingTabindex" in el.dataset;
+        if (active && parked) {
+          const own = el.dataset.rovingTabindex;
+          if (own) el.setAttribute("tabindex", own);
+          else el.removeAttribute("tabindex");
+          delete el.dataset.rovingTabindex;
+        } else if (!active && !parked) {
+          el.dataset.rovingTabindex = el.getAttribute("tabindex") ?? "";
+          el.setAttribute("tabindex", "-1");
+        }
+      }
+    }
+  }, []);
+  useLayoutEffect(syncTabStops);
+  // Back from a dataset page, whose unmount dropped focus on the body, the
+  // card it was opened from takes focus again.
+  useEffect(() => {
+    const shown = wasHiddenRef.current && !hidden;
+    wasHiddenRef.current = hidden;
+    if (!shown || document.activeElement !== document.body) return;
+    const entries = listEntries(listRef.current);
+    if (entries.includes(activeEntryRef.current)) {
+      focusEntry(activeEntryRef.current);
+    }
+  }, [hidden]);
+  const activateEntryOf = (target) => {
+    const entry = target.closest(ENTRY);
+    if (entry && entry !== activeEntryRef.current) {
+      activeEntryRef.current = entry;
+      syncTabStops();
+    }
+  };
+  const handleListKeyDown = (event) => {
+    if (
+      !["ArrowDown", "ArrowUp"].includes(event.key) ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+    const entries = listEntries(listRef.current);
+    if (entries.length === 0) return;
+    const current = event.target.closest(ENTRY);
+    const index = entries.indexOf(current);
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const next =
+      index === -1
+        ? entries.includes(activeEntryRef.current)
+          ? activeEntryRef.current
+          : firstEntry(entries)
+        : entries[Math.min(Math.max(index + step, 0), entries.length - 1)];
+    event.preventDefault();
+    entryStop(next).focus();
+  };
 
   const grouped = isGroupDimension(groupBy);
   const sortFields = useMemo(() => {
@@ -183,11 +284,10 @@ export default function DatasetsTable({
     () =>
       sortDatasets(datasets, sort, {
         pinnedPks,
-        gridFirst,
         t,
         language: i18n.language,
       }),
-    [datasets, sort, pinnedPks, gridFirst, t, i18n.language],
+    [datasets, sort, pinnedPks, t, i18n.language],
   );
 
   const byGroup = useMemo(() => {
@@ -208,11 +308,17 @@ export default function DatasetsTable({
   const fitsOnePage =
     [...byGroup.values()].reduce((n, rows) => n + rows.length, 0) <= pageSize;
   if (useChanged(groupBy, fitsOnePage)) setToggledGroups(new Set());
+  // Ungrouped, the grids lead the in-situ rows as one group of their own,
+  // closed unless they are all there is or their coverage layer is on.
+  const gridGroupOpen =
+    griddapCoverageVisible ||
+    visibleRows.every((row) => row.cdm_data_type === "Grid");
   const isExpanded = useCallback(
     (key) =>
-      (fitsOnePage || parentGroupKeys(groupBy).includes(key)) !==
-      toggledGroups.has(key),
-    [fitsOnePage, groupBy, toggledGroups],
+      (grouped
+        ? fitsOnePage || parentGroupKeys(groupBy).includes(key)
+        : gridGroupOpen) !== toggledGroups.has(key),
+    [grouped, fitsOnePage, gridGroupOpen, groupBy, toggledGroups],
   );
 
   // Groups seen while the dimension's own filter was not narrowing it, so the
@@ -246,7 +352,30 @@ export default function DatasetsTable({
   // dataset under each of its values, so row entries can exceed the unique
   // dataset count; a parent header's count is its unique datasets.
   const renderItems = useMemo(() => {
-    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
+    if (!isGroupDimension(groupBy)) {
+      // Grids sort first (see sortDatasets), folded into a single row.
+      const gridCount = visibleRows.filter(
+        (row) => row.cdm_data_type === "Grid",
+      ).length;
+      if (isDownloadModal || gridCount === 0) {
+        return visibleRows.map((row) => ({ row }));
+      }
+      const grids = visibleRows.slice(0, gridCount);
+      return [
+        {
+          header: true,
+          group: GRID_KEY,
+          count: gridCount,
+          here: grids.filter((row) => pinnedPks.has(Number(row.pk))).length,
+          depth: 0,
+          expandable: true,
+        },
+        ...(isExpanded(GRID_KEY)
+          ? grids.map((row) => ({ row, group: GRID_KEY }))
+          : []),
+        ...visibleRows.slice(gridCount).map((row) => ({ row })),
+      ];
+    }
     const rowsOf = (key) => byGroup.get(key) ?? [];
     const sortKeys = (keys, sizeOf) => {
       const sorted = sortGroupKeys(keys, groupBy, t, i18n.language);
@@ -254,7 +383,7 @@ export default function DatasetsTable({
         const factor = sort.dir === "asc" ? 1 : -1;
         sorted.sort((a, b) => (sizeOf(a) - sizeOf(b)) * factor);
       }
-      if (gridFirst && sorted.includes(GRID_KEY)) {
+      if (sorted.includes(GRID_KEY)) {
         sorted.splice(sorted.indexOf(GRID_KEY), 1);
         sorted.unshift(GRID_KEY);
       }
@@ -339,7 +468,8 @@ export default function DatasetsTable({
     emptyKeys,
     isExpanded,
     sort,
-    gridFirst,
+    pinnedPks,
+    isDownloadModal,
     i18n.language,
     t,
   ]);
@@ -351,6 +481,10 @@ export default function DatasetsTable({
     () => renderItems.reduce((n, item) => (item.header ? n : n + 1), 0),
     [renderItems],
   );
+
+  const foldedGridCount = renderItems.find(
+    (item) => item.header && item.group === GRID_KEY && !isExpanded(GRID_KEY),
+  )?.count;
 
   const pageCount = Math.max(1, Math.ceil(totalRowCount / pageSize));
   // Clamped rather than stored: a page can vanish under the list (the filters
@@ -434,6 +568,8 @@ export default function DatasetsTable({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
     scrollListToTop();
+    // setPage(1) on page 1 doesn't re-render, which would leave the old stop.
+    syncTabStops();
   }, [
     datasetsKey,
     sort,
@@ -441,11 +577,48 @@ export default function DatasetsTable({
     groupBy,
     pageSize,
     pinnedPks,
-    gridFirst,
+    syncTabStops,
+  ]);
+
+  // Set by the pager: the new page opens on its first card, not the button.
+  const focusFirstRef = useRef(false);
+  // From the Datasets button, the sidebar's list does the same once it shows.
+  const openedFocus = !isDownloadModal && listFocusPending;
+  useEffect(() => {
+    if (hidden || !(openedFocus || focusFirstRef.current)) return;
+    const done = () => {
+      focusFirstRef.current = false;
+      if (openedFocus) setListFocusPending(false);
+    };
+    // With no results there is nothing to land on; don't keep the request
+    // for a later list the reader didn't just open.
+    if (visibleRows.length === 0) {
+      done();
+      return;
+    }
+    const entries = listEntries(listRef.current);
+    if (entries.length === 0) return;
+    done();
+    // The card may be sliding in: a scroll-into-view would shift its clipped
+    // parents instead of the list.
+    scrollListToTop();
+    activeEntryRef.current = firstEntry(entries);
+    syncTabStops();
+    focusEntry(activeEntryRef.current);
+  }, [
+    hidden,
+    openedFocus,
+    setListFocusPending,
+    visibleRows,
+    pageItems,
+    syncTabStops,
   ]);
 
   const goToPage = (next) => {
-    setPage(Math.min(Math.max(next, 1), pageCount));
+    const target = Math.min(Math.max(next, 1), pageCount);
+    // On the same page nothing re-renders to consume the request.
+    if (target !== currentPage) focusFirstRef.current = true;
+    setPage(target);
     scrollListToTop();
   };
 
@@ -464,6 +637,10 @@ export default function DatasetsTable({
             <input
               type="checkbox"
               checked={selectAll}
+              disabled={selectAllDisabled}
+              ref={(input) => {
+                if (input) input.indeterminate = Boolean(selectAllMixed);
+              }}
               onChange={handleSelectAllDatasets}
             />
             {t("datasetsTableHeaderSelectAllTitle")}
@@ -472,15 +649,14 @@ export default function DatasetsTable({
         </>
       ) : (
         <div className="datasetsCardToolbar">
-          <button
-            type="button"
+          <ToggleButton
             className={classNames("datasetsCardFilters", {
               active: showFiltersModal,
               applied: !showFiltersModal && activeFilterCount > 0,
             })}
             data-testid="datasets-filters-button"
-            onClick={openFilters}
-            aria-pressed={showFiltersModal}
+            onChange={() => openFilters()}
+            isSelected={showFiltersModal}
             title={t("dockFiltersCountTitle", { count: activeFilterCount })}
           >
             <Filter size={13} aria-hidden="true" />
@@ -490,7 +666,7 @@ export default function DatasetsTable({
                 {activeFilterCount}
               </span>
             )}
-          </button>
+          </ToggleButton>
           {sortControl}
           <SelectPill
             label={t("datasetsCardGroupByLabel")}
@@ -498,12 +674,11 @@ export default function DatasetsTable({
             options={groupByOptions}
             onChange={setGroupBy}
           />
-          <button
-            type="button"
+          <ToggleButton
             className="datasetsCardDensity"
             data-testid="datasets-density-toggle"
-            onClick={() => setListDensity(compact ? "full" : "compact")}
-            aria-pressed={compact}
+            onChange={() => setListDensity(compact ? "full" : "compact")}
+            isSelected={compact}
             aria-label={t("datasetsCardDensityCompactTitle")}
             title={t(
               compact
@@ -516,7 +691,7 @@ export default function DatasetsTable({
             ) : (
               <ViewStacked size={14} aria-hidden="true" />
             )}
-          </button>
+          </ToggleButton>
         </div>
       )}
 
@@ -576,9 +751,28 @@ export default function DatasetsTable({
           </button>
         </div>
       )}
+      {/* Focusable (-1) so a click on a card's blank space, or between cards,
+          hands focus to a card instead of leaving ↑/↓ to scroll. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard handling for the entries inside, each a real control */}
       <div
         className={classNames("datasetsCardList", { compact })}
         ref={listRef}
+        tabIndex={-1}
+        onKeyDown={handleListKeyDown}
+        onFocus={(event) => {
+          if (event.target !== listRef.current) {
+            activateEntryOf(event.target);
+            return;
+          }
+          // The list itself is never the stop: focus goes on to the current
+          // entry (the clicked card, else the first), without scrolling away.
+          const entries = listEntries(listRef.current);
+          const entry = entries.includes(activeEntryRef.current)
+            ? activeEntryRef.current
+            : firstEntry(entries);
+          if (entry) entryStop(entry).focus({ preventScroll: true });
+        }}
+        onMouseDown={(event) => activateEntryOf(event.target)}
         onScroll={(event) => {
           if (!hidden) scrollTopRef.current = event.currentTarget.scrollTop;
         }}
@@ -621,6 +815,17 @@ export default function DatasetsTable({
                 />
               );
             }
+            if (!grouped) {
+              return (
+                <GridGroupHeader
+                  key="group:grid"
+                  count={item.count}
+                  here={item.here}
+                  open={isExpanded(GRID_KEY)}
+                  onToggle={() => toggleGroupExpanded(GRID_KEY)}
+                />
+              );
+            }
             const collapsed = !isExpanded(item.group);
             const filter = filterFor(item.group);
             const label = groupLabel(item.group, groupBy, t, i18n.language);
@@ -648,6 +853,13 @@ export default function DatasetsTable({
                     size={11}
                     aria-hidden="true"
                   />
+                  {item.group === GRID_KEY && (
+                    <Grid3x3Gap
+                      className="datasetsCardGroupIcon"
+                      size={13}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="datasetsCardGroupTitle" title={label}>
                     {label}
                   </span>
@@ -655,11 +867,10 @@ export default function DatasetsTable({
                 </button>
                 {filter && (
                   <>
-                    <button
-                      type="button"
+                    <ToggleButton
                       className="datasetsCardGroupFilter"
-                      onClick={() => filter.toggle("include")}
-                      aria-pressed={filter.state === "include"}
+                      onChange={() => filter.toggle("include")}
+                      isSelected={filter.state === "include"}
                       aria-label={`${t("datasetsCardGroupIncludeAction")}: ${label}`}
                       title={t(
                         filter.state === "include"
@@ -672,12 +883,11 @@ export default function DatasetsTable({
                       ) : (
                         <Square size={13} aria-hidden="true" />
                       )}
-                    </button>
-                    <button
-                      type="button"
+                    </ToggleButton>
+                    <ToggleButton
                       className="datasetsCardGroupFilter exclude"
-                      onClick={() => filter.toggle("exclude")}
-                      aria-pressed={filter.state === "exclude"}
+                      onChange={() => filter.toggle("exclude")}
+                      isSelected={filter.state === "exclude"}
                       aria-label={`${t("filterOptionExcludeAction")}: ${label}`}
                       title={t(
                         filter.state === "exclude"
@@ -686,7 +896,7 @@ export default function DatasetsTable({
                       )}
                     >
                       <SlashCircle size={13} aria-hidden="true" />
-                    </button>
+                    </ToggleButton>
                   </>
                 )}
               </div>
@@ -703,9 +913,12 @@ export default function DatasetsTable({
         onPageSizeChange={setPageSize}
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
-      >
-        {pagerExtra}
-      </Pager>
+        rangeTitle={
+          foldedGridCount
+            ? t("datasetsPagerFoldedGrids", { count: foldedGridCount })
+            : undefined
+        }
+      />
     </div>
   );
 }

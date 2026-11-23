@@ -11,7 +11,11 @@ import TipPointer, {
   useTipTargets,
 } from "./TipPointer.jsx";
 import TipText from "./TipText.jsx";
-import { TIP_MODALS, useTips } from "../../../state/tips/TipsProvider.jsx";
+import {
+  TIPS,
+  TIP_MODALS,
+  useTips,
+} from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
@@ -22,12 +26,11 @@ const OWNS_ARROWS =
   'input, textarea, select, [contenteditable="true"], [role="slider"], .maplibregl-canvas-container';
 
 // A status, not a dialog: announced but never takes focus, and stays until
-// dismissed. Inside a dialog it stays in the dialog's DOM even when hung by
-// its control, so the focus trap and Escape still cover it.
+// dismissed. Inside a dialog it stays in the dialog's DOM, so the focus trap
+// and Escape still cover it.
 export default function TipCard({ inModal }) {
   const { t } = useTranslation();
-  const { activeTip, tourTips, touring, stepTour, dismissTip, disableTips } =
-    useTips();
+  const { activeTip, touring, stepTour, dismissTip, disableTips } = useTips();
   const { showFiltersModal, showDownloadModal } = useUI();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [openedTip, setOpenedTip] = useState(null);
@@ -60,7 +63,7 @@ export default function TipCard({ inModal }) {
       event.preventDefault();
       stepTour(step);
     };
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown); // eslint-disable-line no-restricted-syntax -- the tour's page-wide arrow keys, while a tip shows
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, stepTour]);
 
@@ -82,9 +85,11 @@ export default function TipCard({ inModal }) {
     );
   }
 
-  const anchor = targets[0];
+  // In a dialog it keeps the place it had when the dialog opened: hung by its
+  // control it would jump into the flow whenever a search hid that control.
+  const anchor = inModal ? undefined : targets[0];
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/no-noninteractive-element-interactions -- Escape from the buttons inside a status that never takes focus itself
       className={classNames("tipCard", {
         tipCardInModal: inModal,
         tipCardAnchored: anchor,
@@ -94,18 +99,24 @@ export default function TipCard({ inModal }) {
       role="status"
       data-testid="tip-card"
       onKeyDown={(e) => {
-        if (e.key === "Escape") dismissTip();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          dismissTip();
+        }
       }}
-      // Stepping the tour shouldn't count as an outside click (useOutsideAlerter).
-      onMouseDown={inModal ? (e) => e.stopPropagation() : undefined}
     >
       <div className="tipCardHeader">
         <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />
         <span className="tipCardHeading">
-          {t("tipCounter", {
-            n: tourTips.indexOf(activeTip) + 1,
-            total: tourTips.length,
-          })}
+          {/* Numbered only while touring: an offered tip numbered 13 of 13
+              reads as twelve missed. Over every tip, not the tour's, which
+              shifts with the catalogue in view. */}
+          {touring
+            ? t("tipCounter", {
+                n: TIPS.indexOf(activeTip) + 1,
+                total: TIPS.length,
+              })
+            : t("tipHeading")}
         </span>
         <button
           type="button"

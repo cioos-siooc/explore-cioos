@@ -154,6 +154,12 @@ async function buildShapeSql(
                   count(*)::integer AS profiles_count,
                   ST_Extent(p.search_geom) AS filtered_extent
                   ${
+                    getRecordsList
+                      ? `,min(p.time_min) AS time_min, max(p.time_max) AS time_max,
+                  min(p.depth_min) AS depth_min, max(p.depth_max) AS depth_max`
+                      : ""
+                  }
+                  ${
                     doEstimate
                       ? `,SUM(
                   -- Day factor must be days WITH DATA to match records_per_day;
@@ -230,6 +236,18 @@ async function buildShapeSql(
                     ST_Transform(ST_SetSRID(p.filtered_extent::geometry, 3857), 4326), 6
                   )::json AS filtered_bbox_geojson
                   ${doEstimate ? ",p.records_count" : ""}
+                  -- The measured footprint the dataset page leads with. A grid
+                  -- has no features: its infinite/zero sentinels become NULL.
+                  ${
+                    getRecordsList
+                      ? `,to_char(nullif(p.time_min, '-infinity') AT TIME ZONE 'UTC',
+                          'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS time_min,
+                  to_char(nullif(p.time_max, 'infinity') AT TIME ZONE 'UTC',
+                          'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS time_max,
+                  CASE WHEN d.cdm_data_type <> 'Grid' THEN p.depth_min END AS depth_min,
+                  CASE WHEN d.cdm_data_type <> 'Grid' THEN p.depth_max END AS depth_max`
+                      : ""
+                  }
          FROM     per_dataset p
          JOIN     cde.datasets d
          ON       p.dataset_pk = d.pk)

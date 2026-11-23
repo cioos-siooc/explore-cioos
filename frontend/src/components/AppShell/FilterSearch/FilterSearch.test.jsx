@@ -94,6 +94,34 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-input")).toBeNull();
   });
 
+  it("leaves typeahead in a list, a list's trigger or a popup alone", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <button type="button" aria-haspopup="listbox">
+          Year
+        </button>
+        <div role="listbox" tabIndex={0} aria-label="Years" />
+        <div role="dialog" aria-label="Calendar">
+          <button type="button">Day</button>
+        </div>
+        <FiltersModal />
+      </>,
+      { providers: "app" },
+    );
+
+    for (const target of [
+      screen.getByRole("button", { name: "Year" }),
+      screen.getByRole("listbox"),
+      screen.getByRole("button", { name: "Day" }),
+    ]) {
+      target.focus();
+      await user.keyboard("19");
+    }
+
+    expect(screen.queryByTestId("filter-search-input")).toBeNull();
+  });
+
   it("leaves typing in a field inside a shadow root alone", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(<FiltersModal />, { providers: "app" });
@@ -123,7 +151,7 @@ describe("FilterSearch", () => {
     expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
     expect(box).toHaveValue("oxyg");
     expect(option("Oxygen")).toHaveAttribute("data-state", "include");
-    expect(option("Oxygen")).toHaveAttribute("aria-selected", "true");
+    expect(option("Oxygen")).toHaveAttribute("data-focused", "true");
 
     await user.keyboard("{Enter}");
     expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
@@ -413,8 +441,30 @@ describe("FilterSearch", () => {
     expect(box).toHaveAttribute("aria-busy", "false");
   });
 
+  it("says so when NRCan fails, and stops looking busy", async () => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) =>
+        String(input).startsWith("https://geogratis.gc.ca/")
+          ? new Response("", { status: 503 })
+          : fallback(input, init),
+      ),
+    );
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+
+    expect(
+      await within(screen.getByTestId("filter-search")).findByText(
+        "Place search (NRCan) is unavailable right now. Try again later.",
+      ),
+    ).toBeInTheDocument();
+    expect(box).toHaveAttribute("aria-busy", "false");
+  });
+
   it("lists places after the other suggestions, and the text search last", async () => {
-    answerRegions("Pacific");
+    answerRegions("Pacific Ocean");
     const { user, box } = await renderPalette();
 
     await user.type(box, "pacific");
@@ -432,6 +482,21 @@ describe("FilterSearch", () => {
       firstText,
     );
     expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
+  });
+
+  it("leads with a place named exactly what was typed", async () => {
+    answerRegions("Pacific");
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "pacific");
+    await screen.findByText("Fundian Channel");
+
+    const labels = screen
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(labels.findIndex((l) => l.startsWith("Pacific"))).toBeLessThan(
+      labels.findIndex((l) => l.includes("CIOOS Pacific")),
+    );
   });
 
   it("shows four of a group, and the rest when asked", async () => {
@@ -474,7 +539,7 @@ describe("FilterSearch", () => {
 
     await user.type(box, "fundy");
     await screen.findByText("Bay of Fundy");
-    while (!option("Bay of Fundy").matches("[aria-selected=true]"))
+    while (!option("Bay of Fundy").matches("[data-focused]"))
       await user.keyboard("{ArrowDown}");
     await user.keyboard("{Shift>}{Enter}{/Shift}");
 
@@ -689,6 +754,37 @@ describe("FilterSearch", () => {
     expect(option("Oxygen")).toHaveTextContent(
       "The amount of dissolved oxygen in seawater.",
     );
+  });
+
+  it("finds a variable by its definition, above the title search", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "dissolved oxygen");
+
+    const labels = options().map((o) => o.textContent);
+    expect(labels[0]).toContain("Oxygen");
+    expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
+    await user.keyboard("{Enter}");
+    expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
+  });
+
+  it("offers the closest variable when only the title search matches", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "dissolved oxygen levels");
+
+    expect(options()[0]).toHaveTextContent("Closest variable: Oxygen");
+    expect(options()[1]).toHaveTextContent("Titles matching");
+    await user.keyboard("{ArrowDown}{ArrowUp}{Enter}");
+    expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
+  });
+
+  it("offers no closest variable when nothing resembles one", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "argo float");
+
+    expect(screen.queryByText(/Closest variable/)).toBeNull();
   });
 
   it("empties the box on Escape, and closes on the next", async () => {

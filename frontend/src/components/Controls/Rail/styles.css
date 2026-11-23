@@ -63,7 +63,7 @@
   height: 12px;
   margin: -6px 0 0 -6px;
   border-radius: 50%;
-  background-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary-800);
   box-shadow: var(--cioos-shadow-sm);
   z-index: 1;
 }
@@ -165,7 +165,7 @@
 }
 
 .rail .railHandleGrid:focus-visible {
-  box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
+  box-shadow: 0 0 0 3px var(--cioos-grid-ring);
 }
 
 .railValueInput {
@@ -182,11 +182,13 @@
   color: var(--cioos-ink);
 }
 
-.railValueInput:hover {
+.railValueInput:hover,
+.railValueInput[data-hovered] {
   background-color: var(--cioos-white);
 }
 
-.railValueInput:focus-visible {
+.railValueInput:focus-visible,
+.railValueInput[data-focus-within] {
   outline: none;
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);

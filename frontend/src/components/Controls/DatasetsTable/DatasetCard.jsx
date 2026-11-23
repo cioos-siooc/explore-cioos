@@ -7,6 +7,7 @@ import {
   Download,
   ExclamationTriangle,
   PlusCircle,
+  Grid3x3,
   Grid3x3Gap,
   HexagonFill,
   Check2Circle,
@@ -29,8 +30,9 @@ import {
 } from "../../../downloadLinks.js";
 import erddapServersJSONfile from "../../../erddapServers.json";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
+import Checkbox from "../../ui/Checkbox.jsx";
 import Spinner from "../../ui/Spinner.jsx";
-import Tooltip from "../../ui/Tooltip.jsx";
+import Tooltip, { TooltipTarget } from "../../ui/Tooltip.jsx";
 
 export default function DatasetCard({
   row,
@@ -57,18 +59,19 @@ export default function DatasetCard({
   const isObis = row.source_type === "obis";
   const erddapUrl = localizedErddapUrl(row, row.erddap_url, i18n.language);
   const ckanUrl = localizedCkanUrl(row.ckan_url, i18n.language);
+  const unappliedFilters = downloadLink?.unapplied.length
+    ? new Intl.ListFormat(i18n.language).format(
+        downloadLink.unapplied.map((filter) =>
+          t(`downloadFilterName_${filter}`),
+        ),
+      )
+    : "";
   // griddap is metadata-only, and in the modal a dataset is only selectable
   // when the CDE can deliver it (internalDownload).
   const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
   const estimatesReady = !isEmpty(downloadSizeEstimates);
   // Failed estimates will never arrive: say so instead of spinning.
   const estimatesFailed = !estimatesLoading && !estimatesReady;
-
-  const handleSelect = (e) => {
-    // The card itself opens the dataset page; this control must not.
-    e.stopPropagation();
-    if (!selectDisabled) onSelect(row);
-  };
 
   const clickable = typeof onInspect === "function";
   const handleCardClick = clickable ? () => onInspect(row) : undefined;
@@ -78,7 +81,7 @@ export default function DatasetCard({
     : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
 
   return (
-    <div
+    <div // eslint-disable-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a mouse shortcut; the title button is the way in by keyboard
       data-testid="dataset-card"
       data-dataset-pk={row.pk}
       data-selected={Boolean(selected)}
@@ -92,19 +95,17 @@ export default function DatasetCard({
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
+      onFocus={() => onHover(row)}
+      onBlur={() => onHoverEnd()}
     >
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
-          {/* A button with role=checkbox: it carries an icon a native input
-              cannot. */}
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={Boolean(selected)}
+          <Checkbox
             className={classNames("datasetCardSelect", { checked: selected })}
+            isSelected={Boolean(selected)}
+            isDisabled={selectDisabled}
+            onChange={() => onSelect(row)}
             title={selectTitle}
-            onClick={handleSelect}
-            disabled={selectDisabled}
             aria-label={`${t("datasetsCardSelectForDownloadText")}: ${row.title}`}
             data-tip-highlight={tipHighlight}
           >
@@ -113,7 +114,7 @@ export default function DatasetCard({
             ) : (
               <PlusCircle size={16} aria-hidden="true" />
             )}
-          </button>
+          </Checkbox>
 
           {/* The wrapper is the height of the title's first line, so the dot
               stays centered on that line however the title wraps. */}
@@ -154,7 +155,7 @@ export default function DatasetCard({
                 >
                   {/* Colour alone never carries the status: the word is on
                       the glyph's own <title>. */}
-                  <span className="datasetCardStatus">
+                  <TooltipTarget className="datasetCardStatus">
                     {row.internalDownload ? (
                       <Check2Circle
                         className="downloadableIcon success"
@@ -179,7 +180,10 @@ export default function DatasetCard({
                           : t("downloadSizeUnavailableTitle")
                       }
                     >
-                      {formatSizeEstimate(row?.sizeEstimate?.filteredSize)}
+                      {formatSizeEstimate(
+                        row?.sizeEstimate?.filteredSize,
+                        i18n.language,
+                      )}
                     </span>
                     {/* Shown only when the map's filters narrowed it. */}
                     {row?.sizeEstimate?.filteredSize !==
@@ -187,10 +191,11 @@ export default function DatasetCard({
                       <span className="datasetCardSizeTotal">
                         {`/ ${formatSizeEstimate(
                           row?.sizeEstimate?.unfilteredSize,
+                          i18n.language,
                         )}`}
                       </span>
                     )}
-                  </span>
+                  </TooltipTarget>
                 </Tooltip>
               ) : estimatesFailed ? (
                 <span
@@ -260,15 +265,11 @@ export default function DatasetCard({
               <span
                 className="datasetCardFormatTag datasetCardUnapplied"
                 title={t("datasetCardUnappliedTitle", {
-                  filters: new Intl.ListFormat(i18n.language).format(
-                    downloadLink.unapplied.map((filter) =>
-                      t(`downloadFilterName_${filter}`),
-                    ),
-                  ),
+                  filters: unappliedFilters,
                 })}
               >
                 <ExclamationTriangle size={11} aria-hidden="true" />
-                {t("datasetCardUnappliedText")}
+                {t("datasetCardUnappliedText", { filters: unappliedFilters })}
               </span>
             )}
             {row.ckan_url && (
@@ -303,7 +304,7 @@ export function DatasetPlatformIcon({
   decorative,
 }) {
   const { i18n } = useTranslation();
-  // Grid amber, the colour the map draws gridded coverage in.
+  // Grid navy, the colour of the map's gridded coverage edge.
   if (cdmDataType === "Grid") {
     return (
       <Grid3x3Gap
@@ -327,6 +328,22 @@ export function DatasetPlatformIcon({
   );
 }
 
+// profiles_count counts matched features, and a trajectory's features are the
+// hex cells its tracks cross: its tracks are counted by n_profiles.
+export function locationsText(row, t) {
+  const count = Number(row.profiles_count);
+  const total = row.n_profiles == null ? undefined : Number(row.n_profiles);
+  if (
+    row.source_type !== "obis" &&
+    (row.cdm_data_type || "").includes("Trajectory")
+  ) {
+    return t("datasetCardTracks", { count: total ?? count });
+  }
+  return total !== undefined && count < total
+    ? t("datasetCardLocationsPartial", { shown: count, count: total })
+    : t("datasetCardLocations", { count });
+}
+
 function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
@@ -337,11 +354,7 @@ function DatasetCardMeta({ row, t, i18n }) {
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
     : cdmDataTypeLabel(row.cdm_data_type, t) || "";
-  const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || "—"
-    : row.profiles_count !== row.n_profiles
-      ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count;
+  const gridSize = isGrid && formatGridSize(row.grid_dimensions);
 
   return (
     <span className="datasetCardMeta">
@@ -356,24 +369,31 @@ function DatasetCardMeta({ row, t, i18n }) {
         <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
         {typeLabel}
       </span>
-      <span
-        className="datasetCardMetaItem"
-        title={
-          isGrid
-            ? t("griddapGridSizeTooltip")
-            : t("datasetsTableHeaderLocationsText")
-        }
-      >
-        <PinMapFill size={13} aria-hidden="true" />
-        {locationsLabel}
-      </span>
+      {gridSize && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("griddapGridSizeTooltip")}
+        >
+          <Grid3x3 size={13} aria-hidden="true" />
+          {t("datasetCardGridSize", { size: gridSize })}
+        </span>
+      )}
+      {!isGrid && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("datasetsTableHeaderLocationsText")}
+        >
+          <PinMapFill size={13} aria-hidden="true" />
+          {locationsText(row, t)}
+        </span>
+      )}
       {row.days != null && (
         <span
           className="datasetCardMetaItem"
           title={t("datasetsCardSortDaysText")}
         >
           <CalendarCheck size={13} aria-hidden="true" />
-          {Number(row.days).toLocaleString(i18n.language)}
+          {t("datasetCardDays", { count: Number(row.days) })}
         </span>
       )}
 

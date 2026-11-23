@@ -2,33 +2,18 @@ import { expect, test } from "../support/test.js";
 import { openApp } from "../support/appPage.js";
 import { VIEWPORTS } from "../support/constants.js";
 
-// The datasets list is open by default only above (min-width: 1400px), so what
-// this spec expects depends on which project is running it.
-function startsOpen(viewportWidth) {
-  return viewportWidth >= 1400;
-}
-
 test.describe("the datasets sidebar", () => {
-  test("opens by default only where there is map to spare", async ({
-    page,
-  }, testInfo) => {
+  test("starts closed on every screen size", async ({ page }) => {
     await openApp(page);
-    const expanded = startsOpen(testInfo.project.use.viewport.width);
     await expect(page.getByTestId("sidebar-datasets")).toHaveAttribute(
       "data-expanded",
-      String(expanded),
+      "false",
     );
   });
 
-  test("opens and closes again", async ({ page }, testInfo) => {
+  test("opens and closes again", async ({ page }) => {
     await openApp(page);
     const panel = page.getByTestId("sidebar-datasets");
-    const wasOpen = startsOpen(testInfo.project.use.viewport.width);
-
-    if (wasOpen) {
-      await page.getByTestId("topbar-datasets-button").click();
-      await expect(panel).toHaveAttribute("data-expanded", "false");
-    }
 
     await page.getByTestId("topbar-datasets-button").click();
     await expect(panel).toHaveAttribute("data-expanded", "true");
@@ -61,7 +46,7 @@ test.describe("the datasets sidebar", () => {
     const cards = panel.getByTestId("dataset-card");
     const datasetPk = await cards.first().getAttribute("data-dataset-pk");
     const card = panel.locator(`[data-dataset-pk="${datasetPk}"]`);
-    await card.getByRole("checkbox", { name: "Add to selection" }).click();
+    await card.locator(".datasetCardSelect").click();
     await expect(card).toHaveAttribute("data-selected", "true");
 
     await page.getByTestId("sidebar-collapse").click();
@@ -82,24 +67,22 @@ test.describe("the datasets sidebar", () => {
     // same control is what un-selects it.
     if (await card.isVisible()) {
       await expect(card).toHaveAttribute("data-selected", "true");
-      await card.getByRole("checkbox", { name: "Add to selection" }).click();
+      await card.locator(".datasetCardSelect").click();
       await expect(card).toHaveAttribute("data-selected", "false");
     }
   });
 
   test("a user override outlives a resize", async ({ page }) => {
-    // Once the user has chosen, the screen-size default no longer applies.
     await page.setViewportSize(VIEWPORTS.desktop);
     await openApp(page);
     const panel = page.getByTestId("sidebar-datasets");
-    await expect(panel).toHaveAttribute("data-expanded", "true");
 
     await page.getByTestId("topbar-datasets-button").click();
-    await expect(panel).toHaveAttribute("data-expanded", "false");
+    await expect(panel).toHaveAttribute("data-expanded", "true");
 
     await page.setViewportSize(VIEWPORTS.tablet);
     await page.setViewportSize(VIEWPORTS.desktop);
-    await expect(panel).toHaveAttribute("data-expanded", "false");
+    await expect(panel).toHaveAttribute("data-expanded", "true");
   });
 
   test("widens a dataset page over the map, and Escape returns it to the sidebar", async ({
@@ -132,6 +115,24 @@ test.describe("the datasets sidebar", () => {
     await expect(page).not.toHaveURL(/[?&]wide=/);
     await expect(page.getByRole("tablist")).toBeVisible();
     await expect(page.getByTestId("sidebar-scrim")).toHaveCount(0);
+  });
+
+  test("shows only the selected tab's panel on a dataset page", async ({
+    page,
+  }) => {
+    await openApp(page, "dataset=HakaiBIOOSBuoy1hour");
+    const panel = page.getByTestId("sidebar-datasets");
+    if ((await panel.getAttribute("data-expanded")) !== "true") {
+      await page.getByTestId("topbar-datasets-button").click();
+    }
+    const metadata = page.locator(".datasetPanel-metadata");
+    const data = page.locator(".datasetPanel-data");
+    await expect(metadata).toBeVisible();
+    await expect(data).toBeHidden();
+
+    await page.getByRole("tab", { name: "Data", exact: true }).click();
+    await expect(data).toBeVisible();
+    await expect(metadata).toBeHidden();
   });
 
   test("widens the datasets list into a grid of cards", async ({

@@ -8,6 +8,8 @@
 // Pure on purpose — no React, no Plotly — so every rule below is assertable
 // under `node --test`.
 
+import { scaleLinear } from "d3-scale";
+
 import { paletteFor } from "./erddapPalettes.js";
 import { isTimeLike } from "./previewVariables.js";
 
@@ -246,6 +248,9 @@ export function colorDimensionFor(variable, data) {
 // ticks apart, few enough that 27.837999999999997 does not appear.
 const TICK_DIGITS = 4;
 
+// Share of the ramp kept free of round ticks at each end.
+const TICK_END_CLEARANCE = 0.15;
+
 const formatTick = (value) => String(Number(value.toPrecision(TICK_DIGITS)));
 
 /**
@@ -270,8 +275,17 @@ export function legendTicksFor(dimension) {
       text: dimension.ticks.ticktext[index],
     }));
   }
-  return Array.from({ length: TICK_COUNT }, (_, index) => {
-    const position = index / (TICK_COUNT - 1);
-    return { position, text: formatTick(low + span * position) };
-  });
+  // The ends stay the record's own extent; the ticks between them are round
+  // numbers, kept clear of the ends so no two labels collide.
+  const inner = scaleLinear()
+    .domain([low, high])
+    .ticks(TICK_COUNT)
+    .filter((value) => {
+      const position = (value - low) / span;
+      return position > TICK_END_CLEARANCE && position < 1 - TICK_END_CLEARANCE;
+    });
+  return [low, ...inner, high].map((value) => ({
+    position: (value - low) / span,
+    text: formatTick(value),
+  }));
 }

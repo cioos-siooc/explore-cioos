@@ -104,5 +104,6 @@ Postgres or Docker behaviour. Keep that.
   stay `CREATE OR REPLACE`-safe.
 - **Redis caches API responses.** `FLUSHALL` before measuring anything, and
   never warm a data endpoint before a harvest finishes.
-- **The harvest config is never baked into an image.** Supply it at run time
-  (`HARVEST_CONFIG_B64`, `HARVEST_CONFIG_FILE`, or a mount).
+- **The worker image bakes every committed `harvest_config.*.yaml`** and uses
+  the production one. `HARVEST_CONFIG_FILE` picks another baked or mounted file;
+  `HARVEST_CONFIG_B64` overrides everything.

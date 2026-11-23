@@ -13,7 +13,7 @@
   --harvest-hairline: #ede8e2;
   --harvest-row-hover: #f8f6f3;
   --harvest-input-border: #c6d8db;
-  --harvest-spark-empty: #aaa;
+  --harvest-spark-empty: var(--cioos-ink-40);
 }
 
 /* ── Harvest section root layout ──────────────────────────────────────────── */
@@ -76,7 +76,7 @@
 }
 
 .harvest-breadcrumb a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: none;
 }
 
@@ -189,7 +189,7 @@
   background: var(--cioos-white);
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   font-size: 0.88rem;
 }
 
@@ -230,7 +230,7 @@
   background: var(--cioos-white);
   border-radius: 6px;
   padding: 1rem 1.1rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   text-decoration: none;
   color: inherit;
   display: block;
@@ -238,7 +238,7 @@
 }
 
 .harvest-card:hover {
-  box-shadow: 0 3px 8px rgb(0 0 0 / 12%);
+  box-shadow: 0 3px 8px rgb(21 47 55 / 12%);
   text-decoration: none;
   color: inherit;
 }
@@ -307,6 +307,21 @@
   border-bottom: 2px solid var(--cioos-teal-light);
 }
 
+.harvest-section-desc {
+  margin: -0.25rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--harvest-muted);
+}
+
+.harvest-section-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0;
+  font-size: 0.85rem;
+  color: var(--harvest-muted);
+}
+
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 .harvest-filter-bar {
   display: flex;
@@ -344,7 +359,7 @@
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   display: flex;
   flex-wrap: wrap;
   gap: 1.25rem;
@@ -405,7 +420,7 @@
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
+  box-shadow: 0 1px 3px rgb(21 47 55 / 7%);
   font-size: 0.88rem;
 }
 
@@ -473,7 +488,7 @@
 }
 
 a.harvest-link {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   text-decoration: none;
 }
 
@@ -566,8 +581,8 @@ a.harvest-link:hover {
 }
 
 .harvest-doc-tab.active {
-  color: var(--cioos-primary-700);
-  border-bottom-color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
+  border-bottom-color: var(--cioos-primary-800);
 }
 
 .harvest-doc {
@@ -598,7 +613,7 @@ a.harvest-link:hover {
 }
 
 .harvest-doc a {
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .harvest-doc code {
@@ -611,7 +626,8 @@ a.harvest-link:hover {
 .harvest-doc blockquote {
   margin: 0 0 1rem;
   padding: 0.5rem 1rem;
-  border-left: 3px solid var(--cioos-teal-light);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
   background: var(--cioos-surface-2);
 }
 
@@ -738,11 +754,26 @@ a.harvest-link:hover {
 }
 
 /* ── Catalogue section (overview) ────────────────────────────────────────── */
+
+/* The max() floor caps the grid at two columns, one below ~632px. */
+.harvest-columns,
 .harvest-catalogue {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 0 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 0 2.5rem;
   margin-bottom: 1rem;
+}
+
+.harvest-columns > section,
+.harvest-catalogue > div {
+  min-width: 0;
+}
+
+.harvest-column-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  margin: 1.5rem 0 0.5rem;
 }
 
 .harvest-ckan-pct {
@@ -765,6 +796,49 @@ a.harvest-link:hover {
   background: var(--cioos-success);
 }
 
+.harvest-unmatched {
+  margin: 0.75rem 0;
+}
+
+.harvest-unmatched-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.harvest-unmatched-bar,
+.harvest-stack-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.harvest-unmatched-bar span,
+.harvest-stack-bar span {
+  flex-basis: 0;
+  min-width: 2px;
+}
+
+.harvest-unmatched-bar span:first-child,
+.harvest-stack-bar span:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.harvest-unmatched-bar span:last-child,
+.harvest-stack-bar span:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.harvest-unmatched-bar span:only-child,
+.harvest-stack-bar span:only-child {
+  border-radius: 4px;
+}
+
+.harvest-unmatched .harvest-pie-legend {
+  font-size: 0.8rem;
+}
+
 .harvest-ckan-sources {
   list-style: none;
   margin: 0.75rem 0;
@@ -776,13 +850,33 @@ a.harvest-link:hover {
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.5rem;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.6rem;
 }
 
-.harvest-ckan-sources .harvest-ckan-meter {
+.harvest-ckan-sources .harvest-stack-bar {
   flex-basis: 100%;
-  height: 4px;
+  height: 6px;
   margin: 0.15rem 0 0;
+}
+
+.harvest-link-legend {
+  font-size: 0.8rem;
+}
+
+.harvest-server-links {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 0 0.75rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+}
+
+.harvest-pie-bar {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .harvest-bars {

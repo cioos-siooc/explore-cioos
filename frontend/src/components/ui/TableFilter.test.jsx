@@ -50,4 +50,18 @@ describe("TableFilter", () => {
     await user.type(screen.getByPlaceholderText("Search"), "x");
     expect(onChange).toHaveBeenCalledWith("x");
   });
+
+  it("clears on Escape and from its clear button", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <TableFilter value="orca" onChange={onChange} placeholder="Search" />,
+    );
+    await user.click(screen.getByPlaceholderText("Search"));
+    await user.keyboard("{Escape}");
+    expect(onChange).toHaveBeenLastCalledWith("");
+    onChange.mockClear();
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(onChange).toHaveBeenLastCalledWith("");
+  });
 });
