@@ -81,18 +81,19 @@ test.describe("record preview", () => {
       await page.getByRole("menuitemradio", { name, exact: true }).click();
     };
 
-    await expect(mode).toHaveText("Markers + Line");
-    await pick("Markers");
-
+    // A TimeSeriesProfile opens as a section, drawn as markers.
     await expect(mode).toHaveText("Markers");
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get("pmode"))
-      .toBe("markers");
-
-    // Back to the default and the param goes, rather than being pinned at it.
     await pick("Markers + Line");
 
     await expect(mode).toHaveText("Markers + Line");
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("pmode"))
+      .toBe("markers+lines");
+
+    // Back to the default and the param goes, rather than being pinned at it.
+    await pick("Markers");
+
+    await expect(mode).toHaveText("Markers");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBeNull();
