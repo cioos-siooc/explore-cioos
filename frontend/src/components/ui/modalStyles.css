@@ -40,6 +40,9 @@ body.cioos-modal-open {
   flex-direction: column;
   width: 100%;
   max-height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
+
+  /* The visible height: iOS Safari's 100vh runs under its bottom toolbar. */
+  max-height: calc(100dvh - 2 * var(--cioos-space-lg, 16px));
   pointer-events: auto;
   background-color: var(--cioos-white, #fff);
   border-radius: var(--cioos-radius-lg, 16px);

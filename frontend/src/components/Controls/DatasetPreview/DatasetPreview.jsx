@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check2,
+  Gear,
   GraphUp,
   Link45deg,
   Table as TableIcon,
@@ -13,10 +14,12 @@ import SegmentedToggle from "../../ui/SegmentedToggle.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 import useMediaQuery, {
   MOBILE_QUERY,
+  PREVIEW_COMPACT_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 
 import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
+import PreviewWindowPager from "./PreviewWindowPager.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import usePreviewProfiles from "./usePreviewProfiles.js";
 import { previewSampleFor, previewWindowFor } from "./previewSample.js";
@@ -62,6 +65,8 @@ export default function DatasetPreview({
   // closes it. Only the six the header and the body need are read here; the rest
   // goes to the plot through the provider below.
   const mobile = useMediaQuery(MOBILE_QUERY);
+  // Where the plot keeps its settings in a dialog rather than a pane beside it.
+  const settingsInDialog = useMediaQuery(PREVIEW_COMPACT_QUERY);
   const plotParams = usePreviewPlotParams(
     inspectDataset,
     datasetPreview?.table,
@@ -211,7 +216,7 @@ export default function DatasetPreview({
       {inspectDataset && inspectRecordID && (
         <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
-            {dataIsReady && (
+            {dataIsReady && !mobile && (
               <SegmentedToggle
                 className="previewViewToggle"
                 options={[
@@ -277,8 +282,9 @@ export default function DatasetPreview({
               )}
             </h2>
 
-            {dataIsReady && (
+            {dataIsReady && !mobile && (
               // The URL mirrors the whole app state, so it is the share link.
+              // A phone shares the page from its browser's own menu.
               <button
                 type="button"
                 className="copyLinkButton"
@@ -309,6 +315,50 @@ export default function DatasetPreview({
               />
             </div>
           </Modal.Body>
+          {dataIsReady && mobile && (
+            // In thumb reach and out of the title's way: the record's paging
+            // on the left, how it is shown on the right.
+            <div className="previewBottomBar">
+              <PreviewWindowPager />
+              <div className="previewBottomBarViews">
+                <button
+                  type="button"
+                  className="previewBarButton"
+                  onClick={() =>
+                    setSelectedVis(selectedVis === "plot" ? "table" : "plot")
+                  }
+                >
+                  {selectedVis === "plot" ? (
+                    <TableIcon size={18} aria-hidden="true" />
+                  ) : (
+                    <GraphUp size={18} aria-hidden="true" />
+                  )}
+                  <span className="previewBarLabel">
+                    {t(
+                      selectedVis === "plot"
+                        ? "datasetPreviewTableText"
+                        : "datasetPreviewPlotText",
+                    )}
+                  </span>
+                </button>
+                {settingsInDialog && selectedVis === "plot" && (
+                  <button
+                    type="button"
+                    className="previewBarButton"
+                    aria-haspopup="dialog"
+                    aria-expanded={settingsOpen}
+                    aria-label={t("datasetPreviewPlotSettings")}
+                    onClick={() => setSettingsOpen(true)}
+                  >
+                    <Gear size={18} aria-hidden="true" />
+                    <span className="previewBarLabel" aria-hidden="true">
+                      {t("datasetPreviewPlotSettingsShort")}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </PreviewPlotProvider>
       )}
     </Modal>

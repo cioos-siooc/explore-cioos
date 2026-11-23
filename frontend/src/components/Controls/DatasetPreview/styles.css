@@ -288,34 +288,120 @@
   .dataPreviewModal .datasetPreviewSample {
     margin-top: 0;
   }
+}
 
-  /* Icon-only: the words stay for screen readers. */
-  .previewViewToggle .toggleButton {
-    min-width: 0;
-    padding: 0 8px;
+/* Portrait: who and what, then the close. */
+@media (max-width: 700px) {
+  .tableAndPlotGridContainer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--cioos-space-sm);
+  }
+}
+
+/* Phones: the close at a fingertip's size, and the plot's tools in a bar along
+   the bottom edge, in thumb reach, each an icon over its name. */
+@media (max-width: 700px), (max-height: 500px) {
+  .dataPreviewModal .modal-header .closeButton {
+    width: 40px;
+    height: 40px;
   }
 
-  .previewViewToggle .toggleLabel {
+  /* The bar under it takes the home indicator's inset instead. */
+  .dataPreviewModal .modal-body:has(+ .previewBottomBar) {
+    padding-bottom: var(--cioos-space-xs);
+  }
+
+  .previewBottomBar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cioos-space-sm);
+    padding: var(--cioos-space-xs) var(--cioos-space-sm)
+      max(var(--cioos-space-xs), env(safe-area-inset-bottom));
+    border-top: 1px solid var(--cioos-hairline);
+    background-color: var(--cioos-white);
+  }
+
+  .previewBottomBar .previewWindowPager,
+  .previewBottomBarViews {
+    display: flex;
+    align-items: center;
+    gap: var(--cioos-space-xs);
+  }
+
+  /* The views sit at the right edge even when there is no paging. */
+  .previewBottomBarViews {
+    margin-left: auto;
+  }
+
+  .previewBarButton,
+  .previewBottomBar .previewWindowButton {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 64px;
+    min-height: 48px;
+    padding: var(--cioos-space-xs) var(--cioos-space-sm);
+    border: 0;
+    border-radius: var(--cioos-radius-sm);
+    background: none;
+    color: var(--cioos-primary-800);
+    font-size: var(--cioos-font-size-xs);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--cioos-transition-fast);
+  }
+
+  /* A tap leaves :hover stuck on a touch screen, tinting the last button. */
+  @media (hover: none) {
+    .previewBottomBar .previewWindowButton:hover:not(:disabled) {
+      background-color: transparent;
+    }
+  }
+
+  @media (hover: hover) {
+    .previewBarButton:hover,
+    .previewBottomBar .previewWindowButton:hover:not(:disabled) {
+      background-color: var(--cioos-surface-2);
+    }
+  }
+
+  .previewBarButton:focus-visible,
+  .previewBottomBar .previewWindowButton:focus-visible {
+    outline: none;
+    box-shadow: var(--cioos-focus);
+  }
+
+  .previewBottomBar .previewWindowButton:disabled {
+    color: var(--cioos-ink-40);
+  }
+
+  /* Latest names itself before its icon; in the bar the icon leads. */
+  .previewBottomBar .previewWindowButton svg {
+    order: -1;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* A landscape phone has height for neither the labels nor a 48px bar. */
+@media (max-height: 500px) {
+  .previewBarButton,
+  .previewBottomBar .previewWindowButton {
+    min-height: 40px;
+  }
+
+  .previewBottomBar :is(.previewBarLabel, .previewWindowLabel) {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-}
-
-/* Portrait: the view switch, who and what, then the actions, on one row. */
-@media (max-width: 700px) {
-  .tableAndPlotGridContainer {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: var(--cioos-space-sm);
-  }
-
-  .tableAndPlotGridContainer .copyLinkButton {
-    width: 32px;
-    height: 32px;
   }
 }

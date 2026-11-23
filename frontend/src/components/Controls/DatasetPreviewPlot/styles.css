@@ -938,10 +938,76 @@
   .datasetPreviewPlotColumn {
     order: 2;
   }
+
+  .previewProfileHeader {
+    padding-bottom: var(--cioos-space-xs);
+  }
+
+  /* The gear and the pager, at the height of the dialog header's controls. */
+  .previewPlotTools {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--cioos-space-sm);
+  }
+
+  .previewSettingsButton {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--cioos-hairline);
+    border-radius: var(--cioos-radius);
+    background-color: var(--cioos-white);
+    color: var(--cioos-primary-800);
+    cursor: pointer;
+    transition: background-color var(--cioos-transition-fast);
+  }
+
+  .previewSettingsButton:hover {
+    background-color: var(--cioos-surface-2);
+  }
+
+  .previewSettingsButton:focus-visible {
+    outline: none;
+    box-shadow: var(--cioos-focus);
+  }
+
+  .previewPlotTools .previewWindowButton {
+    height: 40px;
+    padding: 0 14px;
+  }
 }
 
 @media (max-width: 700px) {
   .controlRow .dropdown-toggle {
     min-height: 36px;
+  }
+
+  /* The cast slider takes a line of its own under the tools, its steppers
+     drawn at a fingertip's size rather than as specks beside the rail. */
+  .previewProfileSlice {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .previewProfileSliceControls {
+    gap: var(--cioos-space-sm);
+  }
+
+  .previewProfileSlice .railStep {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--cioos-hairline);
+    background-color: var(--cioos-white);
+    color: var(--cioos-primary-800);
+  }
+
+  .previewProfileSlice .railStep svg {
+    width: 14px;
+    height: 14px;
   }
 }

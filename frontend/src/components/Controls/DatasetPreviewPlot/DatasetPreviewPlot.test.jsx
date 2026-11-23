@@ -457,14 +457,23 @@ describe("DatasetPreviewPlot", () => {
     ).toBeInTheDocument();
   });
 
-  it("gives a phone's plot no header row, its gear in the corner", async () => {
+  it("puts a phone's gear in a bar along the bottom, leaving no row above the plot", async () => {
     setViewportWidth(MOBILE_WIDTH);
     open();
-    const plot = await plotted();
+    await plotted();
     const gear = screen.getByRole("button", { name: "Plot settings" });
-    expect(gear).toHaveClass("paneCollapseToggle");
-    expect(plot.contains(gear)).toBe(false);
+    expect(gear.closest(".previewBottomBar")).not.toBeNull();
+    expect(gear).toHaveTextContent("Settings");
+    expect(document.querySelector(".previewPlotTools")).toBeNull();
     expect(document.querySelector(".previewProfileHeader")).toBeNull();
+  });
+
+  it("keeps a tablet's gear in a row above the plot", async () => {
+    setViewportWidth(TABLET_WIDTH);
+    open();
+    await plotted();
+    const gear = screen.getByRole("button", { name: "Plot settings" });
+    expect(gear.closest(".previewPlotTools")).not.toBeNull();
   });
 
   it("has no gear beside the settings pane", async () => {
