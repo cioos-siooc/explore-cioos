@@ -109,9 +109,15 @@ test.describe("record preview", () => {
     await expect(mode).toHaveText("Line");
     await closeSettings(page);
 
-    await page.getByRole("radio", { name: "Table" }).click();
+    // Two radios on a wide screen; on a phone, one button to the other view.
+    const showView = (name) =>
+      page
+        .getByRole("radio", { name })
+        .or(page.getByRole("button", { name, exact: true }))
+        .click();
+    await showView("Table");
     await expect(plot(page)).toHaveCount(0);
-    await page.getByRole("radio", { name: "Plot" }).click();
+    await showView("Plot");
 
     await expect(plot(page).first()).toBeVisible();
     await showSettings(page);

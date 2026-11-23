@@ -1,10 +1,19 @@
 import * as React from "react";
 
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { RECORD_PARAM } from "../../../state/selection/previewParams.js";
 
-const DatasetPreview = React.lazy(
-  () => import("../../Controls/DatasetPreview/DatasetPreview.jsx"),
-);
+const loadPreview = () =>
+  import("../../Controls/DatasetPreview/DatasetPreview.jsx");
+const DatasetPreview = React.lazy(loadPreview);
+
+// A link that opens on a record is there for its plot: fetch the plot's code
+// with the page instead of after the catalogue the modal waits on. The lazy
+// imports in this chain then resolve from the module cache.
+if (new URLSearchParams(window.location.search).has(RECORD_PARAM)) {
+  loadPreview();
+  import("../../Controls/DatasetPreviewPlot/DatasetPreviewPlot.jsx");
+}
 
 // Mounted at the shell level so it survives panel swaps; loads on first open,
 // then stays mounted so later opens and closes animate.

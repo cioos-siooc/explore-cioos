@@ -823,26 +823,14 @@ export default function DatasetPreviewPlot() {
         "datasetPreviewPlotPanes",
         resizing && "isResizing",
         slideFrom && "isSliding",
-        // The settings in a dialog leave the corner to their gear, as a
-        // collapsed pane leaves it to its toggle.
-        (settingsInDialog || paneCollapsed) && "isPaneHidden",
+        // A collapsed pane leaves the corner to its toggle.
+        !settingsInDialog && paneCollapsed && "isPaneHidden",
       ]
         .filter(Boolean)
         .join(" ")}
     >
       {settingsInDialog ? (
         <>
-          <button
-            type="button"
-            className="paneCollapseToggle"
-            aria-haspopup="dialog"
-            aria-expanded={settingsOpen}
-            aria-label={t("datasetPreviewPlotSettings")}
-            title={t("datasetPreviewPlotSettings")}
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Gear size={16} aria-hidden="true" />
-          </button>
           {/* Over the plot rather than beside or above it: there is not the
               width to share, nor the height to fold into. */}
           <Modal
@@ -924,7 +912,9 @@ export default function DatasetPreviewPlot() {
         {/* Above the figure rather than in the parameters pane: this says WHICH
             rows are drawn where every control in the pane says how, and the
             pane is too narrow to read a cast's date in. */}
-        {(showSlice || (titleInHeader && headerTitle && !mobile)) && (
+        {((settingsInDialog && !mobile) ||
+          showSlice ||
+          (titleInHeader && headerTitle && !mobile)) && (
           <div
             className={
               showSlice
@@ -932,6 +922,25 @@ export default function DatasetPreviewPlot() {
                 : "previewProfileHeader isSingleRow"
             }
           >
+            {/* A row of its own rather than over the figure, where the pager
+                covered the first panel's title. A phone has them in the
+                dialog's header instead. */}
+            {settingsInDialog && !mobile && (
+              <div className="previewPlotTools">
+                <button
+                  type="button"
+                  className="previewSettingsButton"
+                  aria-haspopup="dialog"
+                  aria-expanded={settingsOpen}
+                  aria-label={t("datasetPreviewPlotSettings")}
+                  title={t("datasetPreviewPlotSettings")}
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Gear size={18} aria-hidden="true" />
+                </button>
+                <PreviewWindowPager />
+              </div>
+            )}
             {titleInHeader && headerTitle && !mobile && (
               <h5 className="previewProfileTitle" title={headerTitle}>
                 {headerTitle}
@@ -952,7 +961,7 @@ export default function DatasetPreviewPlot() {
           className={`datasetPreviewPlotBody ${pinnedLeft ? "isPinnedLeft" : "isPinnedBelow"}`}
         >
           {/* Over the figure's top-left corner, which a plot rarely uses. */}
-          <PreviewWindowPager />
+          {!settingsInDialog && !mobile && <PreviewWindowPager />}
           <div
             className="datasetPreviewPlotArea"
             ref={plotAreaRef}

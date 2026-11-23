@@ -274,6 +274,20 @@ describe("DatasetPreview", () => {
       ).toBeTruthy();
     });
 
+    it("offers a phone one button to the other view, and no copy link", async () => {
+      setViewportWidth(MOBILE_WIDTH);
+      const { user } = open();
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Copy link" })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Table" }));
+      expect(screen.queryByTestId("preview-plot")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Table" })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Plot" }));
+      expect(await screen.findByTestId("preview-plot")).toBeInTheDocument();
+    });
+
     it("copies the link from an icon-only button that still has a name", async () => {
       const { user } = open();
       const copy = screen.getByRole("button", { name: "Copy link" });

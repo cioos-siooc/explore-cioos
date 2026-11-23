@@ -26,7 +26,7 @@ export default function PreviewWindowPager() {
         onClick={() => setBefore(earliest)}
       >
         <ChevronLeft size={12} aria-hidden="true" />
-        {t("previewWindowEarlier")}
+        <span className="previewWindowLabel">{t("previewWindowEarlier")}</span>
       </button>
       {before && (
         <button
@@ -35,7 +35,7 @@ export default function PreviewWindowPager() {
           title={t("previewWindowLatestHelp")}
           onClick={() => setBefore(null)}
         >
-          {t("previewWindowLatest")}
+          <span className="previewWindowLabel">{t("previewWindowLatest")}</span>
           <ChevronDoubleRight size={12} aria-hidden="true" />
         </button>
       )}

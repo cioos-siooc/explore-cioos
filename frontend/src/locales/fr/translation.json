@@ -546,6 +546,7 @@
   "datasetPreviewPlotHideParams": "Masquer le panneau de réglages du graphique",
   "datasetPreviewPlotShowParams": "Afficher le panneau de réglages du graphique",
   "datasetPreviewPlotSettings": "Réglages du graphique",
+  "datasetPreviewPlotSettingsShort": "Réglages",
   "datasetPreviewPlotSelectAll": "Tout sélectionner",
   "datasetPreviewPlotSelectNone": "Tout désélectionner",
   "datasetPreviewPlotAddVariable": "Ajouter une variable",

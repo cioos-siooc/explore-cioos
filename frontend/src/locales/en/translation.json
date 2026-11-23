@@ -545,6 +545,7 @@
   "datasetPreviewPlotHideParams": "Hide the plot settings panel",
   "datasetPreviewPlotShowParams": "Show the plot settings panel",
   "datasetPreviewPlotSettings": "Plot settings",
+  "datasetPreviewPlotSettingsShort": "Settings",
   "datasetPreviewPlotSelectAll": "Select all",
   "datasetPreviewPlotSelectNone": "Clear all",
   "datasetPreviewPlotAddVariable": "Add variable",

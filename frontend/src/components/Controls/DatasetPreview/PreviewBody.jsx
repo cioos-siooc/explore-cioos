@@ -3,6 +3,9 @@ import { Suspense, lazy, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import { usePreviewPlot } from "./PreviewPlotProvider.jsx";
 import PreviewWindowPager from "./PreviewWindowPager.jsx";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
@@ -88,6 +91,8 @@ export default function PreviewBody({
   retryPreview,
 }) {
   const { t, i18n } = useTranslation();
+  // A phone pages the window from the dialog's header instead.
+  const mobile = useMediaQuery(MOBILE_QUERY);
   const {
     selectedVis,
     plan,
@@ -167,7 +172,7 @@ export default function PreviewBody({
   if (selectedVis === "table") {
     return (
       <>
-        <PreviewWindowPager />
+        {!mobile && <PreviewWindowPager />}
         <DatasetPreviewTable
           datasetPreview={datasetPreview}
           data={rows}
