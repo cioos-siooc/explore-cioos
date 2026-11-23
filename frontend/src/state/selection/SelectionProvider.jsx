@@ -696,7 +696,13 @@ export default function SelectionProvider({ children }) {
   // language change and fresh identities would refetch payloads up to 59 MB.
   // A record left with no dataset is cleaned up by setInspectDataset, not here,
   // or a cold shared link would lose its record before its dataset loads.
-  const inspectDatasetId = inspectDataset?.dataset_id;
+  // Until the catalogue resolves the dataset, a record link's own dataset id
+  // is enough to start /preview: the slowest leg of opening a shared plot is
+  // ERDDAP, and it need not wait behind the catalogue.
+  const inspectDatasetId =
+    inspectDataset?.dataset_id ??
+    (inspectRecordID ? searchParams.get("dataset") : null) ??
+    undefined;
   // Which profile INSIDE the record is drawn, and whether the colour plot wants
   // every profile in the window instead. Read here rather than in
   // usePreviewPlotParams: they change what is fetched, not how the rows are
