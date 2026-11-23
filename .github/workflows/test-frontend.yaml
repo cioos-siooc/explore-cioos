@@ -58,15 +58,31 @@ jobs:
           path: frontend/coverage/
           retention-days: 7
 
+  # The image must match @playwright/test exactly, and Dependabot only bumps
+  # package.json, so the tag is read from there.
+  playwright-version:
+    name: Playwright version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: frontend/package.json
+          sparse-checkout-cone-mode: false
+
+      - id: read
+        run: echo "version=$(jq -r '.devDependencies["@playwright/test"]' package.json)" >> "$GITHUB_OUTPUT"
+
   e2e:
     name: E2E and accessibility
+    needs: playwright-version
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      # Must match @playwright/test in frontend/package.json exactly; bump the
-      # two together. The same image as e2e/in-container.sh keeps a11y node
-      # counts reproducible.
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      # The same image as e2e/in-container.sh keeps a11y node counts
+      # reproducible.
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-noble
       # Chromium dies on the default 64MB /dev/shm.
       options: --ipc=host
     steps:
