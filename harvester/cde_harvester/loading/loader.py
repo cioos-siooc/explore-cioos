@@ -66,7 +66,7 @@ def parse_day_ranges(value):
 
 
 def prepare_profiles_dataframe(profiles):
-    profiles = profiles.replace("", np.NaN)
+    profiles = profiles.replace("", np.nan)
     # to_sql binds parameters, and psycopg2 adapts a list of strings as text[],
     # which PostgreSQL refuses for a daterange[] column; DateRange adapts.
     if "day_ranges" in profiles.columns:
