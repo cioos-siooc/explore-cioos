@@ -8,6 +8,7 @@
 import {
   idVariablesFor,
   isDownwardVertical,
+  isPresent,
   isTimeLike,
   measurementsOf,
   preferWithData,
@@ -21,13 +22,13 @@ import {
   EUCLIDEAN_DISTANCE_COLUMN,
   TOTAL_DISTANCE_TRAVELED_COLUMN,
 } from "./previewTrackDistance.js";
-import {
-  COLOR_LAYOUT,
-  PANELS_LAYOUT,
-} from "../../../state/selection/previewParams.js";
 
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
+
+// A colour list naming no column: every panel shaded by its own values, opted
+// into from the pane. `*` cannot occur in an ERDDAP variable name.
+export const SELF_COLOR = "*";
 
 const find = (variables, predicate) => (variables || []).find(predicate);
 
@@ -93,6 +94,20 @@ const TRACK_AXIS_COLUMNS = [
   TOTAL_DISTANCE_TRAVELED_COLUMN,
   EUCLIDEAN_DISTANCE_COLUMN,
 ];
+// Time or a track: the axes a record runs along.
+export const isAlongAxis = (variable) =>
+  Boolean(variable) &&
+  (TRACK_AXIS_COLUMNS.includes(variable.columnName) || isTimeLike(variable));
+
+// Several colour columns repeat the panels down when time or a track runs
+// across them (wide plots), across when a depth runs down them (tall ones),
+// otherwise as the cdm_data_type's layout says.
+export function colorRowsFor(plan, xVariables, yVariables) {
+  if (xVariables.some(isAlongAxis)) return true;
+  if (yVariables.some(isDownwardVertical)) return false;
+  return Boolean(plan && plan.colorRows);
+}
+
 const trackLeadingAxes = (variables) =>
   TRACK_AXIS_COLUMNS.map((columnName) =>
     find(variables, (variable) => variable.columnName === columnName),
@@ -109,8 +124,10 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // excluded from the panel set, so "variable 1 on x, the rest as panels" falls
 // out of pointing the shared axis at a measurement.
 //
-// `colorPlot` marks the records holding many profiles: a filled section needs
-// several of them side by side, and it is what they open on.
+// `colorRows` stacks several colour columns as rows of the panel grid rather
+// than columns when the axes drawn do not decide it (colorRowsFor). `section` opens a record of many profiles as a section: time
+// (else its track) across, depth down, shaded by its EOVs. `defaultMode` is the
+// plot type it opens in: a line joining a section's casts zigzags across it.
 const CDM_LAYOUTS = {
   Profile: {
     defaultPanelCount: 3,
@@ -124,7 +141,9 @@ const CDM_LAYOUTS = {
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
     leadingAxesFor: timeLeadingAxis,
-    colorPlot: true,
+    colorRows: true,
+    section: true,
+    defaultMode: "markers",
   },
   TrajectoryProfile: {
     defaultPanelCount: 3,
@@ -132,7 +151,9 @@ const CDM_LAYOUTS = {
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
     leadingAxesFor: trackLeadingAxes,
-    colorPlot: true,
+    colorRows: true,
+    section: true,
+    defaultMode: "markers",
   },
   TimeSeries: {
     defaultPanelCount: 3,
@@ -203,34 +224,6 @@ export function colorCandidatesFor(variables) {
   return [...coordinatesOf(variables), ...measurementsOf(variables)].filter(
     (variable) => variable.isNumeric || isTimeLike(variable),
   );
-}
-
-// The colour plot's X and Y when the link names neither: every panel draws Y
-// against X and is shaded by its own variable, so the two are the record's
-// "where" — time across (the track when there is none), depth down. A
-// profile's shared axis is already that depth, a stack's is already that time.
-export function colorPlotAxesFor(dataset, variables, plan) {
-  if (!plan) return { x: null, y: null };
-  const layout = layoutFor(dataset);
-  const panelDefaults = plan.panelDefaults || [];
-  if (plan.orientation === COLUMNS) {
-    const leading =
-      layout && layout.leadingAxesFor
-        ? layout.leadingAxesFor(variables).filter(Boolean)
-        : [];
-    const across = timeCoordinateOf(variables) || leading[0];
-    return { x: (across && across.columnName) || null, y: plan.sharedAxis };
-  }
-  const notTaken = (variable) =>
-    variable.columnName !== plan.sharedAxis &&
-    !panelDefaults.includes(variable.columnName);
-  const down =
-    verticalCoordinate(variables) ||
-    preferWithData(measurementsOf(variables).filter(notTaken))[0];
-  return {
-    x: plan.sharedAxis,
-    y: down && down.columnName !== plan.sharedAxis ? down.columnName : null,
-  };
 }
 
 // Where a measurement was taken, never what it measured. Excluded from the
@@ -393,9 +386,57 @@ export const PLOT_BLOCKED = {
   NO_MEASUREMENTS: "noMeasurements",
 };
 
+// Rows holding the column and at least one of the panels.
+const rowsSharedWith = (data, column, panels) =>
+  (data || []).filter(
+    (row) =>
+      isPresent(row[column]) && panels.some((panel) => isPresent(row[panel])),
+  ).length;
+
+// Read the same way as depth, so they win a tie.
+const METRE_LIKE_UNITS = new Set(["m", "dbar", "decibar"]);
+
+// A Slocum glider logs its navigation and its CTD on separate rows: depth on
+// one, temperature and pressure on the other. Drawn against a depth that never
+// shares a row with them, the panels hold no point, so the vertical column sharing the most rows with them stands in.
+// The vertical axis given when it already shares one, or nothing does better.
+export function colocatedVerticalFor(variables, data, vertical, panels) {
+  if (
+    !panels.length ||
+    !isDownwardVertical(find(variables, (v) => v.columnName === vertical)) ||
+    rowsSharedWith(data, vertical, panels)
+  ) {
+    return vertical;
+  }
+  let best = null;
+  let bestRows = 0;
+  (variables || []).forEach((variable) => {
+    if (
+      variable.columnName === vertical ||
+      panels.includes(variable.columnName) ||
+      !variable.isNumeric ||
+      !isDownwardVertical(variable)
+    ) {
+      return;
+    }
+    const rows = rowsSharedWith(data, variable.columnName, panels);
+    if (
+      rows > bestRows ||
+      (rows > 0 &&
+        rows === bestRows &&
+        METRE_LIKE_UNITS.has(variable.unit) &&
+        !METRE_LIKE_UNITS.has(best.unit))
+    ) {
+      best = variable;
+      bestRows = rows;
+    }
+  });
+  return best ? best.columnName : vertical;
+}
+
 // One walk, two readings: the plan when there is one, otherwise what stopped it.
 // Shared so the answer and the excuse can never disagree about what is missing.
-function planOrBlockerFor(dataset, variables, data) {
+function planOrBlockerFor(dataset, variables, data, oneProfile) {
   const columns = (variables || []).map((variable) => variable.columnName);
   const cdmDataType = (dataset && dataset.cdm_data_type) || "";
   const blocked = (code, rest) => ({
@@ -424,6 +465,46 @@ function planOrBlockerFor(dataset, variables, data) {
   );
   if (!panelDefaults.length) return blocked(PLOT_BLOCKED.NO_MEASUREMENTS);
 
+  const across =
+    layout.section &&
+    (timeCoordinateOf(variables) ||
+      layout.leadingAxesFor(variables).find(Boolean));
+  if (across) {
+    const colorDefaults = defaultPanelsFor(
+      dataset,
+      variables,
+      data,
+      across,
+      layout.defaultPanelCount,
+    ).filter((columnName) =>
+      colorCandidatesFor(variables).some(
+        (variable) => variable.columnName === columnName,
+      ),
+    );
+    // One cast of a section has no "across": it is drawn as a profile, each
+    // variable against depth, still shaded by the section's first colour.
+    if (oneProfile) {
+      return {
+        plan: {
+          ...planFrom(dataset, COLUMNS, shared, variables, panelDefaults),
+          colorDefaults: colorDefaults.slice(0, 1),
+        },
+      };
+    }
+    const down = colocatedVerticalFor(
+      variables,
+      data,
+      shared.columnName,
+      colorDefaults,
+    );
+    return {
+      plan: {
+        ...planFrom(dataset, ROWS, across, variables, [down]),
+        colorDefaults,
+      },
+    };
+  }
+
   return {
     plan: planFrom(
       dataset,
@@ -443,8 +524,10 @@ export function plotBlockerFor(dataset, variables, data) {
 // null when this record cannot be plotted — the caller shows the table, which is
 // what Grid and any unrecognised cdm_data_type get, and plotBlockerFor above
 // says which of the four reasons applied.
-export function facetPlanFor(dataset, variables, data) {
-  return planOrBlockerFor(dataset, variables, data).plan || null;
+// `oneProfile`: a single cast of a TimeSeriesProfile or TrajectoryProfile is
+// drawn, not the section.
+export function facetPlanFor(dataset, variables, data, { oneProfile } = {}) {
+  return planOrBlockerFor(dataset, variables, data, oneProfile).plan || null;
 }
 
 function planFrom(dataset, orientation, shared, variables, panelDefaults) {
@@ -459,6 +542,9 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
       (variable) => variable.columnName,
     ),
     panelDefaults,
+    colorDefaults: [],
+    colorRows: Boolean(layoutFor(dataset)?.colorRows),
+    defaultMode: layoutFor(dataset)?.defaultMode ?? null,
   };
 }
 
@@ -486,15 +572,3 @@ export function resolvePanels(panels, variables, excluded) {
 export function defaultVisFor(dataset) {
   return layoutFor(dataset) ? "plot" : "table";
 }
-
-export function hasColorPlotFor(dataset) {
-  return Boolean(layoutFor(dataset)?.colorPlot);
-}
-
-// The arrangement drawn: the link's when this record offers it, else the type's.
-export function plotLayoutFor(dataset, layoutParam) {
-  if (!hasColorPlotFor(dataset)) return PANELS_LAYOUT;
-  return layoutParam === PANELS_LAYOUT ? PANELS_LAYOUT : COLOR_LAYOUT;
-}
-
-export const defaultPlotLayoutFor = (dataset) => plotLayoutFor(dataset, null);

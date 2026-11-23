@@ -42,12 +42,6 @@ const Sentry = require("@sentry/node");
  *         name: limit
  *         schema: { type: integer, minimum: 1, maximum: 50000, default: 5000 }
  *         description: How many rows to draw at most.
- *       - in: query
- *         name: allProfiles
- *         schema: { type: boolean }
- *         description: >
- *           Every profile in the window rather than one: `at` is ignored, and a
- *           TimeSeriesProfile record that is one cast stands for its station.
  *     responses:
  *       200:
  *         description: >
@@ -70,7 +64,10 @@ const Sentry = require("@sentry/node");
  *       422:
  *         description: The dataset declares no CF role variable to constrain on.
  *       502:
- *         description: The upstream ERDDAP server failed or timed out.
+ *         description: >
+ *           The upstream ERDDAP server failed or timed out
+ *           (ERDDAP_UNAVAILABLE), or answered with more than the API holds
+ *           (ERDDAP_RESPONSE_TOO_LARGE).
  */
 
 const router = express.Router();
@@ -102,6 +99,11 @@ const constraintFor = (column, value) =>
     ? `${column}=${encodeURIComponent(value)}`
     : `${column}=~${encodeURIComponent(`"${escapeErddapRegex(value)}"`)}`;
 
+// A dataset with no id variable is one unnamed series: the record is the whole
+// dataset, so there is nothing to constrain on.
+const recordConstraint = (column, value) =>
+  column ? `&${constraintFor(column, value)}` : "";
+
 // Whether this record holds several profiles to step through. TimeSeriesProfile
 // and TrajectoryProfile set both id variables and the record is the outer one,
 // so the inner one is the step; a Profile record's own id is both, and a
@@ -113,6 +115,11 @@ const steppedRecord = (recordColumn, stepColumn) =>
 // both handlers bind it into FEATURE_SQL, which sizes its time window against it.
 const PREVIEW_ROW_LIMIT = 5000;
 const MAX_PREVIEW_ROW_LIMIT = 50000;
+
+// How much of one ERDDAP answer the API will hold in memory. A response past it
+// is cut off, which axios reports by this message rather than by a code.
+const MAX_ERDDAP_RESPONSE_BYTES = 100 * 1024 * 1024;
+const isOversized = (error) => /maxContentLength/.test(error.message ?? "");
 
 // Every profile of a record, past this, is more than a slider can address and
 // more than is worth sending: mpoSgdoADCP's longest record has 48166 of them,
@@ -150,7 +157,7 @@ ds AS (
 ),
 profile_feature AS (
   SELECT p.dataset_pk,
-         COALESCE(p.profile_id, p.timeseries_id) AS feature_id,
+         COALESCE(p.profile_id, p.timeseries_id, '') AS feature_id,
          p.time_min,
          p.time_max,
          p.n_records,
@@ -161,35 +168,11 @@ profile_feature AS (
           WHERE  lower(r) < params.before_day) AS data_end
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
-  WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
-),
--- Under allProfiles a cast record stands for its station, so the window below
--- is sized on the station: sized on the cast, it would fetch the whole station.
--- (No bind names in SQL comments: knex binds them there too.)
-station_feature AS (
-  SELECT f.dataset_pk,
-         f.station_id AS feature_id,
-         MIN(p.time_min) AS time_min,
-         MAX(p.time_max) AS time_max,
-         SUM(p.n_records) AS n_records,
-         -- Over elapsed days, not days with data: casts are days apart, so a
-         -- rate over cast days sizes a window holding one or two of them.
-         SUM(p.n_records)::double precision
-           / GREATEST(EXTRACT(EPOCH FROM MAX(p.time_max) - MIN(p.time_min))
-                        / 86400, 1) AS records_per_day,
-         NULL::text AS cast_id,
-         f.station_id,
-         MAX((SELECT MAX(upper(r)) FROM unnest(p.day_ranges) r, params
-              WHERE  lower(r) < params.before_day)) AS data_end
-  FROM   profile_feature f
-  JOIN   ds ON ds.pk = f.dataset_pk
-  JOIN   cde.profiles p
-         ON  p.dataset_pk    = f.dataset_pk
-         AND p.timeseries_id = f.station_id
-  WHERE  CAST(:WHOLE_STATION AS boolean)
-         AND ds.cdm_data_type = 'TimeSeriesProfile'
-         AND f.cast_id IS NOT NULL
-  GROUP  BY f.dataset_pk, f.station_id
+  -- An empty id names a dataset's one unnamed series, whichever way the
+  -- harvest stored it. A station id names every cast of a TimeSeriesProfile
+  -- harvested per cast: the record list keys it on its station.
+  WHERE  :profile IN (COALESCE(p.profile_id, p.timeseries_id, ''),
+                      p.timeseries_id)
 ),
 trajectory_feature AS (
   SELECT s.dataset_pk,
@@ -210,6 +193,50 @@ trajectory_feature AS (
   CROSS JOIN params
   WHERE  s.trajectory_id = :profile
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
+),
+-- A TimeSeriesProfile is stored per cast unless a station holds more than the
+-- harvester's cap (timeseries_profile.py), so its record id can be a cast or
+-- its station. Either stands for the whole station: one feature over all of
+-- the station's casts, so the window is sized from the station's cadence and
+-- the record constraint lands on the station.
+station_casts AS (
+  SELECT p.*
+  FROM   cde.profiles p
+  JOIN   ds ON ds.pk = p.dataset_pk
+  WHERE  ds.cdm_data_type = 'TimeSeriesProfile'
+    AND  p.profile_id IS NOT NULL
+    AND  p.timeseries_id IN (SELECT station_id FROM profile_feature
+                             WHERE  cast_id IS NOT NULL)
+),
+-- A cast is a single-day feature, harvested without day_ranges: its days are
+-- its time span.
+station_days AS (
+  SELECT DISTINCT day::date AS day
+  FROM   station_casts s,
+         unnest(
+           CASE WHEN coalesce(array_length(s.day_ranges, 1), 0) > 0
+                THEN s.day_ranges
+                ELSE ARRAY[daterange(s.time_min::date,
+                                     GREATEST(s.time_max::date,
+                                              s.time_min::date) + 1)]
+           END) r,
+         generate_series(lower(r), upper(r) - 1, interval '1 day') day
+),
+station_feature AS (
+  SELECT s.dataset_pk,
+         s.timeseries_id AS feature_id,
+         MIN(s.time_min) AS time_min,
+         MAX(s.time_max) AS time_max,
+         SUM(s.n_records) AS n_records,
+         SUM(s.n_records)::double precision
+           / GREATEST((SELECT COUNT(*) FROM station_days), 1)
+           AS records_per_day,
+         NULL::text AS cast_id,
+         s.timeseries_id AS station_id,
+         (SELECT MAX(day) + 1 FROM station_days, params
+          WHERE  day < params.before_day) AS data_end
+  FROM   station_casts s
+  GROUP  BY s.dataset_pk, s.timeseries_id
 ),
 feature AS (
   SELECT * FROM station_feature
@@ -236,13 +263,7 @@ SELECT ds.dataset_id,
        -- which is what decides whether a record has profiles to step through;
        -- a Profile record's own id is both, and a TimeSeries has none.
        ds.profile_id_variable AS step_variable,
-       -- A TimeSeriesProfile is stored per cast unless a station holds more
-       -- than the harvester's cap (timeseries_profile.py), so its record id can
-       -- be a cast. The constraint above is on the station, so constrain on the
-       -- cast's station and step to the cast itself.
-       CASE WHEN cast_record.is_cast THEN f.station_id ELSE f.feature_id END
-         AS profile_id,
-       CASE WHEN cast_record.is_cast THEN f.cast_id END AS record_step,
+       f.feature_id AS profile_id,
        f.n_records,
        -- Not a text cast, whose space and non-Z offset would go straight
        -- into an ERDDAP URL.
@@ -253,11 +274,6 @@ SELECT ds.dataset_id,
          OR f.n_records <= :NUM_RECORDS) AS use_whole_profile
 FROM   feature f
 JOIN   ds ON ds.pk = f.dataset_pk
-CROSS JOIN LATERAL (
-  SELECT ds.cdm_data_type = 'TimeSeriesProfile'
-         AND f.cast_id IS NOT NULL
-         AND f.station_id IS NOT NULL AS is_cast
-) cast_record
 CROSS JOIN params
 CROSS JOIN LATERAL (
   -- Where the window is sized back from: the newest row, or the requested
@@ -270,13 +286,28 @@ CROSS JOIN LATERAL (
                f.data_end::timestamp AT TIME ZONE 'UTC') AS window_end
 ) anchor
 CROSS JOIN LATERAL (
+  -- A station's casts each carry their row count, so its window reaches back
+  -- exactly far enough: a cadence averaged over its sampled days would size
+  -- a fortnightly station's window to a cast or two. The second before the
+  -- earliest cast keeps it inside ERDDAP's strict time> bound.
+  SELECT MIN(c.time_min) - interval '1 second' AS cast_start
+  FROM  (SELECT s.time_min,
+                SUM(s.n_records) OVER (ORDER BY s.time_max DESC)
+                  - s.n_records AS rows_after
+         FROM   station_casts s
+         WHERE  s.time_max <= anchor.window_end) c
+  WHERE  c.rows_after < :NUM_RECORDS
+) casts
+CROSS JOIN LATERAL (
   -- A zero or NULL cadence cannot size a window; it falls through to
   -- fetching the whole record.
-  SELECT CASE WHEN COALESCE(f.records_per_day, 0) > 0
-                THEN anchor.window_end
-                     - (interval '1 hour'
-                        * CEIL(:NUM_RECORDS / (f.records_per_day / 24)))
-         END AS new_start_time
+  SELECT COALESCE(
+           casts.cast_start,
+           CASE WHEN COALESCE(f.records_per_day, 0) > 0
+                  THEN anchor.window_end
+                       - (interval '1 hour'
+                          * CEIL(:NUM_RECORDS / (f.records_per_day / 24)))
+           END) AS new_start_time
 ) win
 LIMIT 1`;
 
@@ -285,7 +316,6 @@ const PREVIEW_CHECKS = [
   check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
   check("before").optional().isISO8601({ strict: true }),
   check("limit").optional().isInt({ min: 1, max: MAX_PREVIEW_ROW_LIMIT }),
-  check("allProfiles").optional().isIn(["true", "false"]),
 ];
 
 const rowLimitOf = (query) => Number(query.limit) || PREVIEW_ROW_LIMIT;
@@ -295,7 +325,6 @@ const rowLimitOf = (query) => Number(query.limit) || PREVIEW_ROW_LIMIT;
 // is the request actually running.
 async function resolvePreview(query) {
   const { dataset, profile, at, timeMin, timeMax, before } = query;
-  const allProfiles = query.allProfiles === "true";
 
   // NOTE: filtered by dataset_id alone, so a dataset_id published on two
   // ERDDAP servers resolves to whichever row sorts first.
@@ -303,7 +332,6 @@ async function resolvePreview(query) {
     profile,
     dataset,
     NUM_RECORDS: rowLimitOf(query),
-    WHOLE_STATION: allProfiles,
     BEFORE: before ?? null,
   });
 
@@ -326,10 +354,9 @@ async function resolvePreview(query) {
     profile_id,
     new_start_time,
     use_whole_profile,
-    record_step,
   } = record;
 
-  if (!profile_variable) {
+  if (!profile_variable && profile_id !== "") {
     return {
       refusal: {
         status: 422,
@@ -342,15 +369,10 @@ async function resolvePreview(query) {
     };
   }
 
-  const constraint = constraintFor(profile_variable, profile_id);
-  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?${recordConstraint(profile_variable, profile_id)}`;
   // `at` names one profile inside the record, to reach one OUTSIDE the tail
-  // window below, so the two are exclusive. A cast record with no `at` draws
-  // its own cast.
-  const step =
-    steppedRecord(profile_variable, step_variable) && !allProfiles
-      ? at || record_step
-      : null;
+  // window below, so the two are exclusive.
+  const step = steppedRecord(profile_variable, step_variable) ? at : null;
   const tailWindow = !step && !timeMin && !timeMax;
   const windowed = tailWindow && (!use_whole_profile || Boolean(before));
   if (step) {
@@ -404,8 +426,8 @@ router.get(
       const { data } = await axios.get(erddapQuery, {
         // use_whole_profile records can be tens of MB.
         timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024,
+        maxContentLength: MAX_ERDDAP_RESPONSE_BYTES,
+        maxBodyLength: MAX_ERDDAP_RESPONSE_BYTES,
       });
       console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
       if (!data?.table?.rows?.length) {
@@ -458,6 +480,18 @@ router.get(
           error: "NO_DATA",
           dataset: dataset_id,
           profile: profile_id,
+          erddapQuery,
+        });
+      }
+
+      // ERDDAP answered, with more rows than the harvested counts that sized
+      // the window predicted: the dataset's doing, not an outage.
+      if (isOversized(error)) {
+        console.warn("Preview response too large", erddapQuery);
+        return res.status(502).send({
+          error: "ERDDAP_RESPONSE_TOO_LARGE",
+          dataset: dataset_id,
+          upstreamStatus: null,
           erddapQuery,
         });
       }
@@ -543,9 +577,7 @@ router.get(
  *         description: >
  *           { column, steps: [{ value, time }], count, truncated }. `count` is
  *           always the true number of profiles; `steps` is every k-th of them
- *           once that passes 5000, with `truncated` saying so. `current` is
- *           the cast the record itself names (a TimeSeriesProfile harvested
- *           per cast), which /preview draws when no `at` is given; else null.
+ *           once that passes 5000, with `truncated` saying so.
  *       404:
  *         description: Unknown dataset or unknown record.
  *       422:
@@ -569,7 +601,6 @@ router.get(
       profile,
       dataset,
       NUM_RECORDS: PREVIEW_ROW_LIMIT,
-      WHOLE_STATION: false,
       BEFORE: null,
     });
 
@@ -586,10 +617,9 @@ router.get(
       cdm_data_type,
       erddap_url,
       profile_id,
-      record_step,
     } = rows.rows[0];
 
-    if (!profile_variable) {
+    if (!profile_variable && profile_id !== "") {
       return res.status(422).send({
         error: "NO_RECORD_ID_VARIABLE",
         dataset: dataset_id,
@@ -611,13 +641,13 @@ router.get(
         : `${step_variable},${TIME_COLUMN}`;
     const erddapQuery =
       `${erddap_url}/tabledap/${dataset_id}.json?${columns}` +
-      `&${constraintFor(profile_variable, profile_id)}&distinct()`;
+      `${recordConstraint(profile_variable, profile_id)}&distinct()`;
 
     try {
       const { data } = await axios.get(erddapQuery, {
         timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024,
+        maxContentLength: MAX_ERDDAP_RESPONSE_BYTES,
+        maxBodyLength: MAX_ERDDAP_RESPONSE_BYTES,
       });
 
       const names = data?.table?.columnNames || [];
@@ -645,7 +675,6 @@ router.get(
         steps,
         count: ordered.length,
         truncated,
-        current: record_step ?? null,
       });
     } catch (error) {
       const status = error.response?.status;

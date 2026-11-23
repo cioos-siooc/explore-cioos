@@ -102,7 +102,8 @@ async function buildShapeSql(
   }
 
   // One row per record, not per matched feature: a mission crossing 40 hexes
-  // is 40 `filtered` rows sharing one trajectory_id. profiles_count and the
+  // is 40 `filtered` rows sharing one trajectory_id, and a TimeSeriesProfile
+  // harvested per cast is its station's casts. profiles_count and the
   // estimate still count features.
   const recordsCte = `records AS (
         SELECT   dataset_pk,
@@ -115,7 +116,7 @@ async function buildShapeSql(
                    'eovs',       eovs
                  ) ORDER BY time_min DESC) AS profiles
         FROM     (SELECT   dataset_pk,
-                           coalesce(profile_id, timeseries_id) AS profile_id,
+                           coalesce(timeseries_id, profile_id) AS profile_id,
                            -- Explicit UTC: json_agg would use the session's
                            -- timezone offset.
                            to_char(min(time_min) AT TIME ZONE 'UTC',
@@ -132,7 +133,7 @@ async function buildShapeSql(
                   FROM     filtered
                   LEFT JOIN LATERAL unnest(filtered.feature_eovs) AS eov(name)
                          ON TRUE
-                  GROUP BY dataset_pk, coalesce(profile_id, timeseries_id)) r
+                  GROUP BY dataset_pk, coalesce(timeseries_id, profile_id)) r
         GROUP BY dataset_pk
   ),`;
 

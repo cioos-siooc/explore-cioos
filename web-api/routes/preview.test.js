@@ -135,6 +135,40 @@ test("422s NO_RECORD_ID_VARIABLE when the dataset declares no cf_role variable",
   assert.equal(axios.calls.length, 0);
 });
 
+test("previews a dataset with no cf_role variable as one unconstrained series", async () => {
+  db.queueRaw([{ ...FEATURE_ROW, profile_variable: null, profile_id: "" }]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2024-03-01"]] } },
+  });
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "" });
+  assert.equal(res.status, 200);
+  assert.equal(
+    axios.calls[0].url,
+    "https://erddap.example.com/erddap/tabledap/obs_270.json?",
+  );
+});
+
+test("constrains an unnamed series on its empty id", async () => {
+  db.queueRaw([
+    {
+      ...FEATURE_ROW,
+      cdm_data_type: "Trajectory",
+      profile_variable: "trajectory",
+      profile_id: "",
+    },
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2024-03-01"]] } },
+  });
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "" });
+  assert.equal(res.status, 200);
+  assert.match(axios.calls[0].url, /&trajectory=~%22%22$/);
+});
+
 test("404s NO_DATA when ERDDAP itself has nothing for the constraint", async () => {
   db.queueRaw([FEATURE_ROW]);
   axios.queueResponse({ data: { table: { columnNames: [], rows: [] } } });
@@ -175,6 +209,19 @@ test("502s ERDDAP_UNAVAILABLE for a genuine upstream failure", async () => {
   assert.equal(res.body.error, "ERDDAP_UNAVAILABLE");
   assert.equal(res.body.upstreamStatus, null);
   // So the UI can link the request that failed.
+  assert.equal(res.body.erddapQuery, axios.calls[0].url);
+});
+
+test("502s ERDDAP_RESPONSE_TOO_LARGE when ERDDAP sends past the size cap", async () => {
+  db.queueRaw([FEATURE_ROW]);
+  axios.queueError(new Error("maxContentLength size of 104857600 exceeded"));
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1" });
+
+  assert.equal(res.status, 502);
+  assert.equal(res.body.error, "ERDDAP_RESPONSE_TOO_LARGE");
   assert.equal(res.body.erddapQuery, axios.calls[0].url);
 });
 
@@ -313,15 +360,11 @@ test("without `at` the query is exactly what it always was", async () => {
   assert.ok(url.includes("time>2024-10-01T00:00:00Z"));
 });
 
-// A TimeSeriesProfile harvested per cast: the record id is a cast, resolved to
-// its station plus the cast as the default step.
-const CAST_ROW = {
-  ...STEPPED_ROW,
-  profile_id: "PMZA-VAS",
-  record_step: "PMZA-VAS-24/10/14-08:31:41",
-};
+// A TimeSeriesProfile harvested per cast: the record id is a cast, which
+// FEATURE_SQL answers as its whole station.
+const CAST_ROW = { ...STEPPED_ROW, profile_id: "PMZA-VAS" };
 
-test("a cast record without `at` draws its own cast at its station", async () => {
+test("a cast record draws its station's window, not the one cast", async () => {
   db.queueRaw([CAST_ROW]);
   axios.queueResponse({
     data: { table: { columnNames: ["depth"], rows: [[1]] } },
@@ -335,15 +378,11 @@ test("a cast record without `at` draws its own cast at its station", async () =>
   assert.equal(res.status, 200);
   const { url } = axios.calls[0];
   assert.ok(url.includes(`station_id=~${encodeURIComponent('"PMZA-VAS"')}`));
-  assert.ok(
-    url.includes(
-      `&profile=~${encodeURIComponent('"PMZA-VAS-24/10/14-08:31:41"')}`,
-    ),
-  );
-  assert.ok(!url.includes("time>"));
+  assert.ok(!url.includes("&profile=~"));
+  assert.ok(url.includes("time>2024-10-01T00:00:00Z"));
 });
 
-test("`at` wins over a cast record's own cast", async () => {
+test("`at` picks one cast of a cast record's station", async () => {
   db.queueRaw([CAST_ROW]);
   axios.queueResponse({
     data: { table: { columnNames: ["depth"], rows: [[1]] } },
@@ -357,95 +396,7 @@ test("`at` wins over a cast record's own cast", async () => {
 
   const { url } = axios.calls[0];
   assert.ok(url.includes(encodeURIComponent('"PMZA-VAS-24/10/10-14:01:41"')));
-  assert.ok(!url.includes(encodeURIComponent("24/10/14-08:31:41")));
-});
-
-// --- every profile in the window (the colour plot) ---------------------------
-
-// What FEATURE_SQL answers for CAST_ROW's record under allProfiles: the station.
-const WHOLE_STATION_ROW = {
-  ...CAST_ROW,
-  record_step: null,
-  n_records: 146972,
-};
-
-test("allProfiles sizes the record on the cast's station, not the cast", async () => {
-  db.queueRaw([WHOLE_STATION_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "PMZA-VAS-24/10/14-08:31:41",
-    allProfiles: "true",
-  });
-
-  assert.match(
-    db.queries[0],
-    /WHERE\s+CAST\(true AS boolean\)\s+AND ds\.cdm_data_type/,
-  );
-});
-
-test("without allProfiles the station stand-in is switched off", async () => {
-  db.queueRaw([CAST_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "PMZA-VAS-24/10/14-08:31:41",
-  });
-
-  assert.match(
-    db.queries[0],
-    /WHERE\s+CAST\(false AS boolean\)\s+AND ds\.cdm_data_type/,
-  );
-});
-
-test("allProfiles ignores `at` and a cast's own cast, keeping the tail window", async () => {
-  db.queueRaw([CAST_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "PMZA-VAS-24/10/14-08:31:41",
-    at: "PMZA-VAS-24/10/10-14:01:41",
-    allProfiles: "true",
-  });
-
-  const { url } = axios.calls[0];
-  assert.ok(url.includes(`station_id=~${encodeURIComponent('"PMZA-VAS"')}`));
-  assert.ok(!url.includes("&profile=~"));
-  assert.ok(url.includes("time>2024-10-01T00:00:00Z"));
-});
-
-test("allProfiles keeps a requested period", async () => {
-  db.queueRaw([STEPPED_ROW]);
-  axios.queueResponse({
-    data: { table: { columnNames: ["depth"], rows: [[1]] } },
-  });
-
-  await agent.get("/preview").query({
-    dataset: "mpoPmzaVikingCtdBinned",
-    profile: "AZMP-ESG",
-    allProfiles: "true",
-    timeMin: "2020-01-03T00:00:00Z",
-    timeMax: "2020-01-05T23:59:59Z",
-  });
-
-  assert.match(axios.calls[0].url, /&time>=2020-01-03T00:00:00\.000Z/);
-});
-
-test("rejects an allProfiles that is not true or false", async () => {
-  const res = await agent
-    .get("/preview")
-    .query({ dataset: "obs_270", profile: "1", allProfiles: "yes" });
-  assert.equal(res.status, 400);
-  assert.equal(axios.calls.length, 0);
+  assert.ok(!url.includes("time>"));
 });
 
 // --- how much of the request the rows are ------------------------------------
@@ -506,7 +457,7 @@ test("one cast cut at the row cap is counted from what ERDDAP sent", async () =>
 
 // --- /preview/profiles -------------------------------------------------------
 
-test("a cast record lists its station's casts and names its own as current", async () => {
+test("a cast record lists its station's casts", async () => {
   db.queueRaw([CAST_ROW]);
   axios.queueResponse({
     data: {
@@ -522,7 +473,8 @@ test("a cast record lists its station's casts and names its own as current", asy
     profile: "PMZA-VAS-24/10/14-08:31:41",
   });
 
-  assert.equal(res.body.current, "PMZA-VAS-24/10/14-08:31:41");
+  assert.equal(res.status, 200);
+  assert.equal(res.body.count, 1);
   assert.ok(
     axios.calls[0].url.includes(
       `station_id=~${encodeURIComponent('"PMZA-VAS"')}`,
@@ -552,7 +504,6 @@ test("lists a record's casts, earliest first, with their times", async () => {
   assert.equal(res.body.column, "profile");
   assert.equal(res.body.count, 2);
   assert.equal(res.body.truncated, false);
-  assert.equal(res.body.current, null);
   assert.deepEqual(res.body.steps, [
     { value: "cast-a", time: "2021-05-20T23:01:41Z" },
     { value: "cast-b", time: "2021-05-21T10:00:00Z" },

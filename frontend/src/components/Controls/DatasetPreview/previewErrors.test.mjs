@@ -17,6 +17,11 @@ test("each code the route sends is carried through", () => {
     ],
     [404, { error: "NO_DATA" }, PREVIEW_ERROR.NO_DATA],
     [502, { error: "ERDDAP_UNAVAILABLE" }, PREVIEW_ERROR.ERDDAP_UNAVAILABLE],
+    [
+      502,
+      { error: "ERDDAP_RESPONSE_TOO_LARGE" },
+      PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE,
+    ],
   ];
   cases.forEach(([status, body, code]) => {
     assert.equal(previewErrorFrom(status, body).code, code, body.error);

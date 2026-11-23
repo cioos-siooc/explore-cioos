@@ -218,7 +218,7 @@ test("the automatic choice is a name the picker can show, and agrees with the sc
   });
 });
 
-// --- the colour plot's per-variable scales, in a link ------------------------
+// --- per-variable colour scales, in a link -----------------------------------
 
 test("per-variable scales round-trip through the link", () => {
   const scales = { TE90_01: "KT_thermal", PSAL_01: "Cividis" };

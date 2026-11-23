@@ -143,6 +143,45 @@ describe("DatasetPreview", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("says how many of ERDDAP's rows are kept while it is queried", () => {
+      global.fetch = vi.fn(() => new Promise(() => {}));
+      open({
+        recordLoading: true,
+        previewQuery: "https://erddap.example.com/erddap/tabledap/d1.json",
+        url: "/?prows=20000",
+      });
+      expect(screen.getByTestId("preview-loading")).toHaveTextContent(
+        "CDE keeps up to 20,000 rows of ERDDAP's answer.",
+      );
+    });
+
+    it("blames ERDDAP for an oversized answer and offers fewer rows", async () => {
+      const { user } = open({
+        table: null,
+        previewError: { code: PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE },
+        url: "/?prows=20000",
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /data server \(ERDDAP\) sent more than 100 MB/,
+      );
+      await user.click(screen.getByRole("button", { name: "Load 5,000 rows" }));
+      await waitFor(() =>
+        expect(
+          new URLSearchParams(window.location.search).get("prows"),
+        ).toBeNull(),
+      );
+    });
+
+    it("has no fewer rows to offer below the default", () => {
+      open({
+        table: null,
+        previewError: { code: PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE },
+      });
+      expect(
+        screen.queryByRole("button", { name: /^Load|Retry/ }),
+      ).not.toBeInTheDocument();
+    });
+
     it("names why /preview came back with nothing", () => {
       open({ table: null, previewError: { code: PREVIEW_ERROR.NO_DATA } });
       expect(
@@ -328,26 +367,11 @@ describe("DatasetPreview", () => {
       open({
         table: STATION_TABLE,
         dataset: STATION,
-        url: "/?playout=panels",
+        url: "/",
         sample: { rowCount: 3, totalRowCount: 26131 },
       });
       expect(
         await screen.findByText("Sample: 2 of 335 profiles · 3 of 26,131 rows"),
-      ).toBeInTheDocument();
-    });
-
-    it("says the colour plot draws every profile in the window", async () => {
-      listsProfiles();
-      open({
-        table: STATION_TABLE,
-        dataset: STATION,
-        url: "/?playout=color",
-        sample: { rowCount: 3, totalRowCount: 26131 },
-      });
-      expect(
-        await screen.findByText(
-          "Sample: every profile in the latest 3 of 26,131 rows (2 of 335 profiles)",
-        ),
       ).toBeInTheDocument();
     });
 
@@ -356,7 +380,7 @@ describe("DatasetPreview", () => {
       open({
         table: STATION_TABLE,
         dataset: STATION,
-        url: "/?pstep=cast-1&playout=panels",
+        url: "/?pstep=cast-1",
         sample: { rowCount: 3, totalRowCount: 1500 },
       });
       await waitFor(() => expect(global.fetch).toHaveBeenCalled());
