@@ -10,6 +10,7 @@ import { usePreviewPlot } from "./PreviewPlotProvider.jsx";
 import PreviewWindowPager from "./PreviewWindowPager.jsx";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
 import { PREVIEW_ERROR } from "./previewErrors.js";
+import { ROW_LIMITS } from "../../../state/selection/previewParams.js";
 import {
   PlotErrorBoundary,
   PreviewFailure,
@@ -45,6 +46,7 @@ const RETRYABLE = new Set([
 const PREVIEW_ERROR_MESSAGES = {
   [PREVIEW_ERROR.NO_DATA]: "datasetPreviewErrorNoData",
   [PREVIEW_ERROR.ERDDAP_UNAVAILABLE]: "datasetPreviewErrorUnavailable",
+  [PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE]: "datasetPreviewErrorTooLarge",
   [PREVIEW_ERROR.NO_RECORD_ID_VARIABLE]: "datasetPreviewErrorNoRecordId",
   [PREVIEW_ERROR.RECORD_NOT_FOUND]: "datasetPreviewErrorNotFound",
   [PREVIEW_ERROR.NETWORK]: "datasetPreviewErrorNetwork",
@@ -88,7 +90,7 @@ export default function PreviewBody({
   previewQuery,
   retryPreview,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // A phone pages the window from the dialog's header instead.
   const mobile = useMediaQuery(MOBILE_QUERY);
   const {
@@ -100,6 +102,8 @@ export default function PreviewBody({
     plotData,
     profiles,
     availableHeight,
+    rowLimit,
+    setRowLimit,
   } = usePreviewPlot();
 
   // Two records of the same cdm_data_type genuinely differ here — one publisher
@@ -117,18 +121,33 @@ export default function PreviewBody({
       <PreviewLoading
         labelKeys={["previewStepRecord", ...profileStep]}
         query={previewQuery}
+        rowLimit={rowLimit}
       />
     );
   }
 
   if (!datasetPreview?.table?.rows) {
+    // The settings pane that picks the row count is not shown without rows, so
+    // the way back to a window ERDDAP can answer is offered here.
+    const fewerRows =
+      previewError?.code === PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE
+        ? ROW_LIMITS[ROW_LIMITS.indexOf(rowLimit) - 1]
+        : undefined;
+    let onRetry;
+    if (fewerRows) onRetry = () => setRowLimit(fewerRows);
+    else if (previewError && RETRYABLE.has(previewError.code)) {
+      onRetry = retryPreview;
+    }
     return (
       <PreviewFailure
         query={previewError?.erddapQuery}
-        onRetry={
-          previewError && RETRYABLE.has(previewError.code)
-            ? retryPreview
-            : undefined
+        onRetry={onRetry}
+        retryLabel={
+          fewerRows &&
+          t("previewLoadFewerRows", {
+            count: fewerRows,
+            rows: fewerRows.toLocaleString(i18n.language),
+          })
         }
         message={t(
           (previewError && PREVIEW_ERROR_MESSAGES[previewError.code]) ||

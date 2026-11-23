@@ -107,7 +107,7 @@ const PAIR = "~";
 const SEPARATOR = ",";
 
 /**
- * The colour plot's per-variable scales: 'TE90_01~KT_thermal,PSAL_01~Cividis'
+ * The per-variable colour scales: 'TE90_01~KT_thermal,PSAL_01~Cividis'
  * -> { TE90_01: 'KT_thermal', PSAL_01: 'Cividis' }. The same codec as
  * previewColors' `pcolors`, and the same rule: an unknown column or scale is
  * dropped, never defaulted.

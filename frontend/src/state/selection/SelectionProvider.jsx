@@ -31,8 +31,6 @@ import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { GROUP_SIZE_SORT } from "../datasetSort.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
-  COLOR_LAYOUT,
-  LAYOUT_PARAM,
   PERIOD_PARAM,
   BEFORE_PARAM,
   DEFAULT_ROW_LIMIT,
@@ -50,10 +48,6 @@ import {
   networkPreviewError,
   previewErrorFrom,
 } from "../../components/Controls/DatasetPreview/previewErrors.js";
-import {
-  hasColorPlotFor,
-  plotLayoutFor,
-} from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
 
 const SelectionContext = createContext();
 
@@ -172,7 +166,7 @@ export default function SelectionProvider({ children }) {
   // Seeded from the URL because a shared link arrives with the record open,
   // and true until the payload lands so the modal shows a spinner, not "no data".
   const [recordLoading, setRecordLoading] = useState(() =>
-    Boolean(initialParams.get(RECORD_PARAM)),
+    initialParams.has(RECORD_PARAM),
   );
   const [datasetPreview, setDatasetPreview] = useState();
   // Why the last /preview came back with nothing, or undefined when it did not.
@@ -386,7 +380,8 @@ export default function SelectionProvider({ children }) {
     [setSearchParams],
   );
 
-  const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined;
+  // "" is a record too: a dataset's one unnamed series.
+  const inspectRecordID = searchParams.get(RECORD_PARAM) ?? undefined;
   const periodParam = searchParams.get(PERIOD_PARAM) || undefined;
   const inspectRecordPeriod = useMemo(
     () => parsePeriod(periodParam),
@@ -400,10 +395,10 @@ export default function SelectionProvider({ children }) {
     (recordId, { replace = false, period } = {}) => {
       // Set before navigating so the modal never renders "no data" in the
       // frame before the fetch starts.
-      if (recordId) setRecordLoading(true);
+      if (recordId != null) setRecordLoading(true);
       setSearchParams(
         (previous) => {
-          if (!recordId) return withoutPreviewParams(previous);
+          if (recordId == null) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
           // A profile id belongs to the record it came from: carrying one to
@@ -701,20 +696,13 @@ export default function SelectionProvider({ children }) {
   // ERDDAP, and it need not wait behind the catalogue.
   const inspectDatasetId =
     inspectDataset?.dataset_id ??
-    (inspectRecordID ? searchParams.get("dataset") : null) ??
+    (inspectRecordID !== undefined ? searchParams.get("dataset") : null) ??
     undefined;
-  // Which profile INSIDE the record is drawn, and whether the colour plot wants
-  // every profile in the window instead. Read here rather than in
-  // usePreviewPlotParams: they change what is fetched, not how the rows are
-  // drawn, so they ride this fetch instead of a second one — one request, one
+  // Which profile INSIDE the record is drawn. Read here rather than in
+  // usePreviewPlotParams: it changes what is fetched, not how the rows are
+  // drawn, so it rides this fetch instead of a second one — one request, one
   // previewError, one recordLoading.
-  const inspectAllProfiles =
-    hasColorPlotFor(inspectDataset) &&
-    plotLayoutFor(inspectDataset, searchParams.get(LAYOUT_PARAM)) ===
-      COLOR_LAYOUT;
-  const inspectRecordStep = inspectAllProfiles
-    ? undefined
-    : searchParams.get(STEP_PARAM) || undefined;
+  const inspectRecordStep = searchParams.get(STEP_PARAM) || undefined;
   const inspectRowLimit = parseRowLimit(searchParams.get(ROWS_PARAM));
   // A step or a period already says which rows; /preview would ignore it.
   const inspectBefore =
@@ -723,7 +711,7 @@ export default function SelectionProvider({ children }) {
       : searchParams.get(BEFORE_PARAM) || undefined;
 
   useEffect(() => {
-    if (!inspectDatasetId || !inspectRecordID) return;
+    if (!inspectDatasetId || inspectRecordID === undefined) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setRecordLoading(true);
     const previewUrl =
@@ -732,7 +720,6 @@ export default function SelectionProvider({ children }) {
       (inspectRecordStep
         ? `&at=${encodeURIComponent(inspectRecordStep)}`
         : "") +
-      (inspectAllProfiles ? "&allProfiles=true" : "") +
       (inspectRowLimit !== DEFAULT_ROW_LIMIT
         ? `&limit=${inspectRowLimit}`
         : "") +
@@ -792,7 +779,6 @@ export default function SelectionProvider({ children }) {
     inspectRecordID,
     inspectDatasetId,
     inspectRecordStep,
-    inspectAllProfiles,
     inspectRecordPeriod,
     inspectRowLimit,
     inspectBefore,
@@ -833,7 +819,7 @@ export default function SelectionProvider({ children }) {
     // Both halves deliberately: recordLoading is seeded true by a shared link,
     // so ORing it would leave an empty modal open forever if the link's
     // dataset never resolves.
-    showPreviewModal: Boolean(inspectDataset && inspectRecordID),
+    showPreviewModal: Boolean(inspectDataset) && inspectRecordID !== undefined,
     previewError,
     previewQuery,
     retryPreview,

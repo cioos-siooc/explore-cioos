@@ -13,6 +13,7 @@ export const PREVIEW_ERROR = {
   NO_RECORD_ID_VARIABLE: "NO_RECORD_ID_VARIABLE",
   NO_DATA: "NO_DATA",
   ERDDAP_UNAVAILABLE: "ERDDAP_UNAVAILABLE",
+  ERDDAP_RESPONSE_TOO_LARGE: "ERDDAP_RESPONSE_TOO_LARGE",
   // Never sent by the route: the request did not arrive, or its answer did not.
   NETWORK: "NETWORK",
   // A failure nobody here has a sentence for. The generic message stays for it.
@@ -24,6 +25,7 @@ const SERVER_CODES = new Set([
   PREVIEW_ERROR.NO_RECORD_ID_VARIABLE,
   PREVIEW_ERROR.NO_DATA,
   PREVIEW_ERROR.ERDDAP_UNAVAILABLE,
+  PREVIEW_ERROR.ERDDAP_RESPONSE_TOO_LARGE,
 ]);
 
 /**

@@ -24,10 +24,7 @@ import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import usePreviewProfiles from "./usePreviewProfiles.js";
 import { previewSampleFor, previewWindowFor } from "./previewSample.js";
 import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
-import {
-  COLOR_LAYOUT,
-  DEFAULT_ROW_LIMIT,
-} from "../../../state/selection/previewParams.js";
+import { DEFAULT_ROW_LIMIT } from "../../../state/selection/previewParams.js";
 import "./styles.css";
 
 const NO_CUSTOM_LABELS = {};
@@ -67,31 +64,22 @@ export default function DatasetPreview({
   const mobile = useMediaQuery(MOBILE_QUERY);
   // Where the plot keeps its settings in a dialog rather than a pane beside it.
   const settingsInDialog = useMediaQuery(PREVIEW_COMPACT_QUERY);
-  const plotParams = usePreviewPlotParams(
-    inspectDataset,
-    datasetPreview?.table,
-    rows,
-  );
-  const {
-    selectedVis,
-    setSelectedVis,
-    linkKey,
-    plotLayout,
-    step,
-    before,
-    rowLimit,
-  } = plotParams;
-
   // Fetched separately from the rows and independent of them: a record whose
   // list fails simply gets no slider.
   const profiles = usePreviewProfiles(
     inspectDataset?.dataset_id,
     inspectRecordID,
   );
+  const plotParams = usePreviewPlotParams(
+    inspectDataset,
+    datasetPreview?.table,
+    rows,
+  );
+  const { selectedVis, setSelectedVis, linkKey, step, before, rowLimit } =
+    plotParams;
 
-  const drawsOneProfile =
-    plotLayout !== COLOR_LAYOUT && Boolean(step || profiles.current);
-  // Said beside the title, so the table and both plot layouts all say it.
+  const drawsOneProfile = Boolean(step);
+  // Said beside the title, so the table and the plot both say it.
   const sample = useMemo(
     () =>
       previewSampleFor({
@@ -166,6 +154,7 @@ export default function DatasetPreview({
       inspectDataset,
       inspectRecordID,
       profiles,
+      drawnProfileCount: sample?.profileCount ?? null,
       previewWindow,
       customLabels,
       setCustomLabels,
@@ -182,6 +171,7 @@ export default function DatasetPreview({
       inspectDataset,
       inspectRecordID,
       profiles,
+      sample,
       previewWindow,
       customLabels,
       paneWidth,
@@ -213,7 +203,7 @@ export default function DatasetPreview({
       centered
       aria-labelledby={TITLE_ID}
     >
-      {inspectDataset && inspectRecordID && (
+      {inspectDataset && inspectRecordID !== undefined && (
         <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && !mobile && (
@@ -242,17 +232,20 @@ export default function DatasetPreview({
                 title={inspectDataset.title}
               >
                 {inspectDataset.title}
-                {recordNamedBelow ? <span className="sr-only">:</span> : ":"}
+                {inspectRecordID &&
+                  (recordNamedBelow ? <span className="sr-only">:</span> : ":")}
               </span>{" "}
-              <i
-                className={
-                  recordNamedBelow
-                    ? "datasetPreviewRecord sr-only"
-                    : "datasetPreviewRecord"
-                }
-              >
-                {inspectRecordID}
-              </i>
+              {inspectRecordID && (
+                <i
+                  className={
+                    recordNamedBelow
+                      ? "datasetPreviewRecord sr-only"
+                      : "datasetPreviewRecord"
+                  }
+                >
+                  {inspectRecordID}
+                </i>
+              )}
               {inspectRecordPeriod && (
                 <span className="datasetPreviewPeriod">
                   {t("datasetPreviewPeriodText", inspectRecordPeriod)}
@@ -268,9 +261,7 @@ export default function DatasetPreview({
                   {t(
                     sample.profileCount === null
                       ? "datasetPreviewSampleRows"
-                      : plotLayout === COLOR_LAYOUT
-                        ? "datasetPreviewSampleAllProfiles" // the colour plot draws every profile it loaded
-                        : "datasetPreviewSampleProfiles",
+                      : "datasetPreviewSampleProfiles",
                     {
                       rows: formatCount(sample.rowCount),
                       totalRows: formatCount(sample.totalRowCount),

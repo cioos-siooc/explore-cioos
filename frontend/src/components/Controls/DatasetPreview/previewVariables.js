@@ -252,7 +252,7 @@ export function isDownwardVertical(variable) {
   );
 }
 
-const isPresent = (value) =>
+export const isPresent = (value) =>
   value !== null &&
   value !== undefined &&
   value !== "" &&
