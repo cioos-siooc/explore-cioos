@@ -150,6 +150,40 @@ export function createArcticCapLayer() {
   let indexBuffer;
   let indexCount;
   let disposed = false;
+  let textureRequested = false;
+
+  // On first sight of the globe, not on add: the flat map is the default and
+  // never shows the cap. On failure the cap keeps MapLibre's stretched edge.
+  function loadTexture(gl) {
+    textureRequested = true;
+    fetch(ARCTIC_CAP_URL)
+      .then((res) => res.blob())
+      .then((blob) => createImageBitmap(blob))
+      .then((image) => {
+        if (disposed) return;
+        texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          image,
+        );
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(
+          gl.TEXTURE_2D,
+          gl.TEXTURE_MIN_FILTER,
+          gl.LINEAR_MIPMAP_LINEAR,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        map.triggerRepaint();
+      })
+      .catch((e) => console.warn("EMODnet Arctic cap failed:", e));
+  }
 
   return {
     id: ARCTIC_CAP_LAYER_ID,
@@ -166,42 +200,17 @@ export function createArcticCapLayer() {
       indexBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
-
-      // On failure the cap keeps MapLibre's stretched edge, as before.
-      fetch(ARCTIC_CAP_URL)
-        .then((res) => res.blob())
-        .then((blob) => createImageBitmap(blob))
-        .then((image) => {
-          if (disposed) return;
-          texture = gl.createTexture();
-          gl.bindTexture(gl.TEXTURE_2D, texture);
-          gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            gl.RGBA,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
-            image,
-          );
-          gl.generateMipmap(gl.TEXTURE_2D);
-          gl.texParameteri(
-            gl.TEXTURE_2D,
-            gl.TEXTURE_MIN_FILTER,
-            gl.LINEAR_MIPMAP_LINEAR,
-          );
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          map.triggerRepaint();
-        })
-        .catch((e) => console.warn("EMODnet Arctic cap failed:", e));
     },
 
     render(gl, { shaderData, defaultProjectionData: projection }) {
       // Under mercator the cap lies above the world's top edge.
-      if (!texture || shaderData.variantName !== "globe") return;
+      if (shaderData.variantName !== "globe") return;
       const opacity = capOpacityAt(map.getZoom());
       if (opacity === 0) return;
+      if (!texture) {
+        if (!textureRequested) loadTexture(gl);
+        return;
+      }
 
       if (program?.variant !== shaderData.variantName) {
         program = {
