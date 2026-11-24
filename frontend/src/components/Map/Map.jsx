@@ -10,7 +10,6 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import * as helpers from "@turf/helpers";
 import turfPointsWithinPolygon from "@turf/points-within-polygon";
 
-import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
 import { useTranslation } from "react-i18next";
 import "./styles.css";
@@ -26,13 +25,10 @@ import {
   generateColorStops,
   getCurrentRangeLevel,
   mapCoverPadding,
-  polygonIsRectangle,
   viewportCountRange,
   rangesEqual,
   revealOffset,
   zoomToDatasetCamera,
-  splitTrackRuns,
-  initialBearing,
   withAlpha,
 } from "../../utilities";
 import {
@@ -89,6 +85,7 @@ import {
   isGriddapHit,
   isOnAPointIn,
   loadTurfUnion,
+  nearestFeature,
   selectedTrackLayers,
   trackClickLayers,
   trackItemsIn,
@@ -96,198 +93,13 @@ import {
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
+import { selectedTrackFeatures } from "./selectedTrack.js";
 import { selectionLayerFilter } from "./selectionFilter.js";
 import { createTileRetry } from "./tileRetry.js";
-import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
+import { drawControlOptions } from "./drawControl.js";
 
 // maplibre 6 can't find its worker from inside a bundle.
 setWorkerUrl(maplibreWorkerUrl);
-
-// Captured before the overrides below replace them.
-const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
-const defaultDirectSelectToDisplayFeatures =
-  MapboxDraw.modes.direct_select.toDisplayFeatures;
-
-// mapbox-gl-draw strips a rectangle's closing point; polygonIsRectangle
-// expects a closed 5-point ring.
-function isRectangleFeature(feature) {
-  const ring = feature?.type === "Polygon" && feature.coordinates?.[0];
-  return (
-    Boolean(ring) && ring.length === 4 && polygonIsRectangle([...ring, ring[0]])
-  );
-}
-
-// Hides vertex/midpoint handles for a merely-selected shape; a second click
-// enters direct_select, whose default toDisplayFeatures draws them.
-const disabledEvent = function (state, geojson, display) {
-  display(geojson);
-};
-
-const modes = MapboxDraw.modes;
-MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
-
-// Keeps a drawn box an axis-aligned rectangle: a single-corner drag also
-// slides its two adjacent corners along their shared axes, leaving the
-// opposite corner as the anchor. Anything else keeps the library behaviour.
-modes.direct_select.dragVertex = function (state, e, delta) {
-  const path = state.selectedCoordPaths[0];
-  if (
-    state.selectedCoordPaths.length !== 1 ||
-    !isRectangleFeature(state.feature)
-  ) {
-    defaultDragVertex.call(this, state, e, delta);
-    return;
-  }
-  const [ringIndex, index] = path.split(".").map((x) => parseInt(x, 10));
-  const oldCoord = state.feature.getCoordinate(path);
-  const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat];
-  [(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-    const neighborPath = `${ringIndex}.${neighborIndex}`;
-    const neighborOld = state.feature.getCoordinate(neighborPath);
-    if (neighborOld[0] === oldCoord[0]) {
-      state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1]);
-    } else {
-      state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1]);
-    }
-  });
-  state.feature.updateCoordinate(path, newCoord[0], newCoord[1]);
-};
-
-// A spatial filter can only be resized from its handles, never moved
-// wholesale; dragMoveLocation is still tracked so a later handle-drag in the
-// same gesture doesn't jump.
-modes.direct_select.dragFeature = function (state, e) {
-  state.dragMoveLocation = e.lngLat;
-};
-
-// A midpoint would add a 5th vertex and break a rectangle's 4 corners.
-modes.direct_select.toDisplayFeatures = function (state, geojson, push) {
-  if (
-    state.featureId === geojson.properties.id &&
-    isRectangleFeature(state.feature)
-  ) {
-    defaultDirectSelectToDisplayFeatures.call(
-      this,
-      state,
-      geojson,
-      (feature) => {
-        if (feature.properties?.meta === "midpoint") return;
-        push(feature);
-      },
-    );
-    return;
-  }
-  defaultDirectSelectToDisplayFeatures.call(this, state, geojson, push);
-};
-
-// Keep a drawn shape "active" rather than exiting to simple_select's plain
-// look when clicking empty water or another feature.
-modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
-modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
-
-modes.draw_polygon = withPolygonHint(MapboxDraw.modes.draw_polygon);
-modes.draw_rectangle = withBoxHint(DrawRectangle);
-
-const drawControlOptions = {
-  displayControlsDefault: false,
-  // Driven imperatively from the top bar (see the drawRequest effect).
-  controls: {
-    point: false,
-    line_string: false,
-    polygon: false,
-    trash: false,
-    combine_features: false,
-    uncombine_features: false,
-    modes,
-    pitchWithRotate: false,
-    dragRotate: false,
-    touchZoomRotate: false,
-  },
-  styles: [
-    {
-      id: "gl-draw-polygon-fill",
-      type: "fill",
-      filter: ["all", ["==", "$type", "Polygon"]],
-      paint: {
-        // One colour selected or not: a searched place rests unselected.
-        "fill-color": "#fbb03b",
-        "fill-opacity": 0.1,
-      },
-    },
-    {
-      id: "gl-draw-lines",
-      type: "line",
-      filter: [
-        "any",
-        ["==", "$type", "LineString"],
-        ["==", "$type", "Polygon"],
-      ],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "#fbb03b",
-        "line-dasharray": ["literal", [0.2, 2]],
-        "line-width": 2,
-      },
-    },
-    {
-      id: "gl-draw-point-outer",
-      type: "circle",
-      filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
-      paint: {
-        "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
-        "circle-color": "#fff",
-      },
-    },
-    {
-      id: "gl-draw-point-inner",
-      type: "circle",
-      filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
-      paint: {
-        "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
-        "circle-color": [
-          "case",
-          ["==", ["get", "active"], "true"],
-          "#fbb03b",
-          "#3bb2d0",
-        ],
-      },
-    },
-    {
-      id: "gl-draw-vertex-outer",
-      type: "circle",
-      filter: [
-        "all",
-        ["==", "$type", "Point"],
-        ["==", "meta", "vertex"],
-        ["!=", "mode", "simple_select"],
-      ],
-      paint: {
-        "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
-        "circle-color": "#fff",
-      },
-    },
-    {
-      id: "gl-draw-vertex-inner",
-      type: "circle",
-      filter: [
-        "all",
-        ["==", "$type", "Point"],
-        ["==", "meta", "vertex"],
-        ["!=", "mode", "simple_select"],
-      ],
-      paint: {
-        "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
-        "circle-color": "#fbb03b",
-      },
-    },
-    {
-      id: "gl-draw-midpoint",
-      type: "circle",
-      filter: ["all", ["==", "meta", "midpoint"]],
-      paint: { "circle-radius": 3, "circle-color": "#fbb03b" },
-    },
-  ],
-};
 
 // A debounce, not a throttle: one measurement at the end of a gesture, so a
 // hesitant pan doesn't renumber the legend halfway through.
@@ -421,6 +233,25 @@ const griddapLayerIds = [
 const bathymetryLayerIds = ["bathymetry-nonna", "bathymetry-nonna-hillshade"];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
+
+// A share link routinely resolves before the style adds a source, and nothing
+// else re-runs the effect, so `fn` waits for the load. Registered from an
+// effect, so it runs after the mount's handler that adds the sources.
+function whenSource(map, sourceId, fn) {
+  if (map.getSource(sourceId)) {
+    fn(map.getSource(sourceId));
+    return () => {};
+  }
+  const retry = () => fn(map.getSource(sourceId));
+  map.once("style.load", retry);
+  // Evented.off clears once-listeners too.
+  return () => map.off("style.load", retry);
+}
+
+const boundsOfFeatures = (features) =>
+  boundsFromGeoJson({
+    coordinates: features.map((feature) => feature.geometry.coordinates),
+  });
 
 const TRACK_HEAD_HAS_COURSE = ["has", "cog"];
 // Hidden outside a drawn shape, as the dataset list leaves them out: they can't
@@ -1782,218 +1613,110 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapQueryString, scrubTime, trailingDays]);
 
-  // Drawn clipped to the time filter, and framed only when the selection asks.
+  // Framed only when the selection asks.
   useEffect(() => {
+    if (!map.current) return undefined;
     // Picking a second platform mid-fetch is routine from the map, so the
     // in-flight request is abandoned rather than landing under the newer name.
     const abortController = new AbortController();
-    let superseded = false;
-
-    async function renderSelectedTrack() {
-      if (!map.current) return;
-      // A share link's ?track= routinely resolves before the style adds the
-      // source, and nothing else re-runs this effect, so wait for the load.
-      // Registered from here so it runs after the handler that adds the
-      // sources.
-      if (!map.current.getSource("selected-track")) {
-        map.current.once("style.load", renderSelectedTrack);
-        return;
-      }
-      const source = map.current.getSource("selected-track");
-
-      if (!selectedTrajectory) {
-        rawTrackRef.current = null;
-        // Forgotten so re-picking the same platform frames it again.
-        framedTrackRef.current = null;
-        source.setData({ type: "FeatureCollection", features: [] });
-        applyTrackFocus();
-        return;
-      }
-
-      const { datasetPk, trajectoryId } = selectedTrajectory;
-      const cacheKey = `${datasetPk}|${trajectoryId}`;
-      if (rawTrackRef.current?.key !== cacheKey) {
-        let track;
-        try {
-          const response = await fetch(
-            `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`,
-            { signal: abortController.signal },
-          );
-          if (!response.ok) return;
-          track = await response.json();
-        } catch (error) {
-          reportError("track fetch failed", error);
+    const cancelWait = whenSource(
+      map.current,
+      "selected-track",
+      async (source) => {
+        if (!selectedTrajectory) {
+          rawTrackRef.current = null;
+          // Forgotten so re-picking the same platform frames it again.
+          framedTrackRef.current = null;
+          source.setData(emptyFeatureCollection);
+          applyTrackFocus();
           return;
         }
-        if (superseded) return;
-        rawTrackRef.current = {
-          key: cacheKey,
-          coordinates: track.coordinates,
-          times: track.times,
-          // null per fix for a plain Trajectory dataset; only TrajectoryProfile
-          // fixes are records with an id.
-          profileIds: track.profile_ids,
-        };
-      }
-      const rawCoordinates = rawTrackRef.current.coordinates || [];
-      const rawTimes = rawTrackRef.current.times || [];
-      const rawProfileIds = rawTrackRef.current.profileIds;
-
-      // Clipped to the time filter so the track agrees with every count on the
-      // page; the full response stays cached. The response is time-ordered, so
-      // the window is one contiguous slice. A missing fix time stops the walk
-      // rather than clipping, so a track without times draws whole.
-      const { min: windowMin, max: windowMax } =
-        filterTimeWindow(mapQueryString);
-      let from = 0;
-      let to = rawCoordinates.length;
-      if (windowMin !== undefined) {
-        while (from < to && Date.parse(rawTimes[from]) < windowMin) from++;
-      }
-      if (windowMax !== undefined) {
-        while (to > from && Date.parse(rawTimes[to - 1]) > windowMax) to--;
-      }
-      const coordinates = rawCoordinates.slice(from, to);
-      const times = rawTimes.slice(from, to);
-      const profileIds = rawProfileIds?.slice(from, to);
-
-      // Draw nothing rather than leaving the last selection's track on screen.
-      if (coordinates.length === 0) {
-        source.setData(emptyFeatureCollection);
+        const { datasetPk, trajectoryId } = selectedTrajectory;
+        const cacheKey = `${datasetPk}|${trajectoryId}`;
+        if (rawTrackRef.current?.key !== cacheKey) {
+          try {
+            const track = await fetchJson(
+              `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`,
+              { signal: abortController.signal },
+            );
+            if (abortController.signal.aborted) return;
+            rawTrackRef.current = {
+              key: cacheKey,
+              coordinates: track.coordinates,
+              times: track.times,
+              // null per fix for a plain Trajectory dataset; only
+              // TrajectoryProfile fixes are records with an id.
+              profileIds: track.profile_ids,
+            };
+          } catch (error) {
+            if (error.name !== "AbortError") {
+              reportError("track fetch failed", error);
+            }
+            return;
+          }
+        }
+        // The full response stays cached; only the drawing is clipped. An empty
+        // window draws nothing rather than leaving the last selection on screen.
+        const features = selectedTrackFeatures(
+          rawTrackRef.current,
+          filterTimeWindow(mapQueryString),
+          selectedTrajectory,
+        );
+        source.setData({ type: "FeatureCollection", features });
         applyTrackFocus();
-        return;
-      }
 
-      // Same segmentation rule as the /tiles/tracks layer.
-      const runs = splitTrackRuns(coordinates, times);
-      const lineFeatures = runs
-        .filter((run) => run.length >= 2)
-        .map((run) => ({
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: run,
-          },
-          properties: {},
-        }));
-      // Bearings never span run breaks (a data gap or the antimeridian); cog
-      // stays unset for a single-fix run, which the -nocog circle layer picks
-      // up. The running cursor recovers each point's fix time, since runs
-      // partition the clipped coordinates in order.
-      let fixIndex = 0;
-      const fixFeatures = runs.flatMap((run) => {
-        let lastCog = null;
-        return run.map((coordinate, i) => {
-          const time = times[fixIndex];
-          const profileId = profileIds?.[fixIndex];
-          fixIndex++;
-          const cog =
-            i > 0
-              ? initialBearing(run[i - 1], coordinate)
-              : run.length > 1
-                ? initialBearing(coordinate, run[1])
-                : null;
-          if (cog !== null) lastCog = cog;
-          return {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: coordinate },
-            properties: {
-              ...(lastCog === null ? {} : { cog: lastCog }),
-              ...(profileId ? { profile_id: profileId } : {}),
-              time,
-              trajectory_id: trajectoryId,
-              dataset_title: selectedTrajectory.datasetTitle,
-            },
-          };
-        });
-      });
-      source.setData({
-        type: "FeatureCollection",
-        features: [...lineFeatures, ...fixFeatures],
-      });
-
-      applyTrackFocus();
-
-      // A track clicked on the map is already under the cursor, so flying out
-      // to the whole voyage would throw away the view; only a list pick asks to
-      // frame.
-      if (!selectedTrajectory.frameView) return;
-      // Once per selection: this re-runs as the time rail drags.
-      if (framedTrackRef.current === cacheKey) return;
-      framedTrackRef.current = cacheKey;
-
-      const longitudes = coordinates.map((c) => c[0]);
-      const latitudes = coordinates.map((c) => c[1]);
-      revealBounds(
-        [
-          [Math.min(...longitudes), Math.min(...latitudes)],
-          [Math.max(...longitudes), Math.max(...latitudes)],
-        ],
-        { frame: true },
-      );
-    }
-    renderSelectedTrack();
+        // A track clicked on the map is already under the cursor, so flying out
+        // to the whole voyage would throw away the view; only a list pick asks
+        // to frame. Once per selection: this re-runs as the time rail drags.
+        if (!features.length || !selectedTrajectory.frameView) return;
+        if (framedTrackRef.current === cacheKey) return;
+        framedTrackRef.current = cacheKey;
+        revealBounds(boundsOfFeatures(features), { frame: true });
+      },
+    );
     return () => {
-      superseded = true;
       abortController.abort();
-      // Including a pending 'style.load' retry (Evented.off clears
-      // once-listeners).
-      map.current?.off("style.load", renderSelectedTrack);
+      cancelWait();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
 
   useEffect(() => {
+    if (!map.current) return undefined;
     const abortController = new AbortController();
-
-    async function renderMappedRecord() {
-      if (!map.current) return;
-      // A share link resolves before the style has added the source.
-      const source = map.current.getSource("mapped-record");
-      if (!source) {
-        map.current.once("style.load", renderMappedRecord);
-        return;
-      }
-      source.setData(emptyFeatureCollection);
-      if (!mappedRecord) return;
-
-      const { datasetPk, recordId, frameView } = mappedRecord;
-      let coordinates;
-      try {
-        ({ coordinates } = await fetchJson(
-          `${server}/datasetRecordsList/location?datasetPKs=${datasetPk}&recordId=${encodeURIComponent(recordId)}`,
-          { signal: abortController.signal },
-        ));
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          reportError("record location fetch failed", error);
+    const cancelWait = whenSource(
+      map.current,
+      "mapped-record",
+      async (source) => {
+        source.setData(emptyFeatureCollection);
+        if (!mappedRecord) return;
+        const { datasetPk, recordId, frameView } = mappedRecord;
+        let coordinates;
+        try {
+          ({ coordinates } = await fetchJson(
+            `${server}/datasetRecordsList/location?datasetPKs=${datasetPk}&recordId=${encodeURIComponent(recordId)}`,
+            { signal: abortController.signal },
+          ));
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            reportError("record location fetch failed", error);
+          }
+          return;
         }
-        return;
-      }
-      if (!coordinates.length) return;
-      source.setData({
-        type: "FeatureCollection",
-        features: coordinates.map((coordinate) => ({
+        if (!coordinates.length) return;
+        const features = coordinates.map((coordinate) => ({
           type: "Feature",
           geometry: { type: "Point", coordinates: coordinate },
           properties: {},
-        })),
-      });
-      if (!frameView) return;
-      const longitudes = coordinates.map((c) => c[0]);
-      const latitudes = coordinates.map((c) => c[1]);
-      revealBounds(
-        [
-          [Math.min(...longitudes), Math.min(...latitudes)],
-          [Math.max(...longitudes), Math.max(...latitudes)],
-        ],
-        { frame: true },
-      );
-    }
-    renderMappedRecord();
+        }));
+        source.setData({ type: "FeatureCollection", features });
+        if (frameView)
+          revealBounds(boundsOfFeatures(features), { frame: true });
+      },
+    );
     return () => {
       abortController.abort();
-      map.current?.off("style.load", renderMappedRecord);
+      cancelWait();
     };
   }, [mappedRecord]);
 
@@ -3007,27 +2730,9 @@ export default function CreateMap({
       );
       const tracks = trackItemsIn(hits);
 
-      // The wide invisible hit stroke means one click commonly hits several
-      // nearby stations, so pick the one whose true position is nearest the
-      // cursor. Deduped by pk: a station straddling a tile boundary hits twice.
-      let nearestMarker = null;
-      if (markerHits.length > 0) {
-        const seenPks = new Set();
-        let nearestDistSq = Infinity;
-        markerHits.forEach((feature) => {
-          const pk = feature.properties.pk;
-          if (seenPks.has(pk)) return;
-          seenPks.add(pk);
-          const projected = map.current.project(feature.geometry.coordinates);
-          const dx = projected.x - e.point.x;
-          const dy = projected.y - e.point.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < nearestDistSq) {
-            nearestDistSq = distSq;
-            nearestMarker = feature;
-          }
-        });
-      }
+      const nearestMarker = nearestFeature(markerHits, e.point, (lngLat) =>
+        map.current.project(lngLat),
+      );
 
       // Only markers under the click, and the nearest names one dataset: jump
       // straight to its record.
