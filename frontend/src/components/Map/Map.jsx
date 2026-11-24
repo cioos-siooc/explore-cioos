@@ -5,7 +5,13 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+} from "react";
 
 import debounce from "lodash-es/debounce";
 import { useTranslation } from "react-i18next";
@@ -130,11 +136,9 @@ const boundsOfFeatures = (features) =>
     coordinates: features.map((feature) => feature.geometry.coordinates),
   });
 
-// The eslint-disable react-hooks/exhaustive-deps comments below: effects call
-// helpers rebuilt on every render (the component re-renders on every map
-// move), so listing them would re-issue map commands continuously. The real
-// fix is making the helpers stable with useCallback; until then each site is
-// marked individually so new effects are still checked.
+// Effects that drive the map run their body as an effect event: the helpers
+// they call are rebuilt on every render (the map re-renders on every move),
+// and listing them as deps would re-issue map commands continuously.
 export default function CreateMap({
   mapQueryString,
   polygon,
@@ -442,10 +446,10 @@ export default function CreateMap({
     [depthProbe],
   );
 
-  useEffect(() => {
+  const repaintRamp = useEffectEvent(() => {
     setColorStops();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeLevels, coverageRangeLevels]);
+  });
+  useEffect(() => repaintRamp(), [rangeLevels, coverageRangeLevels]);
 
   function deleteAllShapes() {
     drawPolygon.current?.deleteAll();
@@ -847,7 +851,7 @@ export default function CreateMap({
 
   // The sole writer of griddap-highlight: a second writer in the overlay
   // effect ran later in the same commit and wiped the open grid's box.
-  useEffect(() => {
+  const applyDatasetFocus = useEffectEvent(() => {
     if (map.current) {
       const focusedDataset = hoveredDataset || inspectDataset;
       // The ramp follows the open page only: rescaling per hovered row would
@@ -872,8 +876,11 @@ export default function CreateMap({
       // and clearing a focus has no later event to ride in on.
       applyTrackFocus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoveredDataset, inspectDataset, activeWmsOverlay]);
+  });
+  useEffect(
+    () => applyDatasetFocus(),
+    [hoveredDataset, inspectDataset, activeWmsOverlay],
+  );
 
   useEffect(() => {
     const source = map.current?.getSource("griddap-coverage");
@@ -882,18 +889,18 @@ export default function CreateMap({
 
   // Owns the hex and point layers only; the ref keeps the choice through a WMS
   // overlay.
-  useEffect(() => {
+  const showObservationLayers = useEffectEvent(() => {
     if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(observationLayerIds, dataLayersVisible);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataLayersVisible]);
+  });
+  useEffect(() => showObservationLayers(), [dataLayersVisible]);
 
   // The ref keeps the choice through a WMS overlay, which hides the depth wash.
-  useEffect(() => {
+  const showBathymetry = useEffectEvent(() => {
     if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(bathymetryLayerIds, bathymetryVisible);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bathymetryVisible]);
+  });
+  useEffect(() => showBathymetry(), [bathymetryVisible]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -938,7 +945,7 @@ export default function CreateMap({
     map.current.triggerRepaint();
   }, [featureQueryRequest]);
 
-  useEffect(() => {
+  const followDrawRequest = useEffectEvent(() => {
     if (!drawRequest || !map.current) return;
     if (drawRequest.mode === "clear") {
       endDrawing();
@@ -961,14 +968,14 @@ export default function CreateMap({
     drawPolygon.current.changeMode(
       drawRequest.mode === "box" ? "draw_rectangle" : "draw_polygon",
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawRequest]);
+  });
+  useEffect(() => followDrawRequest(), [drawRequest]);
 
   useEffect(() => {
     if (tileRetryRequest) tileRetry.retryExhausted();
   }, [tileRetryRequest, tileRetry]);
 
-  useEffect(() => {
+  const showWmsOverlay = useEffectEvent(() => {
     if (!map.current) return;
     removeWmsOverlay();
     if (!activeWmsOverlay) {
@@ -986,8 +993,8 @@ export default function CreateMap({
       revealBounds(boundsFromGeoJson(activeWmsOverlay.bbox), { frame: true });
     }
     return () => removeWmsOverlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWmsOverlay, polygon]);
+  });
+  useEffect(() => showWmsOverlay(), [activeWmsOverlay, polygon]);
 
   useEffect(() => {
     applySelectionFilter();
@@ -996,8 +1003,6 @@ export default function CreateMap({
   // A ref so replaying it can't be re-triggered by a later render.
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
 
-  // Written after commit so a render React throws away never leaks into them;
-  // layout effects run before every effect and map event that reads them.
   useLayoutEffect(() => {
     latest.current = {
       activeWmsOverlay,
@@ -1028,7 +1033,7 @@ export default function CreateMap({
     };
   });
 
-  useEffect(() => {
+  const enterDepthTool = useEffectEvent(() => {
     if (!depthToolActive) return undefined;
     popup.remove();
     const canvas = map.current?.getCanvas();
@@ -1041,8 +1046,8 @@ export default function CreateMap({
       window.removeEventListener("keydown", exitOnEscape);
       if (canvas) canvas.style.cursor = "grab";
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depthToolActive]);
+  });
+  useEffect(() => enterDepthTool(), [depthToolActive]);
 
   // /tiles and /tiles/cells split the zoom range for the same selection and
   // take the same params, so the hex switch can't leave trajectory counts in
@@ -1058,33 +1063,36 @@ export default function CreateMap({
     };
   }
 
-  useEffect(() => {
+  const reloadForQuery = useEffectEvent(() => {
     if (!reloadHexTiles()) return;
     setLoading(true);
     setPolygon(
       drawPolygon.current.getAll().features[0]?.geometry.coordinates[0],
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapQueryString]);
+  });
+  useEffect(() => reloadForQuery(), [mapQueryString]);
 
   // The track tiles carry trajectoryTypes too, so they refetch here, or a
   // switched-off geometry's lines would linger until the next scrub.
-  useEffect(() => {
+  const reloadForDataLayers = useEffectEvent(() => {
     if (!reloadHexTiles()) return;
     reloadTrackTiles();
     applyLayerVisibility();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataLayers]);
+  });
+  useEffect(() => reloadForDataLayers(), [dataLayers]);
 
   // Track lines come from their own /tiles/tracks source.
-  useEffect(() => {
+  const reloadForTracks = useEffectEvent(() => {
     applyLayerVisibility();
     reloadTrackTiles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracksMode, mapQueryString, scrubTime, trailingDays]);
+  });
+  useEffect(
+    () => reloadForTracks(),
+    [tracksMode, mapQueryString, scrubTime, trailingDays],
+  );
 
   // Framed only when the selection asks.
-  useEffect(() => {
+  const drawSelectedTrack = useEffectEvent(() => {
     if (!map.current) return undefined;
     // Picking a second platform mid-fetch is routine from the map, so the
     // in-flight request is abandoned rather than landing under the newer name.
@@ -1148,8 +1156,8 @@ export default function CreateMap({
       abortController.abort();
       cancelWait();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTrajectory, mapQueryString]);
+  });
+  useEffect(() => drawSelectedTrack(), [selectedTrajectory, mapQueryString]);
 
   useEffect(() => {
     if (!map.current) return undefined;
@@ -1208,7 +1216,7 @@ export default function CreateMap({
     });
   }
 
-  useEffect(() => {
+  const createMap = useEffectEvent(() => {
     if (map.current) return;
     map.current = new MaplibreMap({
       container: mapContainer.current,
@@ -1429,8 +1437,8 @@ export default function CreateMap({
     // (see the drawRequest effect), but the control must be added for them to
     // exist.
     map.current.addControl(drawPolygon.current, "bottom-right");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
+  useEffect(() => createMap(), []);
 
   // A pan into unseen ground shows stretched parent tiles that look finished,
   // and the half-zoom basemap swap makes all the fetches land at once.
@@ -1558,7 +1566,7 @@ export default function CreateMap({
 
   // The reveal's own reportFirstPaint declines if the basemap is still
   // arriving; this closes it out.
-  useEffect(() => {
+  const watchFirstPaint = useEffectEvent(() => {
     if (!map.current) return;
     const check = () => reportFirstPaint();
     map.current.on("sourcedata", check);
@@ -1567,14 +1575,14 @@ export default function CreateMap({
       map.current.off("sourcedata", check);
       map.current.off("idle", check);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
+  useEffect(() => watchFirstPaint(), []);
 
   // Registered once so the debounce survives re-renders. 'idle' measures
   // undebounced: waiting after it put the re-colouring visibly after the map
   // stopped. The repaint -> 'idle' loop is cut by the ramp key. 'moveend' and
   // 'sourcedata' keep the debounce, for maps that never fully settle.
-  useEffect(() => {
+  const watchViewportRamp = useEffectEvent(() => {
     if (!map.current) return;
     const measure = debounce(
       refreshViewportHexRange,
@@ -1600,8 +1608,8 @@ export default function CreateMap({
       map.current.off("sourcedata", onDataSourceLoaded);
       map.current.off("idle", measureNow);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
+  useEffect(() => watchViewportRamp(), []);
 
   // The initial language is baked in at construction.
   useEffect(() => {
