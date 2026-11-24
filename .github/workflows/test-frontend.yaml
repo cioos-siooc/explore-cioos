@@ -82,12 +82,41 @@ jobs:
         run: npm ci
 
       # These assert through data-testid and user-visible text, which survive
-      # restyling, so they gate every push and PR. The visual suite lives in
-      # build_and_test.yml, gated on a published release.
+      # restyling, so they gate every push and PR. The visual suite is gated
+      # only on a published release (build_and_test.yml).
       - name: Run the behavioural and accessibility suites
         run: npx playwright test --project=desktop --project=tablet --project=mobile --project=a11y
         env:
           CI: "true"
+
+      # Informational only: a diff means the PR changes the interface, not that
+      # it's wrong. The release run in build_and_test.yml is the gate. The list
+      # reporter keeps the github reporter's error annotations off the PR.
+      - name: Check the visual baselines
+        id: visual
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: npx playwright test --project=visual --retries=0 --reporter=list --output=test-results-visual
+        env:
+          CI: "true"
+
+      - name: Flag the interface change
+        if: steps.visual.outcome == 'failure'
+        run: |
+          msg="This PR changes the interface: visual baselines differ. If intended, run 'npm run test:visual:update' in frontend/ and commit the screenshots before the next release."
+          echo "::warning title=Interface changed::$msg"
+          {
+            echo "### Interface changed"
+            echo "$msg"
+            echo "Expected/actual/diff images are in the \`visual-diffs\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: steps.visual.outcome == 'failure'
+        with:
+          name: visual-diffs
+          path: frontend/test-results-visual/
+          retention-days: 7
 
       - uses: actions/upload-artifact@v7
         if: failure()
