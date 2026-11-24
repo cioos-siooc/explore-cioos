@@ -8,9 +8,7 @@ import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 
 import * as helpers from "@turf/helpers";
-import turfBboxPolygon from "@turf/bbox-polygon";
 import turfPointsWithinPolygon from "@turf/points-within-polygon";
-import turfBbox from "@turf/bbox";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
@@ -312,7 +310,6 @@ const trackHeadOpacity = (scale) => [
   scale,
   TRACK_HEAD_INACTIVE_OPACITY * scale,
 ];
-const DATA_STALE_OPACITY = 0.25;
 // direct_select fires draw.update on every drag tick, and setPolygon feeds
 // the /pointQuery fetch.
 const DRAW_UPDATE_DEBOUNCE_MS = 300;
@@ -527,7 +524,6 @@ export default function CreateMap({
   const mapContainer = useRef(null);
   const map = useRef(null);
   const creatingPolygon = useRef(false);
-  const shiftBoxCreate = useRef(false);
 
   // Opaque: overlapping translucent markers mixed into hues no platform has.
   // The white halo is what separates neighbours.
@@ -713,7 +709,7 @@ export default function CreateMap({
   //
   // Zero opacity rather than 'visibility: none': queryRenderedFeatures skips a
   // hidden layer, and measuring the hexes is what decides the reveal. One-way:
-  // later filter changes dim instead (markDataStale).
+  // later filter changes repaint in place.
   function revealData() {
     if (dataRevealed.current || !map.current) return;
     dataRevealed.current = true;
@@ -807,59 +803,6 @@ export default function CreateMap({
       (id) => map.current.getSource(id) && map.current.isSourceLoaded(id),
     );
   }
-
-  // setTiles keeps the previous filters' tiles painted until each is replaced,
-  // seconds on a cold query, so those layers are dimmed meanwhile. Opacity is
-  // zoom-only, so the swap costs no worker relayout.
-  const staleData = useRef({ observations: false, tracks: false });
-  const STALE_GROUPS = {
-    observations: { sources: HEX_SOURCE_IDS, apply: applyObservationOpacity },
-    tracks: { sources: ["tracks"], apply: applyTrackOpacity },
-  };
-
-  function applyTrackOpacity(scale) {
-    if (!map.current.getLayer("track-lines")) return;
-    map.current.setPaintProperty(
-      "track-lines",
-      "line-opacity",
-      TRACK_LINE_OPACITY * scale,
-    );
-    const headOpacity = trackHeadOpacity(scale);
-    map.current.setPaintProperty("track-heads", "icon-opacity", headOpacity);
-    map.current.setPaintProperty(
-      "track-heads-fixed",
-      "circle-opacity",
-      headOpacity,
-    );
-    map.current.setPaintProperty(
-      "track-heads-fixed",
-      "circle-stroke-opacity",
-      headOpacity,
-    );
-  }
-
-  // Before the first reveal the layers are already invisible.
-  function markDataStale(group) {
-    if (!dataRevealed.current || staleData.current[group]) return;
-    staleData.current[group] = true;
-    STALE_GROUPS[group].apply(DATA_STALE_OPACITY);
-  }
-
-  function settleStaleData() {
-    if (!map.current) return;
-    Object.entries(STALE_GROUPS).forEach(([group, { sources, apply }]) => {
-      if (!staleData.current[group]) return;
-      const loaded = sources.every(
-        (id) => !map.current.getSource(id) || map.current.isSourceLoaded(id),
-      );
-      if (!loaded) return;
-      staleData.current[group] = false;
-      apply(1);
-    });
-  }
-
-  const [boxSelectStartCoords, setBoxSelectStartCoords] = useState();
-  const [boxSelectEndCoords, setBoxSelectEndCoords] = useState();
 
   // Own class so the frame-stripping in styles.css is scoped to this popup.
   const [popup] = useState(
@@ -964,32 +907,6 @@ export default function CreateMap({
     setColorStops();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeLevels, coverageRangeLevels]);
-
-  useEffect(() => {
-    if (boxSelectStartCoords && boxSelectEndCoords) {
-      drawPolygon.current?.deleteAll();
-
-      const lineStringObj = helpers.lineString([
-        boxSelectStartCoords,
-        boxSelectEndCoords,
-      ]);
-      const bboxPolygonObj = turfBboxPolygon(turfBbox(lineStringObj));
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBoxSelectEndCoords();
-      setBoxSelectStartCoords();
-      setLoading(true);
-      drawPolygon.current.add({
-        type: "Feature",
-        geometry: {
-          type: "Polygon",
-          coordinates: [bboxPolygonObj.geometry.coordinates[0]],
-        },
-      });
-      highlightPoints(bboxPolygonObj.geometry.coordinates[0]);
-      setPolygon(bboxPolygonObj.geometry.coordinates[0]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boxSelectEndCoords]);
 
   function deleteAllShapes() {
     drawPolygon.current?.deleteAll();
@@ -1980,11 +1897,6 @@ export default function CreateMap({
 
     invalidateHexRamp();
     refreshCombinedSources(mapQueryString);
-    markDataStale("observations");
-    // The tracks effect below refetches them for the same change.
-    if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayersRef.current)) {
-      markDataStale("tracks");
-    }
     setLoading(true);
     doFinalCheck.current = true;
 
@@ -2006,14 +1918,12 @@ export default function CreateMap({
     if (!map.current || !map.current.getSource("cde-tiles")) return;
     invalidateHexRamp();
     refreshCombinedSources(mapQueryString);
-    markDataStale("observations");
     if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayers)) {
       refreshTracksSource(
         mapQueryString,
         scrubTimeRef.current,
         trailingDaysRef.current,
       );
-      markDataStale("tracks");
     }
     applyLayerVisibility();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3603,21 +3513,6 @@ export default function CreateMap({
     // 'idle' waits on every tile, leaving the in-view count empty for as long
     // as the slowest source took.
     pushMapViewRef.current = pushMapView;
-    map.current.on("mousedown", (e) => {
-      if (e.originalEvent.shiftKey) {
-        shiftBoxCreate.current = true;
-        setBoxSelectStartCoords([e.lngLat.lng, e.lngLat.lat]);
-      }
-    });
-
-    map.current.on("mouseup", (e) => {
-      if (shiftBoxCreate.current) {
-        setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat]);
-        map.current.getCanvas().style.cursor = "unset";
-        shiftBoxCreate.current = false;
-      }
-    });
-
     // Replayed at 'idle', the earliest moment every hit-tested source is
     // rendered. Only the card is reproduced, not the click: a replayed click
     // could undo the selection and page the same link just restored.
@@ -3763,21 +3658,16 @@ export default function CreateMap({
   // 'sourcedata' keep the debounce, for maps that never fully settle.
   useEffect(() => {
     if (!map.current) return;
-    // Un-dimming stale layers rides the same pass, so new tiles come up at
-    // full strength in the colours they keep.
-    const measureAndSettle = () => {
-      refreshViewportHexRange();
-      settleStaleData();
-    };
-    const measure = debounce(measureAndSettle, VIEWPORT_RAMP_DEBOUNCE_MS);
+    const measure = debounce(
+      refreshViewportHexRange,
+      VIEWPORT_RAMP_DEBOUNCE_MS,
+    );
     const measureNow = () => {
       measure.cancel();
-      measureAndSettle();
+      refreshViewportHexRange();
     };
     const onDataSourceLoaded = (e) => {
-      if (!e.isSourceLoaded) return;
-      if (HEX_SOURCE_IDS.includes(e.sourceId)) measure();
-      else if (e.sourceId === "tracks") settleStaleData();
+      if (e.isSourceLoaded && HEX_SOURCE_IDS.includes(e.sourceId)) measure();
     };
     const onMoveEnd = () => {
       panSettlePending.current = true;
