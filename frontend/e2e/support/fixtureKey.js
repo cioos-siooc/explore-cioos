@@ -54,7 +54,7 @@ export const EXTERNAL_HOSTS = new Set([
 // Basemap rasters the API proxies (web-api/routes/emodnet.js): neither recorded
 // nor replayed, but blanked like the third-party ones above.
 export function isProxiedBasemapTile(url) {
-  return /\/emodnet\/\d+\/\d+\/\d+\.webp$/.test(url.pathname);
+  return /\/emodnet\/(\d+\/\d+\/\d+|arctic)\.webp$/.test(url.pathname);
 }
 
 export function externalKey(rawUrl) {
