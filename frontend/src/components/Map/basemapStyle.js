@@ -79,6 +79,9 @@ const NONNA_HILLSHADE_PAINT = {
   "hillshade-exaggeration": 1,
 };
 
+const EMODNET_ATTRIBUTION =
+  '<a href="https://doi.org/10.12770/386fe2aa-84c4-4cea-9e22-fcba4d5f2e75">EMODnet Bathymetry World Base Layer v1</a> © <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a> (EMODnet DTM, GEBCO 2019)';
+
 const CHS_ATTRIBUTION =
   'Bathymetry © <a href="https://www.charts.gc.ca/data-gestion/index-eng.html">Canadian Hydrographic Service</a> (NONNA)';
 
@@ -544,8 +547,9 @@ export function buildBasemapStyle(
         // they are ~80% of the tiles over Canada that the proxy caches, so
         // that half zoom overzooms z9.
         maxzoom: 9,
-        attribution:
-          '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>',
+        // EMODnet's recommended citation for the WMTS base layer, whose
+        // composition (EMODnet DTM, GEBCO elsewhere) its DOI record states.
+        attribution: EMODNET_ATTRIBUTION,
       },
       imagery: {
         type: "raster",

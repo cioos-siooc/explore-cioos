@@ -112,7 +112,7 @@
   "privacy_analytics_title": "Visit counts",
   "privacy_analytics_body": "We count visits with Plausible, run by CIOOS. It uses no cookies and keeps no personal information, only totals such as pages viewed, which site you came from, and how many download requests are submitted (with the number of datasets and the language, never your email address).",
   "privacy_map_title": "Map backgrounds",
-  "privacy_map_body": "Your browser loads map backgrounds directly from their providers (EMODnet, OpenFreeMap and, for satellite imagery, Esri). Like any website, they see your IP address and which part of the map you are viewing. Seafloor depths come through our server from the Canadian Hydrographic Service (NONNA) and GEBCO, through the UK's CEDA archive: they see the area or the clicked point, never your IP address.",
+  "privacy_map_body": "Your browser loads map backgrounds directly from their providers (OpenFreeMap and, for satellite imagery, Esri). Like any website, they see your IP address and which part of the map you are viewing. The EMODnet bathymetry background and seafloor depths come through our server, from EMODnet, the Canadian Hydrographic Service (NONNA) and GEBCO (through the UK's CEDA archive): they see the area or the clicked point, never your IP address.",
   "privacy_regions_title": "Place-name search",
   "privacy_regions_body": "When you type three or more characters in the filter search, your browser also sends what you typed to Natural Resources Canada's geographical names service to find matching places, even if you are not looking for one. Like any website, it sees your IP address (<nrcan>NRCan's privacy notice</nrcan>).",
   "privacy_rights_title": "Questions and requests",
