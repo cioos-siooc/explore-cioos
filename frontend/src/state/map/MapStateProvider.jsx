@@ -85,9 +85,8 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
   const reportFirstPaint = useCallback(() => setMapLoaded(true), []);
 
   const firstPaintPending = loading && !mapLoaded;
-  // Layer ids from Map.jsx's WATCHED_MAP_LAYERS currently fetching tiles, so
-  // the activity badge can name what is on the wire.
-  const [loadingLayers, setLoadingLayers] = useState([]);
+  // Data tiles or a WMS image on the wire, past the first paint's splash.
+  const [dataLoading, setDataLoading] = useState(false);
 
   // Seeded from the share link (or default view) rather than empty: MapLibre
   // only pushes a view on 'idle'/'moveend', and zoom-keyed consumers like the
@@ -167,7 +166,7 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
       setLoading,
       reportFirstPaint,
       firstPaintPending,
-      loadingLayers,
+      dataLoading,
       mapLoaded,
       mapView,
       setMapView,
@@ -176,14 +175,14 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
       hexRangeLevel,
       setViewportHexRange,
       setViewportPointRange,
-      setLoadingLayers,
+      setDataLoading,
     }),
     [
       loading,
       setLoading,
       reportFirstPaint,
       firstPaintPending,
-      loadingLayers,
+      dataLoading,
       mapLoaded,
       mapView,
       zoom,

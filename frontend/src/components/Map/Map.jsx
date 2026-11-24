@@ -12,10 +12,8 @@ import turfPointsWithinPolygon from "@turf/points-within-polygon";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import "./styles.css";
-import Spinner from "../ui/Spinner.jsx";
 
 import { server } from "../../config";
 import reportError from "../../state/reportError.js";
@@ -62,6 +60,7 @@ import {
 import platforms from "../../platforms.json";
 import { platformColor, platformLabel } from "../../platformVocab.js";
 import DepthProbe from "./DepthProbe.jsx";
+import useMapDataLoading from "./useMapDataLoading.js";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
@@ -361,19 +360,6 @@ const HEX_FILL_FADE_END_ZOOM = basemapHandoffEndZoom;
 // the map by a wide margin. See reportFirstPaint.
 const BASEMAP_SOURCE_IDS = ["bathymetry", "imagery", "ofm"];
 
-// Grouped the way a reader thinks about the map, not by MapLibre source. `id`
-// maps to a translated label in ActivityTasks.
-const WATCHED_MAP_LAYERS = [
-  { id: "observations", sources: HEX_SOURCE_IDS },
-  { id: "tracks", sources: ["tracks", "selected-track"] },
-  { id: "bathymetry", sources: ["bathymetry", "nonna"] },
-  { id: "imagery", sources: ["imagery"] },
-  { id: "griddap", sources: ["griddap-coverage"] },
-  { id: "wmsOverlay", sources: ["wms-overlay"] },
-];
-// A browser-cached GetMap resolves in a frame or two; the spinner would flash.
-const WMS_SPINNER_DELAY_MS = 300;
-
 // The round trip is exact to float noise for a point really on the surface,
 // off by tens of pixels for one that isn't (see viewportQueryIsReliable).
 const SURFACE_ROUND_TRIP_TOLERANCE_PX = 1;
@@ -461,7 +447,7 @@ export default function CreateMap({
   polygon,
   setPolygon,
   setLoading,
-  setLoadingLayers = () => {},
+  setDataLoading = () => {},
   // Read once, when the map is created.
   initialView,
   setMapView,
@@ -1342,38 +1328,6 @@ export default function CreateMap({
   // An overlay set before the style loaded hid layers that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
-  // A marker so it follows the region being fetched through a pan, not the
-  // map centre: a spatial filter can clip the overlay to part of the view.
-  const [wmsSpinnerElement] = useState(() => {
-    const element = document.createElement("div");
-    element.className = "wmsLoadingSpinner cioosSpinnerDisc";
-    element.dataset.testid = "wms-loading-spinner";
-    return element;
-  });
-  const wmsSpinnerMarker = useRef(null);
-  const wmsSpinnerTimer = useRef(null);
-
-  function showWmsSpinner(bounds) {
-    wmsSpinnerTimer.current = setTimeout(() => {
-      if (!map.current) return;
-      // Midpoint on screen, not in degrees: at Canadian latitudes the
-      // arithmetic midpoint sits well south of the image's visual centre.
-      const northWest = map.current.project([bounds.west, bounds.north]);
-      const southEast = map.current.project([bounds.east, bounds.south]);
-      wmsSpinnerMarker.current ??= new Marker({
-        element: wmsSpinnerElement,
-      });
-      wmsSpinnerMarker.current
-        .setLngLat(map.current.unproject(northWest.add(southEast).div(2)))
-        .addTo(map.current);
-    }, WMS_SPINNER_DELAY_MS);
-  }
-
-  function hideWmsSpinner() {
-    clearTimeout(wmsSpinnerTimer.current);
-    wmsSpinnerMarker.current?.remove();
-  }
-
   function setGriddapHighlight(geometry) {
     const source = map.current?.getSource("griddap-highlight");
     if (!source) return;
@@ -1518,126 +1472,6 @@ export default function CreateMap({
     setLayersVisibility(bathymetryLayerIds, bathymetryVisibleRef.current);
     setLayersVisibility(trackLayerIds, true);
     applyLayerVisibility();
-  }
-
-  function removeWmsOverlay() {
-    wmsRenderToken.current += 1;
-    hideWmsSpinner();
-    if (wmsMoveHandler.current) {
-      map.current.off("moveend", wmsMoveHandler.current);
-      wmsMoveHandler.current = null;
-    }
-    if (map.current.getLayer("wms-overlay")) {
-      map.current.removeLayer("wms-overlay");
-    }
-    if (map.current.getSource("wms-overlay")) {
-      map.current.removeSource("wms-overlay");
-    }
-    setDataLayersVisibility(true);
-  }
-
-  // ERDDAP's WMS is EPSG:4326-only, so the image is requested with extra
-  // vertical resolution and warped to Mercator (see wmsUtilities). A spatial
-  // filter clips the request to its bounding box; read through a ref so the
-  // debounced moveend handler uses the current polygon.
-  function renderWmsImage(overlay) {
-    if (!map.current) return;
-    // A GetMap for an earlier pan resolving after a newer one would paint stale
-    // bounds.
-    const token = ++wmsRenderToken.current;
-    hideWmsSpinner();
-    const viewportBounds = clampBoundsForWms(map.current.getBounds());
-    if (
-      viewportBounds.south >= viewportBounds.north ||
-      viewportBounds.west >= viewportBounds.east
-    ) {
-      return;
-    }
-    const bounds = intersectBoundsWithPolygonBbox(
-      viewportBounds,
-      polygonRef.current,
-    );
-    // filter selection is entirely off-screen: nothing to draw
-    if (!bounds) {
-      const emptySource = map.current.getSource("wms-overlay");
-      if (emptySource && map.current.getLayer("wms-overlay")) {
-        map.current.setLayoutProperty("wms-overlay", "visibility", "none");
-      }
-      return;
-    }
-    if (map.current.getLayer("wms-overlay")) {
-      map.current.setLayoutProperty("wms-overlay", "visibility", "visible");
-    }
-    const canvasElement = map.current.getCanvas();
-    const outWidth = Math.min(canvasElement.clientWidth, 2048);
-    const outHeight = Math.min(canvasElement.clientHeight, 2048);
-    const url = buildWmsGetMapUrl({
-      wmsUrl: overlay.wmsUrl,
-      datasetId: overlay.datasetId,
-      variable: overlay.variable.name,
-      bounds,
-      width: outWidth,
-      height: Math.min(Math.round(outHeight * 1.75), 2048),
-      time: overlay.time,
-      elevation: overlay.elevation,
-    });
-    showWmsSpinner(bounds);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (token !== wmsRenderToken.current || !map.current) return;
-      // A share link's overlay can resolve before the style has loaded;
-      // registered after the handler that adds the data layers it sits under.
-      if (!map.current.getSource("cde-tiles")) {
-        map.current.once("style.load", img.onload);
-        return;
-      }
-      hideWmsSpinner();
-      let imageUrl;
-      try {
-        imageUrl = warpEquirectToMercator(
-          img,
-          bounds.south,
-          bounds.north,
-          outWidth,
-          outHeight,
-        ).toDataURL("image/png");
-      } catch (error) {
-        // canvas tainted (server without CORS headers) — show unwarped
-        console.warn("WMS warp failed, using unwarped image", error);
-        imageUrl = url;
-      }
-      const coordinates = [
-        [bounds.west, bounds.north],
-        [bounds.east, bounds.north],
-        [bounds.east, bounds.south],
-        [bounds.west, bounds.south],
-      ];
-      const source = map.current.getSource("wms-overlay");
-      if (source) {
-        source.updateImage({ url: imageUrl, coordinates });
-      } else {
-        map.current.addSource("wms-overlay", {
-          type: "image",
-          url: imageUrl,
-          coordinates,
-        });
-        map.current.addLayer(
-          {
-            id: "wms-overlay",
-            type: "raster",
-            source: "wms-overlay",
-            paint: { "raster-opacity": 0.85, "raster-fade-duration": 0 },
-          },
-          map.current.getLayer("coverage-hexes") ? "coverage-hexes" : undefined,
-        );
-      }
-    };
-    img.onerror = () => {
-      if (token === wmsRenderToken.current) hideWmsSpinner();
-      console.warn(`WMS GetMap failed: ${url}`);
-    };
-    img.src = url;
   }
 
   // The sole writer of griddap-highlight: a second writer in the overlay
@@ -3541,102 +3375,128 @@ export default function CreateMap({
   }, []);
 
   // A pan into unseen ground shows stretched parent tiles that look finished,
-  // and the half-zoom basemap swap makes all the fetches land at once. Tracked
-  // per layer so the badge can say which one is still fetching.
-  useEffect(() => {
+  // and the half-zoom basemap swap makes all the fetches land at once.
+  const setWmsPending = useMapDataLoading(map, setDataLoading);
+
+  function removeWmsOverlay() {
+    wmsRenderToken.current += 1;
+    setWmsPending(false);
+    if (wmsMoveHandler.current) {
+      map.current.off("moveend", wmsMoveHandler.current);
+      wmsMoveHandler.current = null;
+    }
+    if (map.current.getLayer("wms-overlay")) {
+      map.current.removeLayer("wms-overlay");
+    }
+    if (map.current.getSource("wms-overlay")) {
+      map.current.removeSource("wms-overlay");
+    }
+    setDataLayersVisibility(true);
+  }
+
+  // ERDDAP's WMS is EPSG:4326-only, so the image is requested with extra
+  // vertical resolution and warped to Mercator (see wmsUtilities). A spatial
+  // filter clips the request to its bounding box; read through a ref so the
+  // debounced moveend handler uses the current polygon.
+  function renderWmsImage(overlay) {
     if (!map.current) return;
-
-    // Browser-cache hits resolve in a frame or two; announcing them would flash
-    // the badge on every wheel notch.
-    const ANNOUNCE_AFTER_MS = 300;
-    // Tiles arrive in waves with empty frames between; clearing instantly would
-    // flicker and keep resetting the announce countdown, so a load of several
-    // short waves would never be announced.
-    const SETTLE_MS = 250;
-
-    const timers = new Map(
-      WATCHED_MAP_LAYERS.map((layer) => [
-        layer.id,
-        { announceTimer: null, settleTimer: null, announced: false },
-      ]),
+    // A GetMap for an earlier pan resolving after a newer one would paint stale
+    // bounds.
+    const token = ++wmsRenderToken.current;
+    setWmsPending(false);
+    const viewportBounds = clampBoundsForWms(map.current.getBounds());
+    if (
+      viewportBounds.south >= viewportBounds.north ||
+      viewportBounds.west >= viewportBounds.east
+    ) {
+      return;
+    }
+    const bounds = intersectBoundsWithPolygonBbox(
+      viewportBounds,
+      polygonRef.current,
     );
-    let published = [];
-
-    const publish = () => {
-      const next = WATCHED_MAP_LAYERS.filter(
-        (layer) => timers.get(layer.id).announced,
-      ).map((layer) => layer.id);
-      if (
-        next.length === published.length &&
-        next.every((id, index) => id === published[index])
-      ) {
+    // filter selection is entirely off-screen: nothing to draw
+    if (!bounds) {
+      const emptySource = map.current.getSource("wms-overlay");
+      if (emptySource && map.current.getLayer("wms-overlay")) {
+        map.current.setLayoutProperty("wms-overlay", "visibility", "none");
+      }
+      return;
+    }
+    if (map.current.getLayer("wms-overlay")) {
+      map.current.setLayoutProperty("wms-overlay", "visibility", "visible");
+    }
+    const canvasElement = map.current.getCanvas();
+    const outWidth = Math.min(canvasElement.clientWidth, 2048);
+    const outHeight = Math.min(canvasElement.clientHeight, 2048);
+    const url = buildWmsGetMapUrl({
+      wmsUrl: overlay.wmsUrl,
+      datasetId: overlay.datasetId,
+      variable: overlay.variable.name,
+      bounds,
+      width: outWidth,
+      height: Math.min(Math.round(outHeight * 1.75), 2048),
+      time: overlay.time,
+      elevation: overlay.elevation,
+    });
+    setWmsPending(true);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (token !== wmsRenderToken.current || !map.current) return;
+      // A share link's overlay can resolve before the style has loaded;
+      // registered after the handler that adds the data layers it sits under.
+      if (!map.current.getSource("cde-tiles")) {
+        map.current.once("style.load", img.onload);
         return;
       }
-      published = next;
-      setLoadingLayers(next);
-    };
-
-    const pending = (layer) =>
-      layer.sources.some(
-        // isSourceLoaded throws on an unknown id (absent mid style-change).
-        (id) => map.current.getSource(id) && !map.current.isSourceLoaded(id),
-      );
-
-    const sync = (layer) => {
-      const state = timers.get(layer.id);
-      if (pending(layer)) {
-        clearTimeout(state.settleTimer);
-        state.settleTimer = null;
-        if (state.announced || state.announceTimer) return;
-        state.announceTimer = setTimeout(() => {
-          state.announceTimer = null;
-          state.announced = true;
-          publish();
-        }, ANNOUNCE_AFTER_MS);
-        return;
+      setWmsPending(false);
+      let imageUrl;
+      try {
+        imageUrl = warpEquirectToMercator(
+          img,
+          bounds.south,
+          bounds.north,
+          outWidth,
+          outHeight,
+        ).toDataURL("image/png");
+      } catch (error) {
+        // canvas tainted (server without CORS headers) — show unwarped
+        console.warn("WMS warp failed, using unwarped image", error);
+        imageUrl = url;
       }
-      // See SETTLE_MS.
-      if (state.settleTimer || (!state.announced && !state.announceTimer))
-        return;
-      state.settleTimer = setTimeout(() => {
-        state.settleTimer = null;
-        if (pending(layer)) return sync(layer);
-        clearTimeout(state.announceTimer);
-        state.announceTimer = null;
-        if (state.announced) {
-          state.announced = false;
-          publish();
-        }
-      }, SETTLE_MS);
+      const coordinates = [
+        [bounds.west, bounds.north],
+        [bounds.east, bounds.north],
+        [bounds.east, bounds.south],
+        [bounds.west, bounds.south],
+      ];
+      const source = map.current.getSource("wms-overlay");
+      if (source) {
+        source.updateImage({ url: imageUrl, coordinates });
+      } else {
+        map.current.addSource("wms-overlay", {
+          type: "image",
+          url: imageUrl,
+          coordinates,
+        });
+        map.current.addLayer(
+          {
+            id: "wms-overlay",
+            type: "raster",
+            source: "wms-overlay",
+            paint: { "raster-opacity": 0.85, "raster-fade-duration": 0 },
+          },
+          map.current.getLayer("coverage-hexes") ? "coverage-hexes" : undefined,
+        );
+      }
     };
-
-    const syncAll = () => WATCHED_MAP_LAYERS.forEach(sync);
-
-    // 'data'/'dataloading' fire per tile for every source, so each is routed to
-    // its owning layer. 'idle' is the backstop, including sources dropped past
-    // a layer's minzoom rather than loaded.
-    const onSourceEvent = (e) => {
-      if (e.dataType !== "source") return;
-      const layer = WATCHED_MAP_LAYERS.find((l) =>
-        l.sources.includes(e.sourceId),
-      );
-      if (layer) sync(layer);
+    img.onerror = () => {
+      if (token === wmsRenderToken.current) setWmsPending(false);
+      console.warn(`WMS GetMap failed: ${url}`);
     };
-    map.current.on("dataloading", onSourceEvent);
-    map.current.on("data", onSourceEvent);
-    map.current.on("idle", syncAll);
-
-    return () => {
-      timers.forEach((state) => {
-        clearTimeout(state.announceTimer);
-        clearTimeout(state.settleTimer);
-      });
-      map.current.off("dataloading", onSourceEvent);
-      map.current.off("data", onSourceEvent);
-      map.current.off("idle", syncAll);
-      if (published.length) setLoadingLayers([]);
-    };
-  }, [setLoadingLayers]);
+    img.src = url;
+  }
 
   // The reveal's own reportFirstPaint declines if the basemap is still
   // arriving; this closes it out.
@@ -3702,18 +3562,12 @@ export default function CreateMap({
   }, [i18n.language, t]);
 
   return (
-    <>
-      <div
-        ref={mapContainer}
-        className="map"
-        data-testid="map-container"
-        data-projection={projection}
-        data-map-ready={firstPainted || undefined}
-      />
-      {createPortal(
-        <Spinner size="lg" role="presentation" />,
-        wmsSpinnerElement,
-      )}
-    </>
+    <div
+      ref={mapContainer}
+      className="map"
+      data-testid="map-container"
+      data-projection={projection}
+      data-map-ready={firstPainted || undefined}
+    />
   );
 }

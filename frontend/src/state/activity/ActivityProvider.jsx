@@ -28,26 +28,15 @@ export function useActivity() {
   return useContext(ActivityContext);
 }
 
-const NOTHING = [];
-
-// A list so a caller with dynamic waits (the map's layers) keeps a fixed hook
-// count. Counted, not flagged, so the first of two same-key callers to finish
+// Counted, not flagged, so the first of two same-key callers to finish
 // doesn't clear the label from under the second.
-export function useActivityTasks(labelKeys = NOTHING) {
-  const { register } = useActivity();
-  // Keyed on the joined string so a fresh array of the same keys doesn't
-  // re-register on every render.
-  const joined = labelKeys.join("\u0000");
-
-  useEffect(() => {
-    if (!joined) return undefined;
-    const unregisters = joined.split("\u0000").map(register);
-    return () => unregisters.forEach((unregister) => unregister());
-  }, [register, joined]);
-}
-
 export function useActivityTask(labelKey, active) {
-  useActivityTasks(active && labelKey ? [labelKey] : NOTHING);
+  const { register } = useActivity();
+  const on = Boolean(active && labelKey);
+  useEffect(
+    () => (on ? register(labelKey) : undefined),
+    [register, labelKey, on],
+  );
 }
 
 export default function ActivityProvider({ children }) {
