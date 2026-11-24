@@ -481,6 +481,7 @@
   "downloadDetailsProgressTooltipText": "Les téléchargements sont limités à 100MB",
   "mapHexCountDays_one": "{{count, number}} jour de données",
   "mapHexCountDays_other": "{{count, number}} jours de données",
+  "mapNorthPole": "Pôle Nord",
   "mapChipGridStack": "{{n}} jeux maillés",
   "mapChipInGrid": "Grille : {{title}}",
   "mapChipPlatformUnknown": "Plateforme inconnue",

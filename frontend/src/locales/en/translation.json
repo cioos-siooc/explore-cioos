@@ -480,6 +480,7 @@
   "downloadDetailsProgressTooltipText": "Downloads are limited to 100MB",
   "mapHexCountDays_one": "{{count, number}} day of data",
   "mapHexCountDays_other": "{{count, number}} days of data",
+  "mapNorthPole": "North Pole",
   "mapChipGridStack": "{{n}} gridded datasets",
   "mapChipInGrid": "Grid: {{title}}",
   "mapChipPlatformUnknown": "Platform unknown",

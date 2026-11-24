@@ -102,6 +102,7 @@ import { focusedPointFeatures } from "./focusedPoints.js";
 import { selectionLayerFilter } from "./selectionFilter.js";
 import { createTileRetry } from "./tileRetry.js";
 import { createArcticCapLayer } from "./arcticCapLayer.js";
+import { createNorthPoleMarker } from "./northPoleMarker.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // maplibre 6 can't find its worker from inside a bundle.
@@ -875,6 +876,12 @@ export default function CreateMap({
         maxWidth: "260px",
       }),
   );
+
+  const [northPole] = useState(createNorthPoleMarker);
+
+  useEffect(() => {
+    northPole.setLabel(t("mapNorthPole"));
+  }, [northPole, t]);
 
   // A dot under the label, so the depth reads as that exact spot's. The label
   // is its own React root: MapLibre owns the popup's DOM.
@@ -1797,7 +1804,8 @@ export default function CreateMap({
     map.current.setProjection({
       type: projection === "globe" ? "globe" : "mercator",
     });
-  }, [projection]);
+    northPole.sync(map.current);
+  }, [northPole, projection]);
 
   // The camera settings are shared with ZoomToDataset, which compares them
   // against the live camera.
@@ -3459,6 +3467,7 @@ export default function CreateMap({
       // Last, under the labels only: the globe smears every fill clipped at
       // 85.05°N (water tint, hexes) across the cap, and this covers them.
       map.current.addLayer(createArcticCapLayer(), FIRST_LABEL_LAYER_ID);
+      northPole.sync(map.current);
       applySelectionFilter();
 
       applyLayerVisibility();
