@@ -17,8 +17,18 @@ const router = express.Router();
  * visible change, and later requests skip the round trip to Europe.
  */
 
-const EMODNET_TILES =
-  "https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator";
+const EMODNET_BASELAYER = "https://tiles.emodnet-bathymetry.eu/2020/baselayer";
+const EMODNET_TILES = `${EMODNET_BASELAYER}/web_mercator`;
+
+// Web mercator stops at 85.05°N, so the globe's polar cap is drawn from the
+// same base layer in IBCAO polar stereographic (frontend arcticCapLayer.js).
+// Columns and rows 6-9 of this z4 grid enclose the cap; the frontend derives
+// the image's extent from the same numbers.
+const ARCTIC_TILES = `${EMODNET_BASELAYER}/epsg_3996`;
+const ARCTIC_ZOOM = 4;
+const ARCTIC_FIRST_TILE = 6;
+const ARCTIC_TILE_SPAN = 4;
+const TILE_PX = 256;
 
 // The deepest level the basemap requests (basemapStyle.js's bathymetry source).
 const MAX_ZOOM = 9;
@@ -68,6 +78,76 @@ const tileCache = createTileCache("emodnet", {
  *       400:
  *         description: Tile coordinates outside the zoom's grid.
  */
+const toWebp = (input) =>
+  sharp(input).removeAlpha().webp({ quality: WEBP_QUALITY }).toBuffer();
+
+async function buildArcticCap() {
+  const offsets = [...Array(ARCTIC_TILE_SPAN).keys()];
+  const tiles = await Promise.all(
+    offsets.flatMap((dy) =>
+      offsets.map(async (dx) => {
+        const x = ARCTIC_FIRST_TILE + dx;
+        const y = ARCTIC_FIRST_TILE + dy;
+        const upstream = await axios.get(
+          `${ARCTIC_TILES}/${ARCTIC_ZOOM}/${x}/${y}.png`,
+          { responseType: "arraybuffer", timeout: UPSTREAM_TIMEOUT_MS },
+        );
+        return {
+          input: Buffer.from(upstream.data),
+          left: dx * TILE_PX,
+          top: dy * TILE_PX,
+        };
+      }),
+    ),
+  );
+  const size = ARCTIC_TILE_SPAN * TILE_PX;
+  const mosaic = await sharp({
+    create: { width: size, height: size, channels: 3, background: "#000" },
+  })
+    .composite(tiles)
+    .png()
+    .toBuffer();
+  return toWebp(mosaic);
+}
+
+/**
+ * @swagger
+ * /emodnet/arctic.webp:
+ *   get:
+ *     summary: EMODnet bathymetry for the Arctic cap past web mercator's reach
+ *     tags: [Basemap]
+ *     description: >
+ *       A 1024 px mosaic of EMODnet Bathymetry World Base Layer tiles in IBCAO
+ *       polar stereographic (EPSG:3996, z4, columns and rows 6-9), as WebP.
+ *       The globe drapes it over the cap north of 85.05°N. A transparent PNG
+ *       is served on a short TTL when upstream fails.
+ *     responses:
+ *       200:
+ *         description: WebP mosaic (or a transparent PNG when upstream failed).
+ *         content:
+ *           image/webp:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+router.get("/arctic.webp", async (req, res) => {
+  const cached = await tileCache.get("arctic");
+  if (cached) {
+    return sendTile(res, cached, "image/webp", BROWSER_MAX_AGE_S);
+  }
+  try {
+    const body = await buildArcticCap();
+    tileCache.set("arctic", body);
+    return sendTile(res, body, "image/webp", BROWSER_MAX_AGE_S);
+  } catch (e) {
+    console.error(
+      "EMODnet Arctic cap failed:",
+      e.response ? `upstream ${e.response.status}` : e.message,
+    );
+    return sendFallbackTile(res);
+  }
+});
+
 // No apicache: tiles use their own two-tier cache.
 router.get(
   "/:z/:x/:y.webp",
@@ -90,10 +170,7 @@ router.get(
         timeout: UPSTREAM_TIMEOUT_MS,
       });
       // The source is fully opaque, so the alpha channel is dead weight.
-      const body = await sharp(Buffer.from(upstream.data))
-        .removeAlpha()
-        .webp({ quality: WEBP_QUALITY })
-        .toBuffer();
+      const body = await toWebp(Buffer.from(upstream.data));
       tileCache.set(key, body);
       return sendTile(res, body, "image/webp", BROWSER_MAX_AGE_S);
     } catch (e) {
