@@ -85,6 +85,7 @@ export const SELECTION_FILTERED_LAYERS = {
   "track-heads-fixed": ["!", TRACK_HEAD_HAS_COURSE],
 };
 
+export const NOTHING_SELECTED = ["in", "pk", ""];
 export const NO_HEX_HOVERED = ["==", ["get", "pk"], -1];
 // The hex under the cursor, outlined so the chip's figure has a visible owner:
 // at hex zoom a cell can be a few pixels across. One layer per source, each
@@ -472,7 +473,7 @@ function layerSpecs({ tracksVisible }) {
           // A ring around a greyed circle would still read as picked out.
           "circle-stroke-width": ["case", IS_DIMMED, 0, 0.75],
         },
-        filter: ["in", "pk", ""],
+        filter: NOTHING_SELECTED,
       },
       FIRST_LABEL_LAYER_ID,
     ],
