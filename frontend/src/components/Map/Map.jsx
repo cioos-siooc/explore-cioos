@@ -101,6 +101,7 @@ import { rampExpression, toRampStops } from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
 import { selectionLayerFilter } from "./selectionFilter.js";
 import { createTileRetry } from "./tileRetry.js";
+import { createArcticCapLayer } from "./arcticCapLayer.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // maplibre 6 can't find its worker from inside a bundle.
@@ -3455,6 +3456,9 @@ export default function CreateMap({
       addClickHighlightLayers();
       addTrackLayers();
       addSelectedTrackLayers();
+      // Last, under the labels only: the globe smears every fill clipped at
+      // 85.05°N (water tint, hexes) across the cap, and this covers them.
+      map.current.addLayer(createArcticCapLayer(), FIRST_LABEL_LAYER_ID);
       applySelectionFilter();
 
       applyLayerVisibility();
