@@ -157,8 +157,11 @@ jobs:
           ssh_host: ${{ secrets.SERVER_IP }}
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
-          deploy_path: /srv/services/explore-cioos
-          stack_name: explore-cioos-production
+          # Not explore-cioos / explore-cioos-production: those are the old
+          # build's checkout and compose project, which keep serving until the
+          # proxy is switched to this stack.
+          deploy_path: /srv/services/explore-cioos-v2
+          stack_name: explore-cioos-v2
           compose_files: docker-compose.yaml docker-compose.production.yaml
           op_secret_files: .env.production:.env
           env_overrides: |

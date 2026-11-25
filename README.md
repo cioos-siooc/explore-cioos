@@ -374,7 +374,7 @@ Everything else is inherited.
    ```
 
    `COMPOSE_FILE` makes every `docker compose` command on the box use the pair.
-   Production also sets `DB_PORT=5433`, `CORS_ORIGINS`, `ENABLE_API_DOCS=false`,
+   Production also sets `NGINX_PORT=8099`, `DB_PORT=5434`, `CORS_ORIGINS`, `ENABLE_API_DOCS=false`,
    Gmail credentials and Sentry. For an external harvester over the VPN, set
    `DB_HOST_EXTERNAL` and `DB_BIND_ADDRESS` to the VPN address; otherwise the DB
    port stays bound to `127.0.0.1`.
