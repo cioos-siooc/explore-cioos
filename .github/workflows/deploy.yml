@@ -138,7 +138,7 @@ jobs:
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
-          docker_compose_down: "true"
+          wait: "true"
 
   production:
     name: Deploy production
@@ -166,4 +166,4 @@ jobs:
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
-          docker_compose_down: "true"
+          wait: "true"
