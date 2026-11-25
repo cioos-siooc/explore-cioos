@@ -283,7 +283,9 @@ async function createDBFilter(
 
   // Combined "Data Portal" filter, an OR of its parts: ERDDAP datasets have
   // NULL obis_nodes and OBIS datasets carry the sentinel https://obis.org as
-  // erddap_url. `obisCatalogues` is a portal's (CKAN owner's) OBIS records.
+  // erddap_url. `obisCatalogues` are OBIS records by catalogue source: a
+  // portal (CKAN owner) or an institute in it. Rows harvested before
+  // ckan_sources existed count as their owner's.
   const sourceConds = [];
   if (obisNodes) {
     parameters.obisNodesArr = obisNodes.split(",");
@@ -296,7 +298,7 @@ async function createDBFilter(
   if (obisCatalogues) {
     parameters.obisCataloguesArr = obisCatalogues.split(",");
     sourceConds.push(
-      "(d.source_type = 'obis' AND d.ckan_owner = ANY(:obisCataloguesArr))",
+      "(d.source_type = 'obis' AND coalesce(d.ckan_sources, ARRAY[d.ckan_owner]) && :obisCataloguesArr)",
     );
   }
   if (sourceConds.length === 1) {
@@ -319,7 +321,7 @@ async function createDBFilter(
   if (excludeObisCatalogues) {
     parameters.excludeObisCataloguesArr = excludeObisCatalogues.split(",");
     filters.push(
-      "NOT (d.source_type = 'obis' AND coalesce(d.ckan_owner = ANY(:excludeObisCataloguesArr), false))",
+      "NOT coalesce(d.source_type = 'obis' AND coalesce(d.ckan_sources, ARRAY[d.ckan_owner]) && :excludeObisCataloguesArr, false)",
     );
   }
 

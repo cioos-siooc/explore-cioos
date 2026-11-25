@@ -374,6 +374,7 @@ class OBISHarvester(BaseHarvester):
             df_datasets["title_fr"] = None
             df_datasets["ckan_id"] = None
             df_datasets["ckan_owner"] = None
+            df_datasets["ckan_sources"] = None
             df_datasets["metadata"] = None
             return df_datasets
 

@@ -65,7 +65,7 @@ BEGIN
     coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
     coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
     table_variables, grid_variables, grid_dimensions, wms_url, metadata,
-    cdm_altitude_proxy, ckan_owner, archive_url
+    cdm_altitude_proxy, ckan_owner, ckan_sources, archive_url
   )
   SELECT
     pk_url, dataset_id, erddap_url, platform, platform_category, title, title_fr,
@@ -77,7 +77,7 @@ BEGIN
     coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
     coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
     table_variables, grid_variables, grid_dimensions, wms_url, metadata,
-    cdm_altitude_proxy, ckan_owner, archive_url
+    cdm_altitude_proxy, ckan_owner, ckan_sources, archive_url
   FROM temp_datasets
   ON CONFLICT (dataset_id, erddap_url)
   DO UPDATE SET
@@ -120,6 +120,7 @@ BEGIN
     metadata = EXCLUDED.metadata,
     cdm_altitude_proxy = EXCLUDED.cdm_altitude_proxy,
     ckan_owner = EXCLUDED.ckan_owner,
+    ckan_sources = EXCLUDED.ckan_sources,
     archive_url = EXCLUDED.archive_url;
 END;
 $$ LANGUAGE plpgsql;

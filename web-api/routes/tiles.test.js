@@ -200,7 +200,7 @@ test("GET /tiles/tracks/:z/:x/:y.mvt carries every dataset column the shared fil
   );
   const filter = (await createDBFilter(datasetLevel)).shared.toString();
   const read = new Set([...filter.matchAll(/\bd\.(\w+)/g)].map((m) => m[1]));
-  assert.ok(read.has("ckan_owner"));
+  assert.ok(read.has("ckan_sources"));
   for (const column of read) {
     assert.match(
       candRows,

@@ -25,17 +25,33 @@ export default function SourceFilter({ searchTerms, ...lists }) {
 
   const search = (searchTerms || "").toString().toLowerCase();
   const matches = (text) => text.toLowerCase().includes(search);
+  const shownOf = (group, ...labels) =>
+    group.leaves
+      .filter(
+        (leaf) =>
+          !search ||
+          [group.label, ...labels].some(matches) ||
+          matches(leaf.label),
+      )
+      .sort((a, b) =>
+        group.isObis ? a.label.localeCompare(b.label, i18n.language) : 0,
+      );
   const portals = buildPortals(lists, i18n.language)
-    .map((portal) => ({
-      ...portal,
-      shown: portal.leaves
-        .filter(
-          (leaf) => !search || matches(portal.label) || matches(leaf.label),
-        )
-        .sort((a, b) =>
-          portal.isObis ? a.label.localeCompare(b.label, i18n.language) : 0,
-        ),
-    }))
+    .map((portal) => {
+      const institutes = portal.institutes
+        ?.map((institute) => ({
+          ...institute,
+          shown: shownOf(institute, portal.label),
+        }))
+        .filter((institute) => institute.shown.length > 0);
+      return {
+        ...portal,
+        institutes,
+        shown: institutes
+          ? institutes.flatMap((institute) => institute.shown)
+          : shownOf(portal),
+      };
+    })
     .filter((portal) => portal.shown.length > 0);
 
   if (portals.length === 0) {
@@ -49,6 +65,25 @@ export default function SourceFilter({ searchTerms, ...lists }) {
   return (
     <div className="multiCheckboxFilter sourceFilter">
       {portals.map((portal) => {
+        if (portal.institutes) {
+          return (
+            <SourceGroup
+              key={portal.key}
+              portal={portal}
+              shown={[]}
+              forceExpanded={Boolean(search)}
+            >
+              {portal.institutes.map((institute) => (
+                <SourceGroup
+                  key={institute.key}
+                  portal={institute}
+                  shown={institute.shown}
+                  forceExpanded={Boolean(search)}
+                />
+              ))}
+            </SourceGroup>
+          );
+        }
         if (!portal.isObis) {
           return (
             <SourceGroup
@@ -98,7 +133,7 @@ export default function SourceFilter({ searchTerms, ...lists }) {
 
 function SourceGroup({ portal, shown, forceExpanded, children }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(portal.someSet);
+  const [expanded, setExpanded] = useState(true);
   const { label, state } = portal;
 
   const childrenVisible = expanded || forceExpanded;

@@ -18,6 +18,7 @@ from cde_harvester.core.record_metadata import from_ckan
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     ckan_organizations,
     ckan_owner,
+    ckan_sources,
     list_ckan_records,
     remove_newlines,
     unescape_ascii,
@@ -28,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 OBIS_RECORDS_QUERY = "res_url:*obis.org* OR res_url:*ipt*"
 CKAN_OBIS_COLUMNS = [
-    "dataset_id", "ckan_id", "ckan_eovs", "ckan_organizations", "ckan_owner", "ckan_title", "title_fr",
-    "ckan_metadata",
+    "dataset_id", "ckan_id", "ckan_eovs", "ckan_organizations", "ckan_owner", "ckan_sources", "ckan_title",
+    "title_fr", "ckan_metadata",
 ]
 
 _OBIS_DATASET_URL = re.compile(r"obis\.org/dataset/([0-9a-f-]{36})")
@@ -61,6 +62,7 @@ def _ckan_row(dataset_id, record):
         "ckan_eovs": record.get("eov") or [],
         "ckan_organizations": ckan_organizations(record),
         "ckan_owner": ckan_owner(record),
+        "ckan_sources": ckan_sources(record),
         "ckan_title": title,
         "title_fr": title_fr,
         "ckan_metadata": from_ckan(record),
@@ -77,6 +79,7 @@ def _stored_ckan_rows(dataset_ids, erddap_url):
             "ckan_eovs": list(row.eovs or []),
             "ckan_organizations": list(row.organizations or []),
             "ckan_owner": row.ckan_owner,
+            "ckan_sources": list(row.ckan_sources or []),
             "ckan_title": row.title,
             "title_fr": row.title_fr,
             "ckan_metadata": row.metadata,

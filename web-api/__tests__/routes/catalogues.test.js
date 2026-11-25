@@ -21,11 +21,12 @@ describe("GET /catalogues", () => {
     expect(res.status).toBe(200);
   });
 
-  it("queries non-null CKAN owners in name order", async () => {
+  it("queries non-null CKAN owners in name order, with their sources", async () => {
     await request(app).get("/catalogues");
     const [sql] = db.raw.mock.calls[0];
-    expect(sql).toContain("SELECT ckan_owner AS name");
+    expect(sql).toContain("SELECT s.owner AS name");
     expect(sql).toContain("ckan_owner IS NOT NULL");
-    expect(sql).toContain("ORDER BY o.name");
+    expect(sql).toContain("ORDER BY s.owner");
+    expect(sql).toContain("AS sources");
   });
 });

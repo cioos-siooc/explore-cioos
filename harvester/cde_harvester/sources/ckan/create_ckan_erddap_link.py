@@ -120,6 +120,35 @@ def ckan_owner(record):
     return CKAN_OWNER_NAMES.get(owner.get("name")) or owner.get("title") or None
 
 
+# Institutes that publish into a portal through their own metadata pipeline.
+# The national harvest rewrites a record's owner to the portal but keeps
+# xml_location_url, the source ISO file. Names are as records cite them.
+CKAN_INSTITUTES = [
+    (
+        "Hakai Institute",
+        "CIOOS Pacific",
+        re.compile(r"https?://metadata-generator-proxy\.server\.hakai\.app/metadata/hakai/"),
+    ),
+    ("Ocean Networks Canada Society", "CIOOS Pacific", re.compile(r"https?://[^/]*oceannetworks\.ca/")),
+]
+
+
+def ckan_sources(record):
+    """The portal's institute that published the record, or else the portal
+    itself plus any of its institutes the record cites (e.g. a Hakai record
+    entered through the CIOOS Pacific metadata form)."""
+    owner = ckan_owner(record)
+    if not owner:
+        return []
+    institutes = [(name, pattern) for name, portal, pattern in CKAN_INSTITUTES if portal == owner]
+    url = record.get("xml_location_url") or ""
+    for name, pattern in institutes:
+        if pattern.match(url):
+            return [name]
+    cited = set(ckan_organizations(record))
+    return [owner] + [name for name, _ in institutes if name in cited]
+
+
 @task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """Fetch the full CKAN record for each harvested dataset ID.
@@ -177,6 +206,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                     is_subset,
                     metadata,
                     ckan_owner(record_full),
+                    ckan_sources(record_full),
                 ],
             )
 
@@ -190,6 +220,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "is_subset": [x[5] for x in out],
         "ckan_metadata": [x[6] for x in out],
         "ckan_owner": [x[7] for x in out],
+        "ckan_sources": [x[8] for x in out],
     }
 
     df = pd.DataFrame(line)

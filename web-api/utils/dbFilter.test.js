@@ -195,7 +195,7 @@ test("a portal's OBIS records join the Data Portal OR", async () => {
   });
   assert.match(
     any.shared.toString(),
-    /\(d\.obis_nodes && .* OR \(d\.source_type = 'obis' AND d\.ckan_owner = ANY\('\{"CIOOS Pacific"\}'\)\)\)/,
+    /\(d\.obis_nodes && .* OR \(d\.source_type = 'obis' AND coalesce\(d\.ckan_sources, ARRAY\[d\.ckan_owner\]\) && '\{"CIOOS Pacific"\}'\)\)/,
   );
 
   const ownerOnly = await createDBFilter({ obisCatalogues: "SLGO" });
@@ -203,11 +203,11 @@ test("a portal's OBIS records join the Data Portal OR", async () => {
   assert.equal(ownerOnly.datasetLevelOnly, true);
 });
 
-test("excludeObisCatalogues drops only that portal's OBIS records", async () => {
+test("excludeObisCatalogues drops only that source's OBIS records", async () => {
   const f = await createDBFilter({ excludeObisCatalogues: "SLGO" });
   assert.match(
     f.shared.toString(),
-    /NOT \(d\.source_type = 'obis' AND coalesce\(d\.ckan_owner = ANY\('\{"SLGO"\}'\), false\)\)/,
+    /NOT coalesce\(d\.source_type = 'obis' AND coalesce\(d\.ckan_sources, ARRAY\[d\.ckan_owner\]\) && '\{"SLGO"\}', false\)/,
   );
 });
 

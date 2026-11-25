@@ -373,24 +373,34 @@ export default function useFilterModel(
             ]
           : []),
         ...portals.flatMap((portal) => [
-          {
-            id: `portal-${portal.key}`,
-            label: portal.label,
+          ...[portal, ...(portal.institutes ?? [])].map((group) => ({
+            id: `portal-${group.key}`,
+            label:
+              group === portal
+                ? group.label
+                : `${portal.label} · ${group.label}`,
             description: t("filterSearchSourceKindDescription", {
-              count: portal.leaves.length,
+              count: group.leaves.length,
             }),
-            state: portal.state,
+            state: group.state,
             shortcut: true,
-            covers: portal.leaves.map((leaf) => leaf.id),
-            toggle: portal.toggle,
-          },
+            covers: [
+              ...group.leaves.map((leaf) => leaf.id),
+              ...(group === portal
+                ? (portal.institutes ?? []).map((i) => `portal-${i.key}`)
+                : []),
+            ],
+            toggle: group.toggle,
+          })),
           ...portal.leaves.map((leaf) => {
             const state = stateOf(leaf.option);
             return {
               id: leaf.id,
               label: portal.isObis
                 ? leaf.label
-                : `${portal.label} · ${leaf.label}`,
+                : [portal.label, leaf.group, leaf.label]
+                    .filter(Boolean)
+                    .join(" · "),
               description: leaf.option.url,
               state,
               toggle: (target) =>

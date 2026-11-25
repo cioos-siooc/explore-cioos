@@ -481,6 +481,11 @@ def main(folder, incremental=False):
     for col in ("wms_url", "cdm_altitude_proxy", "ckan_owner", "archive_url"):
         if col not in datasets.columns:
             datasets[col] = None
+    datasets["ckan_sources"] = (
+        datasets["ckan_sources"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) and x else None)
+        if "ckan_sources" in datasets.columns
+        else None
+    )
 
     if datasets.empty:
         if not incremental:

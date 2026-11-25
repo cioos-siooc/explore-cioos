@@ -46,6 +46,19 @@ function Harness({ initial = {}, searchTerms, onState }) {
   );
 }
 
+// Every portal starts expanded.
+const EXPANDED = [
+  "CIOOS Pacific",
+  "OBIS",
+  "OBIS",
+  "OBIS Canada",
+  "SLGO",
+  "ERDDAP",
+  "OBIS",
+  "Zeta ERDDAP",
+  "ERDDAP",
+];
+
 const names = () =>
   [...document.querySelectorAll(".optionName")].map((el) => el.textContent);
 const portalRow = (label) =>
@@ -69,48 +82,123 @@ describe("SourceFilter", () => {
     expect(screen.getByText("No filter options")).toBeInTheDocument();
   });
 
-  it("lists the portals alphabetically and collapsed, an unclaimed server as its own portal", () => {
+  it("lists the portals alphabetically and expanded, an unclaimed server as its own portal", () => {
     renderWithProviders(<Harness />);
-    expect(names()).toEqual(["CIOOS Pacific", "OBIS", "SLGO", "Zeta ERDDAP"]);
+    expect(names()).toEqual(EXPANDED);
   });
 
-  it("a portal's chevron shows the ERDDAP and OBIS it has, without toggling it", async () => {
+  it("a portal's chevron hides and shows the ERDDAP and OBIS it has, without toggling it", async () => {
     let state;
     const { user } = renderWithProviders(
       <Harness onState={(s) => (state = s)} />,
     );
     await user.click(
-      within(portalRow("SLGO")).getByRole("button", { expanded: false }),
+      within(portalRow("SLGO")).getByRole("button", { expanded: true }),
     );
     expect(names()).toEqual([
       "CIOOS Pacific",
       "OBIS",
-      "SLGO",
-      "ERDDAP",
       "OBIS",
+      "OBIS Canada",
+      "SLGO",
       "Zeta ERDDAP",
+      "ERDDAP",
     ]);
     expect(ticked(state.servers)).toEqual([]);
     await user.click(
-      within(portalRow("SLGO")).getByRole("button", { expanded: true }),
+      within(portalRow("SLGO")).getByRole("button", { expanded: false }),
     );
-    expect(names()).toEqual(["CIOOS Pacific", "OBIS", "SLGO", "Zeta ERDDAP"]);
+    expect(names()).toEqual(EXPANDED);
   });
 
-  it("a portal with a set leaf starts expanded", () => {
-    renderWithProviders(
+  it("nests a portal's sources, each with its own ERDDAP and OBIS", async () => {
+    let state;
+    const hakai = { pk: 2, url: "https://hakai/erddap", title: "Hakai ERDDAP" };
+    const { user } = renderWithProviders(
       <Harness
-        initial={{ servers: [{ ...SERVERS[0], isExcluded: true }, SERVERS[1]] }}
+        onState={(s) => (state = s)}
+        initial={{
+          servers: [hakai],
+          nodes: [],
+          owners: [
+            {
+              pk: "CIOOS Pacific",
+              title: "CIOOS Pacific",
+              erddapServers: [hakai.url],
+              sources: [
+                {
+                  pk: "CIOOS Pacific",
+                  title: "CIOOS Pacific",
+                  erddapServers: [],
+                },
+                {
+                  pk: "Hakai Institute",
+                  title: "Hakai Institute",
+                  erddapServers: [hakai.url],
+                },
+              ],
+            },
+          ],
+          obisCatalogues: [
+            { pk: "CIOOS Pacific", title: "CIOOS Pacific" },
+            { pk: "Hakai Institute", title: "Hakai Institute" },
+          ],
+        }}
       />,
     );
     expect(names()).toEqual([
       "CIOOS Pacific",
+      "CIOOS Pacific",
       "OBIS",
-      "SLGO",
+      "Hakai Institute",
       "ERDDAP",
       "OBIS",
-      "Zeta ERDDAP",
     ]);
+    await user.click(
+      portalRow("Hakai Institute").querySelector(
+        ".sourceGroupButton .optionToggle",
+      ),
+    );
+    expect(ticked(state.servers)).toEqual([2]);
+    expect(ticked(state.obisCatalogues)).toEqual(["Hakai Institute"]);
+    expect(stateOf("Hakai Institute")).toEqual(["selected"]);
+    expect(stateOf("CIOOS Pacific")).toEqual([]);
+  });
+
+  it("a search on a source's name shows only that source", () => {
+    renderWithProviders(
+      <Harness
+        searchTerms="hakai"
+        initial={{
+          servers: [],
+          nodes: [],
+          owners: [
+            {
+              pk: "CIOOS Pacific",
+              title: "CIOOS Pacific",
+              erddapServers: [],
+              sources: [
+                {
+                  pk: "CIOOS Pacific",
+                  title: "CIOOS Pacific",
+                  erddapServers: [],
+                },
+                {
+                  pk: "Hakai Institute",
+                  title: "Hakai Institute",
+                  erddapServers: [],
+                },
+              ],
+            },
+          ],
+          obisCatalogues: [
+            { pk: "CIOOS Pacific", title: "CIOOS Pacific" },
+            { pk: "Hakai Institute", title: "Hakai Institute" },
+          ],
+        }}
+      />,
+    );
+    expect(names()).toEqual(["CIOOS Pacific", "Hakai Institute", "OBIS"]);
   });
 
   it("a portal's box ticks every leaf it has, across the lists", async () => {
@@ -131,9 +219,6 @@ describe("SourceFilter", () => {
     let state;
     const { user } = renderWithProviders(
       <Harness onState={(s) => (state = s)} />,
-    );
-    await user.click(
-      within(portalRow("SLGO")).getByRole("button", { expanded: false }),
     );
     const leaves = portalRow("SLGO").nextElementSibling;
     await user.click(within(leaves).getByText("OBIS"));

@@ -460,26 +460,30 @@ export default function FilterProvider({ children }) {
 
     const cataloguesRequest = fetchJson(`${server}/catalogues`).then(
       (ownersR) => {
-        setPortalOwners(
-          ownersR.map((owner) => ({
-            title: owner.name,
-            pk: owner.name,
-            erddapServers: owner.erddapServers ?? [],
-          })),
+        const asOption = ({ name, erddapServers }) => ({
+          title: name,
+          pk: name,
+          erddapServers: erddapServers ?? [],
+        });
+        const owners = ownersR.map((owner) => ({
+          ...asOption(owner),
+          sources: (owner.sources ?? [owner]).map(asOption),
+        }));
+        setPortalOwners(owners);
+        const obisSources = ownersR.flatMap((owner) =>
+          (owner.sources ?? [owner])
+            .filter((source) => source.hasObis)
+            .map((source) => source.name),
         );
         setObisCataloguesSelected(
-          ownersR
-            .filter((owner) => owner.hasObis)
-            .map((owner) => ({
-              title: owner.name,
-              isSelected: namesFromURL(obisCatalogues ?? "").includes(
-                owner.name,
-              ),
-              isExcluded: namesFromURL(excludeObisCatalogues ?? "").includes(
-                owner.name,
-              ),
-              pk: owner.name,
-            })),
+          obisSources.map((name) => ({
+            title: name,
+            isSelected: namesFromURL(obisCatalogues ?? "").includes(name),
+            isExcluded: namesFromURL(excludeObisCatalogues ?? "").includes(
+              name,
+            ),
+            pk: name,
+          })),
         );
       },
     );

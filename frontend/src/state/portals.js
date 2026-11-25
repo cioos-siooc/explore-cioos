@@ -42,9 +42,22 @@ const PORTAL_NAMES_FR = {
 const portalName = (name, locale) =>
   (locale === "fr" && PORTAL_NAMES_FR[name]) || name;
 
+const withState = (group) => {
+  const state = portalState(group.leaves);
+  return {
+    ...group,
+    state,
+    someSet: group.leaves.some((l) => isSet(l.option)),
+    toggle: (target) =>
+      setLeaves(group.leaves, state === target ? undefined : target),
+  };
+};
+
 // The Data Portal filter as a tree: each portal (a CKAN owner such as SLGO,
 // OBIS, or an ERDDAP server no owner claims) over its ERDDAP / OBIS leaves.
-// A leaf `id` is its option's id in useFilterModel. Sorted by label.
+// A portal with several sources (CIOOS Pacific: Hakai Institute, …) also
+// groups its leaves by source in `institutes`; `leaves` stays flat. A leaf
+// `id` is its option's id in useFilterModel. Sorted by label.
 export function buildPortals(
   {
     erddapServersSelected = [],
@@ -66,31 +79,53 @@ export function buildPortals(
   });
   const claimed = new Set(portalOwners.flatMap((c) => c.erddapServers));
 
+  const sourceLeaves = (source) => {
+    const servers = erddapServersSelected.filter((s) =>
+      source.erddapServers?.includes(s.url),
+    );
+    const obis = obisCataloguesSelected.find((o) => o.pk === source.pk);
+    return [
+      ...servers.map((s) =>
+        serverLeaf(s, servers.length > 1 ? `ERDDAP: ${s.title}` : "ERDDAP"),
+      ),
+      ...(obis
+        ? [
+            {
+              id: `obiscat-${obis.pk}`,
+              kind: "obis",
+              label: "OBIS",
+              option: obis,
+              setList: setObisCataloguesSelected,
+            },
+          ]
+        : []),
+    ];
+  };
+
   const portals = [
     ...portalOwners.map((owner) => {
-      const servers = erddapServersSelected.filter((s) =>
-        owner.erddapServers?.includes(s.url),
-      );
-      const obis = obisCataloguesSelected.find((o) => o.pk === owner.pk);
+      const institutes = (owner.sources ?? [owner])
+        .map((source) => ({
+          key: `source-${source.pk}`,
+          label: portalName(source.title, locale),
+          leaves: sourceLeaves(source),
+        }))
+        .filter((institute) => institute.leaves.length > 0)
+        .sort((a, b) => a.label.localeCompare(b.label, locale));
+      const nested = institutes.length > 1;
       return {
         key: `ckan-${owner.pk}`,
         label: portalName(owner.title, locale),
-        leaves: [
-          ...servers.map((s) =>
-            serverLeaf(s, servers.length > 1 ? `ERDDAP: ${s.title}` : "ERDDAP"),
-          ),
-          ...(obis
-            ? [
-                {
-                  id: `obiscat-${owner.pk}`,
-                  kind: "obis",
-                  label: "OBIS",
-                  option: obis,
-                  setList: setObisCataloguesSelected,
-                },
-              ]
-            : []),
-        ],
+        // `group` names a leaf's source where the tree shows one.
+        leaves: institutes.flatMap((institute) =>
+          nested
+            ? institute.leaves.map((leaf) => ({
+                ...leaf,
+                group: institute.label,
+              }))
+            : institute.leaves,
+        ),
+        ...(nested && { institutes: institutes.map(withState) }),
       };
     }),
     ...erddapServersSelected
@@ -120,15 +155,6 @@ export function buildPortals(
 
   return portals
     .filter((portal) => portal.leaves.length > 0)
-    .map((portal) => {
-      const state = portalState(portal.leaves);
-      return {
-        ...portal,
-        state,
-        someSet: portal.leaves.some((l) => isSet(l.option)),
-        toggle: (target) =>
-          setLeaves(portal.leaves, state === target ? undefined : target),
-      };
-    })
+    .map(withState)
     .sort((a, b) => a.label.localeCompare(b.label, locale));
 }

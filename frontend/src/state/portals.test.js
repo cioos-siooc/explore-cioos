@@ -24,6 +24,74 @@ describe("buildPortals", () => {
     ]);
   });
 
+  it("groups a portal with several sources by source, keeping its leaves flat", () => {
+    const [pacific] = buildPortals({
+      erddapServersSelected: [
+        server(0, "https://hakai"),
+        server(1, "https://cp"),
+      ],
+      portalOwners: [
+        {
+          pk: "CIOOS Pacific",
+          title: "CIOOS Pacific",
+          erddapServers: ["https://hakai", "https://cp"],
+          sources: [
+            {
+              pk: "Hakai Institute",
+              title: "Hakai Institute",
+              erddapServers: ["https://hakai"],
+            },
+            {
+              pk: "CIOOS Pacific",
+              title: "CIOOS Pacific",
+              erddapServers: ["https://cp"],
+            },
+          ],
+        },
+      ],
+      obisCataloguesSelected: [
+        { pk: "Hakai Institute", title: "Hakai Institute", isSelected: true },
+        { pk: "CIOOS Pacific", title: "CIOOS Pacific" },
+      ],
+    });
+    expect(
+      pacific.institutes.map((i) => [
+        i.label,
+        i.leaves.map((l) => l.id),
+        i.someSet,
+      ]),
+    ).toEqual([
+      ["CIOOS Pacific", ["erddap-1", "obiscat-CIOOS Pacific"], false],
+      ["Hakai Institute", ["erddap-0", "obiscat-Hakai Institute"], true],
+    ]);
+    expect(pacific.leaves.map((l) => [l.id, l.group])).toEqual([
+      ["erddap-1", "CIOOS Pacific"],
+      ["obiscat-CIOOS Pacific", "CIOOS Pacific"],
+      ["erddap-0", "Hakai Institute"],
+      ["obiscat-Hakai Institute", "Hakai Institute"],
+    ]);
+  });
+
+  it("does not group a portal with a single source", () => {
+    const [slgo] = buildPortals({
+      erddapServersSelected: [server(0, "https://a")],
+      portalOwners: [
+        {
+          pk: "SLGO",
+          title: "SLGO",
+          erddapServers: ["https://a"],
+          sources: [
+            { pk: "SLGO", title: "SLGO", erddapServers: ["https://a"] },
+          ],
+        },
+      ],
+    });
+    expect(slgo.institutes).toBeUndefined();
+    expect(slgo.leaves.map((l) => [l.id, l.group])).toEqual([
+      ["erddap-0", undefined],
+    ]);
+  });
+
   it("names a known portal in French", () => {
     const owner = (title) => ({
       portalOwners: [{ pk: title, title, erddapServers: ["https://a"] }],
