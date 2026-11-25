@@ -158,11 +158,15 @@ services:
       # service and proxy it to container port 4000. Inert outside Coolify.
       - SERVICE_FQDN_NGINX_4000
     # Gate on health, not creation, or deploys serve 502s while web-api starts.
+    # restart: nginx resolves upstreams once at startup, so it must follow a
+    # recreated web-api/frontend to their new addresses.
     depends_on:
       web-api:
         condition: service_healthy
+        restart: true
       frontend:
         condition: service_healthy
+        restart: true
   scheduler:
     build:
       context: .
