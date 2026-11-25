@@ -4,13 +4,12 @@ on:
   pull_request:
     branches:
       - main
-      - master # Keep coverage while master remains the repository default branch.
       - "development*"
   # Deploy is gated on the Integration Tests run for the pushed commit; these
   # run on the same pushes so a deployable branch always has both results.
   push:
     branches:
-      - master
+      - main
       - development
   workflow_dispatch:
 

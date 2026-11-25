@@ -255,34 +255,34 @@ npm --prefix frontend run test:a11y                    # axe, ratcheting baselin
 
 ### CI/CD
 
-The [Deploy workflow](.github/workflows/deploy.yml) runs when a GitHub release
-is published (or is dispatched by hand with an existing tag). Its `release` job
-verifies the tag and deploys nothing; then exactly one deploy job runs. The tag
-name picks the target and any other name is rejected:
+The [Deploy workflow](.github/workflows/deploy.yml) runs on every push to
+`main`, when a GitHub release is published, or when dispatched by hand with an
+existing tag. Its `release` job verifies the trigger and deploys nothing; then
+exactly one deploy job runs. A tag other than these is rejected:
 
-| Tag | Release type | Target | Commit must be on |
+| Trigger | Release type | Target | Commit must be on |
 |---|---|---|---|
-| `beta*` | prerelease | beta | `development*` or `master` |
-| `vX.Y.Z-rc.N` | prerelease | staging | `master` |
-| `vX.Y.Z` | full release | production | `master`, with a successful staging deployment of the same commit |
+| push to `main` | — | staging | `main` |
+| `beta*` tag | prerelease | beta | `development*` or `main` |
+| `vX.Y.Z` tag | full release | production | `main`, with a successful staging deployment of the same commit |
 
-Before any deploy, `release` also requires a non-draft release and the
-release-triggered Integration Tests (including visual regression) to pass.
-Production's extra gate reads GitHub's deployment records: tag `vX.Y.Z` on the
-same commit as the `vX.Y.Z-rc.N` that deployed successfully. A beta deploy never
-satisfies it.
+Before any deploy, `release` waits for the Integration Tests of the same push or
+release to pass; a release's run also includes visual regression. A release must
+not be a draft. Production's extra gate reads GitHub's deployment records: the
+`vX.Y.Z` commit must have been deployed to staging successfully by its push to
+`main`. A beta deploy never satisfies it.
 
 ```bash
+git push origin main                                                    # staging
 gh release create beta3 --target <branch-or-sha> --prerelease          # beta
-gh release create v1.2.0-rc.1 --target master --prerelease             # staging
-gh release create v1.2.0 --target master                               # production
+gh release create v1.2.0 --target main                                 # production
 ```
 
 Beta and staging are one stack on one Juno host (`beta.explore.cioos.ca`) and
 deploy one at a time; production is another host. All run over WireGuard through
-the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
-roll back or redeploy, dispatch Deploy with an existing published release tag;
-the target follows from the tag.
+the shared `cioos-deploy-docker-compose` action, pinned to the deployed commit. To
+roll back or redeploy, dispatch Deploy with an existing published release tag
+(the target follows from the tag), or re-run a push's Deploy run for staging.
 
 `.env.production` in this repo **is** the production configuration: `op://`
 references name 1Password items, everything else ships as written. Change
