@@ -181,8 +181,7 @@ export function installClick(
 
     // A click on empty water is the touch user's only undo: it closes the
     // card and drops the spatial selection (not the download selection, which
-    // is derived from the results). getLayer guard: a click before
-    // 'style.load' would setFilter on a layer that doesn't exist yet.
+    // is derived from the results).
     if (!query && draw.getAll().features.length === 0) {
       latest.current.setPolygon();
     }
