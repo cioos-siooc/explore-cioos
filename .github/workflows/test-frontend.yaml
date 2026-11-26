@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - main
-      - master
       - "development*"
     paths:
       - "frontend/**"
@@ -14,7 +13,6 @@ on:
   pull_request:
     branches:
       - main
-      - master # Keep coverage while master remains the repository default branch.
       - "development*"
     paths:
       - "frontend/**"
