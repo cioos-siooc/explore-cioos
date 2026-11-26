@@ -11,6 +11,7 @@ DATASET_ARRAY_DTYPES = {
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
     "obis_nodes": ARRAY(TEXT),
+    "ckan_sources": ARRAY(TEXT),
     "table_variables": JSONB,
     "grid_variables": JSONB,
     "grid_dimensions": JSONB,

@@ -15,6 +15,45 @@ import { Tag, TagGroup, TagList } from "../../ui/TagGroup.jsx";
 // Short enough that a group's values stay on its label pill's row.
 const MAX_VISIBLE_VALUES = 2;
 
+// The word between two values of one group: "or" unless the group requires
+// every value, and always "and" next to an excluded value (it only takes
+// away). `toggle` when clicking it flips the group's match-all switch.
+export function connectorBetween(group, prev, item) {
+  const { match } = group;
+  if (prev.excluded || item.excluded) return { all: true };
+  if (!match) return { all: false };
+  return { all: match.all, toggle: () => match.set(!match.all) };
+}
+
+function Connector({ all, toggle, testId }) {
+  const { t } = useTranslation();
+  const word = all ? t("filterConnectorAnd") : t("filterConnectorOr");
+  if (!toggle) {
+    return (
+      <span className="activeFilterConnector" data-testid={testId}>
+        {word}
+      </span>
+    );
+  }
+  const title = all
+    ? t("filterConnectorToAnyTitle")
+    : t("filterConnectorToAllTitle");
+  return (
+    // slot={null}: the Tag around it only provides a "remove" button slot.
+    <Button
+      slot={null}
+      className={classNames("activeFilterConnector toggle", { all })}
+      data-testid={testId}
+      data-match-all={all}
+      onPress={toggle}
+      title={title}
+      aria-label={`${word}: ${title}`}
+    >
+      {word}
+    </Button>
+  );
+}
+
 // Clear all is the quick filters' Reset (see QuickFilters).
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
@@ -57,7 +96,7 @@ export default function ActiveFilterChips() {
       data-testid="active-filter-chips"
       aria-label={t("activeFiltersLabel")}
     >
-      {activeFilters.map((f) => {
+      {activeFilters.map((f, groupIndex) => {
         const expanded = expandedGroups.has(f.key);
         const shownItems = expanded
           ? f.items
@@ -65,131 +104,152 @@ export default function ActiveFilterChips() {
         const hiddenCount = f.items.length - shownItems.length;
 
         return (
-          <li
-            key={f.key}
-            className="activeFilterGroup"
-            data-testid="filter-chip-group"
-            data-filter-key={f.key}
-          >
-            <span className="activeFilterGroupBubble">
-              <button
-                type="button"
-                className="activeFilterGroupRemove"
-                data-testid="filter-chip-group-remove"
-                aria-label={t("activeFilterRemoveAllTitle", {
-                  filter: f.label,
-                })}
-                onClick={f.removeAll}
-                title={t("activeFilterRemoveAllTitle", { filter: f.label })}
+          <React.Fragment key={f.key}>
+            {groupIndex > 0 && (
+              <li
+                className="activeFilterConnectorItem"
+                data-testid="filter-group-connector"
+                aria-hidden="true"
               >
-                <X size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="activeFilterGroupLabel"
-                data-testid="filter-chip-label"
-                onClick={f.goToFilter}
-                title={t("activeFilterGoToFilterTitle", { filter: f.label })}
-              >
-                <span className="activeFilterGroupIcon" aria-hidden="true">
-                  {f.icon}
+                <span className="activeFilterConnector between">
+                  {t("filterConnectorAnd")}
                 </span>
-                <span className="activeFilterGroupLabelText">{f.label}</span>
-              </button>
-            </span>
-            <TagGroup
-              className="activeFilterTags"
-              aria-label={f.label}
-              onRemove={(keys) =>
-                f.items
-                  .filter((item) => keys.has(item.id))
-                  .forEach((item) => item.remove())
-              }
+              </li>
+            )}
+            <li
+              className="activeFilterGroup"
+              data-testid="filter-chip-group"
+              data-filter-key={f.key}
             >
-              <TagList className="activeFilterTagList">
-                {shownItems.map((item) => {
-                  // The chip shows the "not" as its own tag instead.
-                  const fullLabel = item.excluded
-                    ? t("filterExcludedOption", { title: item.label })
-                    : item.label;
-                  return (
-                    <Tag
-                      key={item.id}
-                      id={item.id}
-                      textValue={fullLabel}
-                      className={classNames("activeFilterItem", {
-                        excluded: item.excluded,
-                      })}
-                      data-testid="filter-chip-item"
-                      data-item-id={item.id}
-                      data-excluded={Boolean(item.excluded)}
-                      onAction={f.goToFilter}
-                    >
-                      {item.excluded && (
+              <span className="activeFilterGroupBubble">
+                <button
+                  type="button"
+                  className="activeFilterGroupRemove"
+                  data-testid="filter-chip-group-remove"
+                  aria-label={t("activeFilterRemoveAllTitle", {
+                    filter: f.label,
+                  })}
+                  onClick={f.removeAll}
+                  title={t("activeFilterRemoveAllTitle", { filter: f.label })}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="activeFilterGroupLabel"
+                  data-testid="filter-chip-label"
+                  onClick={f.goToFilter}
+                  title={t("activeFilterGoToFilterTitle", { filter: f.label })}
+                >
+                  <span className="activeFilterGroupIcon" aria-hidden="true">
+                    {f.icon}
+                  </span>
+                  <span className="activeFilterGroupLabelText">{f.label}</span>
+                </button>
+              </span>
+              <TagGroup
+                className="activeFilterTags"
+                aria-label={f.label}
+                onRemove={(keys) =>
+                  f.items
+                    .filter((item) => keys.has(item.id))
+                    .forEach((item) => item.remove())
+                }
+              >
+                <TagList className="activeFilterTagList">
+                  {shownItems.map((item, i) => {
+                    // The chip shows the "not" as its own tag instead.
+                    const fullLabel = item.excluded
+                      ? t("filterExcludedOption", { title: item.label })
+                      : item.label;
+                    // Inside the tag: a TagList only takes tags.
+                    const connector =
+                      i > 0 && connectorBetween(f, shownItems[i - 1], item);
+                    return (
+                      <Tag
+                        key={item.id}
+                        id={item.id}
+                        textValue={fullLabel}
+                        className={classNames("activeFilterItem", {
+                          excluded: item.excluded,
+                        })}
+                        data-testid="filter-chip-item"
+                        data-item-id={item.id}
+                        data-excluded={Boolean(item.excluded)}
+                        onAction={f.goToFilter}
+                      >
+                        {connector && (
+                          <Connector
+                            {...connector}
+                            testId="filter-item-connector"
+                          />
+                        )}
+                        {item.excluded && (
+                          <span
+                            className="activeFilterItemNot"
+                            aria-hidden="true"
+                          >
+                            {t("filterNotTag")}
+                          </span>
+                        )}
                         <span
-                          className="activeFilterItemNot"
-                          aria-hidden="true"
+                          className="activeFilterItemLabel"
+                          data-testid="filter-chip-item-label"
+                          // The full value first: the label truncates.
+                          title={`${fullLabel}\n${t("activeFilterGoToFilterTitle", { filter: f.label })}`}
                         >
-                          {t("filterNotTag")}
+                          <span className="sr-only">
+                            {item.excluded && `${t("filterNotTag")} `}
+                          </span>
+                          {item.label}
                         </span>
-                      )}
-                      <span
-                        className="activeFilterItemLabel"
-                        data-testid="filter-chip-item-label"
-                        // The full value first: the label truncates.
-                        title={`${fullLabel}\n${t("activeFilterGoToFilterTitle", { filter: f.label })}`}
-                      >
-                        <span className="sr-only">
-                          {item.excluded && `${t("filterNotTag")} `}
-                        </span>
-                        {item.label}
-                      </span>
-                      <Button
-                        slot="remove"
-                        className="activeFilterItemRemove"
-                        data-testid="filter-chip-item-remove"
-                        title={t("activeFilterRemoveItemTitle")}
-                        // Unique per chip so tests and screen readers can tell them apart.
-                        aria-label={`${t("activeFilterRemoveItemTitle")}: ${fullLabel}`}
-                      >
-                        <X size={14} aria-hidden="true" />
-                      </Button>
-                    </Tag>
-                  );
-                })}
-              </TagList>
-            </TagGroup>
-            {hiddenCount > 0 && (
-              <button
-                type="button"
-                className="activeFilterMoreButton"
-                data-testid="filter-chip-more"
-                onClick={() => toggleGroup(f.key)}
-                title={t("activeFilterShowMoreTitle", { count: hiddenCount })}
-                aria-label={t("activeFilterShowMoreTitle", {
-                  count: hiddenCount,
-                })}
-              >
-                +{hiddenCount}
-              </button>
-            )}
-            {expanded && f.items.length > MAX_VISIBLE_VALUES && (
-              <button
-                type="button"
-                className="activeFilterMoreButton"
-                data-testid="filter-chip-less"
-                onClick={() => toggleGroup(f.key)}
-                title={t("activeFilterShowLessTitle", {
-                  count: f.items.length - MAX_VISIBLE_VALUES,
-                })}
-                aria-label={t("activeFilterShowLessTitle", {
-                  count: f.items.length - MAX_VISIBLE_VALUES,
-                })}
-              >
-                &minus;{f.items.length - MAX_VISIBLE_VALUES}
-              </button>
-            )}
-          </li>
+                        <Button
+                          slot="remove"
+                          className="activeFilterItemRemove"
+                          data-testid="filter-chip-item-remove"
+                          title={t("activeFilterRemoveItemTitle")}
+                          // Unique per chip so tests and screen readers can tell them apart.
+                          aria-label={`${t("activeFilterRemoveItemTitle")}: ${fullLabel}`}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </Button>
+                      </Tag>
+                    );
+                  })}
+                </TagList>
+              </TagGroup>
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  className="activeFilterMoreButton"
+                  data-testid="filter-chip-more"
+                  onClick={() => toggleGroup(f.key)}
+                  title={t("activeFilterShowMoreTitle", { count: hiddenCount })}
+                  aria-label={t("activeFilterShowMoreTitle", {
+                    count: hiddenCount,
+                  })}
+                >
+                  +{hiddenCount}
+                </button>
+              )}
+              {expanded && f.items.length > MAX_VISIBLE_VALUES && (
+                <button
+                  type="button"
+                  className="activeFilterMoreButton"
+                  data-testid="filter-chip-less"
+                  onClick={() => toggleGroup(f.key)}
+                  title={t("activeFilterShowLessTitle", {
+                    count: f.items.length - MAX_VISIBLE_VALUES,
+                  })}
+                  aria-label={t("activeFilterShowLessTitle", {
+                    count: f.items.length - MAX_VISIBLE_VALUES,
+                  })}
+                >
+                  &minus;{f.items.length - MAX_VISIBLE_VALUES}
+                </button>
+              )}
+            </li>
+          </React.Fragment>
         );
       })}
     </ul>
