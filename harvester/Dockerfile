@@ -17,7 +17,9 @@ WORKDIR /app/harvester
 # 2. Install dependencies only (no project code yet)
 # --locked with no fallback: a lockfile mismatch must be fixed in the repo,
 # not resolved to untested versions inside the build.
-RUN --mount=type=cache,target=/root/.cache/uv \
+# Own cache id: compose builds harvester and scheduler in parallel, and a shared
+# mount makes one wait on the other's per-wheel uv locks (300s timeout, then fail).
+RUN --mount=type=cache,id=uv-harvester,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # 3. Copy source code
@@ -35,7 +37,7 @@ COPY ./Obis_Datasets.json ./Obis_Datasets.json
 COPY ./database /app/database
 
 # 4. Install project itself
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=uv-harvester,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)
 
 # The source and venv stay root-owned, so `app` cannot modify them; it only

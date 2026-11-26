@@ -143,10 +143,12 @@ async function createDBFilter(
     scientificNames,
     obisNodes,
     erddapServers,
+    obisCatalogues,
     excludePlatforms,
     excludeOrganizations,
     excludeObisNodes,
     excludeErddapServers,
+    excludeObisCatalogues,
     excludeEovs,
     excludeScientificNames,
   } = request;
@@ -279,23 +281,30 @@ async function createDBFilter(
     );
   }
 
-  // Combined "Data Source" filter: ERDDAP datasets have NULL obis_nodes and
-  // OBIS datasets carry the sentinel https://obis.org as erddap_url, so with
-  // both params a dataset matches either.
+  // Combined "Data Portal" filter, an OR of its parts: ERDDAP datasets have
+  // NULL obis_nodes and OBIS datasets carry the sentinel https://obis.org as
+  // erddap_url. `obisCatalogues` are OBIS records by catalogue source: a
+  // portal (CKAN owner) or an institute in it. Rows harvested before
+  // ckan_sources existed count as their owner's.
+  const sourceConds = [];
   if (obisNodes) {
     parameters.obisNodesArr = obisNodes.split(",");
+    sourceConds.push("d.obis_nodes && :obisNodesArr");
   }
   if (erddapServers) {
     parameters.erddapServersArray = erddapServers.split(",");
+    sourceConds.push("d.erddap_url = ANY(:erddapServersArray)");
   }
-  if (obisNodes && erddapServers) {
-    filters.push(
-      "(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))",
+  if (obisCatalogues) {
+    parameters.obisCataloguesArr = obisCatalogues.split(",");
+    sourceConds.push(
+      "(d.source_type = 'obis' AND coalesce(d.ckan_sources, ARRAY[d.ckan_owner]) && :obisCataloguesArr)",
     );
-  } else if (obisNodes) {
-    filters.push("d.obis_nodes && :obisNodesArr");
-  } else if (erddapServers) {
-    filters.push("d.erddap_url = ANY(:erddapServersArray)");
+  }
+  if (sourceConds.length === 1) {
+    filters.push(sourceConds[0]);
+  } else if (sourceConds.length > 1) {
+    filters.push(`(${sourceConds.join(" OR ")})`);
   }
 
   // Source excludes take no part in the OBIS-only gate (utils/selection.js).
@@ -308,6 +317,12 @@ async function createDBFilter(
   if (excludeObisNodes) {
     parameters.excludeObisNodesArr = excludeObisNodes.split(",");
     filters.push("NOT coalesce(d.obis_nodes && :excludeObisNodesArr, false)");
+  }
+  if (excludeObisCatalogues) {
+    parameters.excludeObisCataloguesArr = excludeObisCatalogues.split(",");
+    filters.push(
+      "NOT coalesce(d.source_type = 'obis' AND coalesce(d.ckan_sources, ARRAY[d.ckan_owner]) && :excludeObisCataloguesArr, false)",
+    );
   }
 
   if (polygon) {

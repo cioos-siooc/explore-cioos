@@ -7,7 +7,9 @@ import pandas as pd
 import pytest
 import requests
 from cde_harvester.core.errors import HASH_CKAN_UNAVAILABLE
+from cde_harvester.core.schemas import DatasetSchema
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
+    ckan_sources,
     erddap_join_key,
     get_ckan_records,
     split_erddap_url,
@@ -255,7 +257,8 @@ class TestCkanUnavailable:
             return_value=pd.DataFrame([
                 {"erddap_url": "https://obis.org", "dataset_id": d, "ckan_id": f"ckan-{d}",
                  "title": "Stored", "title_fr": "Stocké", "organizations": [], "eovs": ["fish"],
-                 "metadata": {"abstract": {"en": "Stored abstract"}}}
+                 "metadata": {"abstract": {"en": "Stored abstract"}}, "ckan_owner": "SLGO",
+                 "ckan_sources": ["SLGO"]}
                 for d in ("uuid-1", "uuid-other")
             ]),
         )
@@ -263,6 +266,7 @@ class TestCkanUnavailable:
         load.assert_called_once_with(["https://obis.org"])
         assert df.to_dict("records") == [{
             "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
+            "ckan_organizations": [], "ckan_owner": "SLGO", "ckan_sources": ["SLGO"],
             "ckan_title": "Stored", "title_fr": "Stocké",
             "ckan_metadata": {"abstract": {"en": "Stored abstract"}},
         }]
@@ -310,6 +314,7 @@ class TestGetCkanObisRecords:
         df = get_ckan_obis_records({OBIS_UUID: None, "11111111-1111-4111-8111-111111111111": None})
         assert df.to_dict("records") == [{
             "dataset_id": OBIS_UUID, "ckan_id": "by-uuid", "ckan_eovs": ["fishAbundanceAndDistribution"],
+            "ckan_organizations": [], "ckan_owner": None, "ckan_sources": [],
             "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
             "ckan_metadata": {"resources": [
                 {"url": "https://catalogue.example/notes.pdf"},
@@ -330,6 +335,36 @@ class TestGetCkanObisRecords:
         ))
         assert get_ckan_obis_records({OBIS_UUID: QU39_IPT}).empty
 
+    def test_organizations_from_cited_responsible_parties(self, mocker):
+        record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["cited-responsible-party"] = [
+            {"organisation-name": "Comit\\u00e9 ZIP C\\u00f4te-Nord du Golfe"},
+            {"organisation-name": "Comit\\u00e9 ZIP C\\u00f4te-Nord du Golfe"},
+            {"individual-name": "Someone"},
+        ]
+        _make_ckan_get(mocker, _search_pages(record))
+        df = get_ckan_obis_records({OBIS_UUID: None})
+        assert df["ckan_organizations"].tolist() == [["Comité ZIP Côte-Nord du Golfe"]]
+
+    @pytest.mark.parametrize(("owner", "expected"), [
+        ("slgo", "St. Lawrence Global Observatory (SLGO)"),
+        ("cioos-pacific", "CIOOS Pacific"),
+        ("unknown-owner", "Titre en français"),
+    ])
+    def test_owner_named_from_the_owner_map_or_its_title(self, mocker, owner, expected):
+        record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["organization"] = {"name": owner, "title": "Titre en français"}
+        _make_ckan_get(mocker, _search_pages(record))
+        assert get_ckan_obis_records({OBIS_UUID: None})["ckan_owner"].tolist() == [expected]
+
+    def test_sources_stored_with_the_record(self, mocker):
+        record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["organization"] = {"name": "slgo"}
+        _make_ckan_get(mocker, _search_pages(record))
+        assert get_ckan_obis_records({OBIS_UUID: None})["ckan_sources"].tolist() == [
+            ["St. Lawrence Global Observatory (SLGO)"]
+        ]
+
     def test_titles_cleaned_like_erddap(self, mocker):
         record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
         record["title_translated"] = {"en": "Line\\none"}
@@ -346,7 +381,7 @@ class TestGetCkanObisRecords:
 
 
 class TestMergeCkanJoin:
-    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True):
+    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True, erddap_columns=(), **ckan_columns):
         from cde_harvester.__main__ import merge_and_write_csvs
 
         logger = mocker.MagicMock()
@@ -360,6 +395,9 @@ class TestMergeCkanJoin:
             "content_hash_reason": [None, None],
             "metadata": [{"abstract": {"en": "ERDDAP"}, "lineage": "history"}, {}],
         })
+        for column in erddap_columns:
+            if column not in erddap_datasets:
+                erddap_datasets[column] = None
         df_ckan = pd.DataFrame({
             "erddap_url": [ckan_erddap_url],
             "dataset_id": ["matched"],
@@ -368,6 +406,7 @@ class TestMergeCkanJoin:
             "ckan_title": ["CKAN title"],
             "title_fr": ["Titre"],
             "ckan_metadata": [{"abstract": {"en": "CKAN"}}],
+            **ckan_columns,
         })
         merge_and_write_csvs.fn(
             str(tmp_path), erddap_datasets,
@@ -436,3 +475,59 @@ class TestMergeCkanJoin:
     def test_hash_kept_when_ckan_available(self, mocker, tmp_path):
         datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")
         assert datasets.loc["matched", "content_hash"] == "h1"
+
+    def test_owner_kept_apart_from_organizations(self, mocker, tmp_path):
+        datasets, _ = self._merge(
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_owner=["Amundsen Science"],
+            ckan_sources=[["Amundsen Science"]],
+        )
+        assert ast.literal_eval(datasets.loc["matched", "organizations"]) == ["CKAN org"]
+        assert datasets.loc["matched", "ckan_owner"] == "Amundsen Science"
+        assert ast.literal_eval(datasets.loc["matched", "ckan_sources"]) == ["Amundsen Science"]
+        assert pd.isna(datasets.loc["orphan", "ckan_owner"])
+        assert pd.isna(datasets.loc["orphan", "ckan_sources"])
+
+    def test_joins_onto_every_column_the_erddap_harvester_emits(self, mocker, tmp_path):
+        datasets, _ = self._merge(
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_owner=["SLGO"],
+            erddap_columns=DatasetSchema.to_schema().columns.keys(),
+        )
+        assert datasets.loc["matched", "ckan_owner"] == "SLGO"
+
+
+HAKAI_XML = "https://metadata-generator-proxy.server.hakai.app/metadata/hakai/protistan_6756b.xml"
+PACIFIC_FORM_XML = "https://waf.forms.cioos.ca/metadata/pacific/hakai_institute_juvenile_salmo_50f11.xml"
+IYS_XML = "https://metadata-generator-proxy.server.hakai.app/metadata/iys/trawl_7935f.xml"
+
+
+def _pacific(xml, *cited):
+    return {
+        "organization": {"name": "cioos-pacific"},
+        "xml_location_url": xml,
+        "cited-responsible-party": [{"organisation-name": c} for c in cited],
+    }
+
+
+class TestCkanSources:
+    @pytest.mark.parametrize(("record", "expected"), [
+        (_pacific(HAKAI_XML, "Hakai Institute"), ["Hakai Institute"]),
+        (_pacific("https://ftp.oceannetworks.ca/pub/x/1.xml"), ["Ocean Networks Canada Society"]),
+        (_pacific("https://qa.oceannetworks.ca/pub/x/1.xml"), ["Ocean Networks Canada Society"]),
+        # A program, not an institute: the portal's own.
+        (_pacific(IYS_XML, "University of British Columbia"), ["CIOOS Pacific"]),
+        (_pacific(PACIFIC_FORM_XML, "Fisheries and Oceans Canada (DFO)"), ["CIOOS Pacific"]),
+        # Entered through the portal's form, so both the portal and the institute.
+        (_pacific(PACIFIC_FORM_XML, "Hakai Institute", "Simon Fraser University"),
+         ["CIOOS Pacific", "Hakai Institute"]),
+        (_pacific(None), ["CIOOS Pacific"]),
+    ])
+    def test_pacific(self, record, expected):
+        assert ckan_sources(record) == expected
+
+    def test_institutes_only_within_their_portal(self):
+        record = _pacific(HAKAI_XML, "Hakai Institute")
+        record["organization"] = {"name": "slgo"}
+        assert ckan_sources(record) == ["St. Lawrence Global Observatory (SLGO)"]
+
+    def test_no_owner_no_sources(self):
+        assert ckan_sources({"xml_location_url": HAKAI_XML}) == []

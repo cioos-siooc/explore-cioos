@@ -19,7 +19,9 @@ COPY harvester ./harvester
 
 WORKDIR /usr/src/app/download_scheduler
 # --locked: without it uv may re-resolve to versions CI never tested.
-RUN --mount=type=cache,target=/root/.cache/uv \
+# Own cache id: compose builds harvester and scheduler in parallel, and a shared
+# mount makes one wait on the other's per-wheel uv locks (300s timeout, then fail).
+RUN --mount=type=cache,id=uv-download-scheduler,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # Same split as harvester/Dockerfile: root-owned code, `app` writes only the

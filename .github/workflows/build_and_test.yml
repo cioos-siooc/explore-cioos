@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - master
+      - main
       - "development*"
   # The visual (screenshot) suite's trigger; a published release runs this
   # whole workflow unconditionally (no `paths:` filter on `release` events).

@@ -1,16 +1,18 @@
 name: Deploy
 
-# The tag name picks the target (anything else is rejected):
-#   beta*          -> beta        any development*/master commit
-#   vX.Y.Z-rc.N    -> staging     master only
-#   vX.Y.Z         -> production  master only, and only a SHA whose staging
+# What triggers it picks the target (any other tag is rejected):
+#   push to main   -> staging
+#   beta* tag      -> beta        any development*/main commit
+#   vX.Y.Z tag     -> production  main only, and only a SHA whose staging
 #                                 deployment succeeded
 # beta and staging share one stack on the Juno host cioos-co-dev-explore
-# (beta.explore.cioos.ca, behind Caddy basic_auth), one deploy at a time, and
-# always keep their volumes: reset the database by hand (README → Deployment).
-# Wait for the release's Integration Tests (including visual regression) before
-# deploying.
+# (beta.explore.cioos.ca), one deploy at a time, and always keep their volumes:
+# reset the database by hand (README → Deployment). Each deploy waits for the
+# Integration Tests of its push or release (a release's include visual
+# regression).
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
   workflow_dispatch:
@@ -38,7 +40,7 @@ jobs:
       - name: Checkout release
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
           fetch-depth: 0
 
       - name: Verify release and source branch
@@ -48,33 +50,38 @@ jobs:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
           PUBLISHED_AT: ${{ github.event.release.published_at }}
         run: |
-          case "$TAG" in
-            beta*) target=beta ;;
-            *) if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then target=staging
-               elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then target=production
-               else echo "Tag $TAG is not beta*, vX.Y.Z-rc.N or vX.Y.Z" >&2; exit 1; fi ;;
-          esac
-          git show-ref --verify --quiet "refs/tags/$TAG"
-          sha=$(git rev-parse "$TAG^{commit}")
-          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")
-          test "$(jq -r '.draft' <<< "$release")" = false
-          if [ "$target" = production ]; then
-            test "$(jq -r '.prerelease' <<< "$release")" = false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            # Named by commit: SENTRY_RELEASE and the User-Agent carry it.
+            target=staging sha=$GITHUB_SHA TAG=main-${GITHUB_SHA::7} tests_event=push
           else
-            test "$(jq -r '.prerelease' <<< "$release")" = true
+            case "$TAG" in
+              beta*) target=beta ;;
+              *) if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then target=production
+                 else echo "Tag $TAG is not beta* or vX.Y.Z" >&2; exit 1; fi ;;
+            esac
+            git show-ref --verify --quiet "refs/tags/$TAG"
+            sha=$(git rev-parse "$TAG^{commit}")
+            tests_event=release
+            release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")
+            test "$(jq -r '.draft' <<< "$release")" = false
+            if [ "$target" = production ]; then
+              test "$(jq -r '.prerelease' <<< "$release")" = false
+            else
+              test "$(jq -r '.prerelease' <<< "$release")" = true
+            fi
           fi
           git fetch origin '+refs/heads/*:refs/remotes/origin/*'
           if [ "$target" = beta ]; then
             found=false
             for branch in $(git for-each-ref --format='%(refname)' refs/remotes/origin); do
               case "$branch" in
-                refs/remotes/origin/development*|refs/remotes/origin/master)
+                refs/remotes/origin/development*|refs/remotes/origin/main)
                   if git merge-base --is-ancestor "$sha" "$branch"; then found=true; break; fi ;;
               esac
             done
             test "$found" = true
           else
-            git merge-base --is-ancestor "$sha" refs/remotes/origin/master
+            git merge-base --is-ancestor "$sha" refs/remotes/origin/main
           fi
           if [ "$target" = production ]; then
             staged=false
@@ -90,12 +97,12 @@ jobs:
             test "$passed" -gt 0 || { echo "$sha has no successful release Integration Tests run" >&2; exit 1; }
           else
             for _ in $(seq 1 70); do
-              conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_test.yml/runs?event=release&head_sha=$sha&per_page=100" \
+              conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_test.yml/runs?event=$tests_event&head_sha=$sha&per_page=100" \
                 | jq -r --arg published "$PUBLISHED_AT" '.workflow_runs | map(select(.created_at >= $published)) | sort_by(.created_at) | last | .conclusion // "pending"')
               case "$conclusion" in
                 success) break ;;
                 pending) sleep 60 ;;
-                *) echo "Release Integration Tests: $conclusion" >&2; exit 1 ;;
+                *) echo "Integration Tests ($tests_event): $conclusion" >&2; exit 1 ;;
               esac
             done
             test "$conclusion" = success
@@ -138,7 +145,7 @@ jobs:
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
-          docker_compose_down: "true"
+          wait: "true"
 
   production:
     name: Deploy production
@@ -157,8 +164,11 @@ jobs:
           ssh_host: ${{ secrets.SERVER_IP }}
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
-          deploy_path: /srv/services/explore-cioos
-          stack_name: explore-cioos-production
+          # Not explore-cioos / explore-cioos-production: those are the old
+          # build's checkout and compose project, which keep serving until the
+          # proxy is switched to this stack.
+          deploy_path: /srv/services/explore-cioos-v2
+          stack_name: explore-cioos-v2
           compose_files: docker-compose.yaml docker-compose.production.yaml
           op_secret_files: .env.production:.env
           env_overrides: |
@@ -166,4 +176,4 @@ jobs:
             SOURCE_COMMIT=${{ needs.release.outputs.sha }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
-          docker_compose_down: "true"
+          wait: "true"

@@ -188,6 +188,29 @@ test("obisNodes and erddapServers OR together only when both are set", async () 
   assert.doesNotMatch(serversOnly.shared.toString(), /obis_nodes/);
 });
 
+test("a portal's OBIS records join the Data Portal OR", async () => {
+  const any = await createDBFilter({
+    obisNodes: "n1",
+    obisCatalogues: "CIOOS Pacific",
+  });
+  assert.match(
+    any.shared.toString(),
+    /\(d\.obis_nodes && .* OR \(d\.source_type = 'obis' AND coalesce\(d\.ckan_sources, ARRAY\[d\.ckan_owner\]\) && '\{"CIOOS Pacific"\}'\)\)/,
+  );
+
+  const ownerOnly = await createDBFilter({ obisCatalogues: "SLGO" });
+  assert.match(ownerOnly.shared.toString(), /^\(d\.source_type = 'obis' AND /);
+  assert.equal(ownerOnly.datasetLevelOnly, true);
+});
+
+test("excludeObisCatalogues drops only that source's OBIS records", async () => {
+  const f = await createDBFilter({ excludeObisCatalogues: "SLGO" });
+  assert.match(
+    f.shared.toString(),
+    /NOT coalesce\(d\.source_type = 'obis' AND coalesce\(d\.ckan_sources, ARRAY\[d\.ckan_owner\]\) && '\{"SLGO"\}', false\)/,
+  );
+});
+
 test("excludeEovs drops at both levels and keeps datasets with no EOVs", async () => {
   const f = await createDBFilter({ excludeEovs: "salinity" });
   const clause = /NOT coalesce\(eovs && '\{"salinity"\}', false\)/;

@@ -55,6 +55,11 @@ CREATE TABLE datasets (
     organizations text[],
     eovs text[],
     ckan_id text,
+    -- The CKAN organization that owns the record (SLGO, CIOOS Pacific, …).
+    ckan_owner text,
+    -- Who within the owner published it (Hakai Institute, …); the owner itself
+    -- when none of its institutes did (state/portals.js shows both levels).
+    ckan_sources text[],
     timeseries_id_variable text,
     profile_id_variable text,
     trajectory_id_variable text,
