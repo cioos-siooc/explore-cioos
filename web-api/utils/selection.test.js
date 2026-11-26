@@ -43,6 +43,7 @@ test("an obisNodes selection is OBIS-only unless erddapServers joins it", () => 
     true,
   );
   assert.equal(erddapVisible({ erddapServers: "https://e" }), true);
+  assert.equal(erddapVisible({ obisCatalogues: "SLGO" }), false);
 });
 
 test("only an explicit includeObis=false hides occurrence cells", () => {

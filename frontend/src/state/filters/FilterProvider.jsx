@@ -33,6 +33,7 @@ import {
   defaultScientificNamesSelected,
   defaultObisNodesSelected,
   defaultErddapServersSelected,
+  defaultCataloguesSelected,
   defaultRealtimeOnly,
 } from "../../components/config.js";
 import {
@@ -98,8 +99,8 @@ export default function FilterProvider({ children }) {
   const debouncedPlatformsSelected = useDebounce(platformsSelected, 500);
   const [platformsSearchTerms, setPlatformsSearchTerms] = useState("");
 
-  // Two lists because they map to different API parameters, rendered as one
-  // "Data Source" filter.
+  // Four lists because they map to different API parameters, rendered as one
+  // "Data Portal" tree (state/portals.js).
   const [erddapServerSelections, setErddapServersSelected] = useState(
     defaultErddapServersSelected,
   );
@@ -124,6 +125,16 @@ export default function FilterProvider({ children }) {
     defaultObisNodesSelected,
   );
   const debouncedObisNodesSelected = useDebounce(obisNodesSelected, 500);
+  // CKAN owners, not a filter: they say which servers and OBIS records make
+  // up each portal.
+  const [portalOwners, setPortalOwners] = useState([]);
+  const [obisCataloguesSelected, setObisCataloguesSelected] = useState(
+    defaultCataloguesSelected,
+  );
+  const debouncedObisCataloguesSelected = useDebounce(
+    obisCataloguesSelected,
+    500,
+  );
   const [sourcesSearchTerms, setSourcesSearchTerms] = useState("");
 
   // Not debounced: a single toggle, unlike the list filters.
@@ -172,14 +183,19 @@ export default function FilterProvider({ children }) {
 
   const anyServersSelected = erddapServersSelected.some((s) => s.isSelected);
   const anyObisNodesSelected = obisNodesSelected.some((n) => n.isSelected);
+  const anyCataloguesSelected = obisCataloguesSelected.some(
+    (c) => c.isSelected,
+  );
   const allObisNodesSelected =
     obisNodesSelected.length > 0 &&
     obisNodesSelected.every((n) => n.isSelected);
   const allObisNodesExcluded =
     obisNodesSelected.length > 0 &&
     obisNodesSelected.every((n) => n.isExcluded);
+  // A catalogue can own OBIS records, so it keeps OBIS in view like a node.
   const showObis =
-    (!anyServersSelected || anyObisNodesSelected) && !allObisNodesExcluded;
+    (!anyServersSelected || anyObisNodesSelected || anyCataloguesSelected) &&
+    !allObisNodesExcluded;
   // An empty /obisNodes means no OBIS data, so OBIS-only UI is hidden.
   const obisDataAvailable = obisNodesSelected.length > 0;
 
@@ -192,6 +208,7 @@ export default function FilterProvider({ children }) {
     platformsSelected !== debouncedPlatformsSelected ||
     erddapServersSelected !== debouncedErddapServersSelected ||
     obisNodesSelected !== debouncedObisNodesSelected ||
+    obisCataloguesSelected !== debouncedObisCataloguesSelected ||
     startDate !== debouncedStartDate ||
     endDate !== debouncedEndDate ||
     startDepth !== debouncedStartDepth ||
@@ -217,6 +234,7 @@ export default function FilterProvider({ children }) {
       scientificNamesExcluded: showObis ? debouncedScientificNamesExcluded : [],
       obisNodesSelected: debouncedObisNodesSelected,
       erddapServersSelected: debouncedErddapServersSelected,
+      obisCataloguesSelected: debouncedObisCataloguesSelected,
       realtimeOnly,
       searchText: search.text,
       searchIn: search.in,
@@ -237,6 +255,7 @@ export default function FilterProvider({ children }) {
       debouncedScientificNamesExcluded,
       debouncedObisNodesSelected,
       debouncedErddapServersSelected,
+      debouncedObisCataloguesSelected,
       realtimeOnly,
       search,
       eovsMatchAll,
@@ -310,6 +329,7 @@ export default function FilterProvider({ children }) {
       includeObis,
       scientificNames,
       obisNodes,
+      obisCatalogues,
       realtimeOnly: realtimeOnlyFromURL,
       eovsMatch,
       organizationsMatch,
@@ -320,6 +340,7 @@ export default function FilterProvider({ children }) {
       excludeDatasetPKs,
       excludeErddapServers,
       excludeObisNodes,
+      excludeObisCatalogues,
       excludeScientificNames,
     } = filtersFromURL;
 
@@ -437,6 +458,36 @@ export default function FilterProvider({ children }) {
       );
     });
 
+    const cataloguesRequest = fetchJson(`${server}/catalogues`).then(
+      (ownersR) => {
+        const asOption = ({ name, erddapServers }) => ({
+          title: name,
+          pk: name,
+          erddapServers: erddapServers ?? [],
+        });
+        const owners = ownersR.map((owner) => ({
+          ...asOption(owner),
+          sources: (owner.sources ?? [owner]).map(asOption),
+        }));
+        setPortalOwners(owners);
+        const obisSources = ownersR.flatMap((owner) =>
+          (owner.sources ?? [owner])
+            .filter((source) => source.hasObis)
+            .map((source) => source.name),
+        );
+        setObisCataloguesSelected(
+          obisSources.map((name) => ({
+            title: name,
+            isSelected: namesFromURL(obisCatalogues ?? "").includes(name),
+            isExcluded: namesFromURL(excludeObisCatalogues ?? "").includes(
+              name,
+            ),
+            pk: name,
+          })),
+        );
+      },
+    );
+
     const datasetsFromURL = (datasetPKs?.split(",") || []).map((e) =>
       Number.parseInt(e),
     );
@@ -495,6 +546,7 @@ export default function FilterProvider({ children }) {
       eovsRequest,
       orgsRequest,
       obisNodesRequest,
+      cataloguesRequest,
       datasetsRequest,
       erddapServersRequest,
     ]).then((results) => {
@@ -560,6 +612,11 @@ export default function FilterProvider({ children }) {
         return { ...node, isSelected: false, isExcluded: false };
       }),
     );
+    setObisCataloguesSelected(
+      obisCataloguesSelected.map((owner) => {
+        return { ...owner, isSelected: false, isExcluded: false };
+      }),
+    );
     setScientificNamesSelected([]);
     setScientificNamesExcluded([]);
   }
@@ -588,6 +645,9 @@ export default function FilterProvider({ children }) {
     setErddapServersSelected,
     obisNodesSelected,
     setObisNodesSelected,
+    portalOwners,
+    obisCataloguesSelected,
+    setObisCataloguesSelected,
     sourcesSearchTerms,
     setSourcesSearchTerms,
     realtimeOnly,
