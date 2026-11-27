@@ -101,6 +101,12 @@
   background-color: var(--cioos-teal-light, #c6e3df);
 }
 
+.dropdownItemCheck {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--cioos-primary-800);
+}
+
 .dropdown-item[data-focus-visible] {
   box-shadow: inset var(--cioos-focus);
 }

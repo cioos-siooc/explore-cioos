@@ -1,35 +1,63 @@
-.wmsLegendPeek {
+/* The folded legend's controls, in the variable picker's teal field. */
+.wmsLegendPeek,
+.wmsLegendFold {
   display: inline-flex;
   align-items: center;
-  align-self: flex-start;
   gap: 6px;
-  max-width: 100%;
+  min-height: 32px;
   margin: 0;
-  padding: 6px 12px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
+  padding: 6px 10px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-sm);
+  background-color: rgb(82 167 155 / 8%);
   background-image: none;
-  box-shadow: var(--cioos-shadow-float);
   font: inherit;
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-800);
   cursor: pointer;
 }
 
-.wmsLegendPeek:hover {
-  background-color: var(--cioos-surface-2);
+.wmsLegendPeek {
+  width: 100%;
 }
 
-.wmsLegendPeek:focus-visible {
+/* Level with the picker, not centred on the picker and its label. */
+.wmsLegendFold {
+  flex: 0 0 auto;
+  align-self: flex-end;
+}
+
+.wmsLegendPeek > svg,
+.wmsLegendFold > svg {
+  flex: 0 0 auto;
+  color: var(--cioos-primary);
+}
+
+.wmsLegendPeek:hover,
+.wmsLegendFold:hover,
+.wmsLegendFold[aria-expanded="true"] {
+  background-color: rgb(82 167 155 / 18%);
+}
+
+.wmsLegendPeek:focus-visible,
+.wmsLegendFold:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
 
 .wmsLegendPeekLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Room between the picker and the colorbar it keys. */
+.wmsLegend.card .wmsLegendHeader:not(:last-child) {
+  margin-bottom: 8px;
 }
 
 .wmsLegend.inline {
@@ -89,8 +117,8 @@
 
 .wmsLegendFieldLabel {
   font-size: var(--cioos-font-size-2xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cioos-ink-80);
 }
@@ -103,9 +131,36 @@
   min-width: 0;
 }
 
-.wmsLegendVariableSelector .dropdown-toggle {
+/* A teal field rather than stock form chrome, so it reads as the control that
+   picks what the map draws rather than as a caption over the colorbar. */
+.dropdown.wmsLegendVariableSelector .dropdown-toggle {
   width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-color: var(--cioos-primary);
+  background-color: rgb(82 167 155 / 8%);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-800);
   text-align: left;
+}
+
+.dropdown.wmsLegendVariableSelector .dropdown-toggle[data-hovered] {
+  background-color: rgb(82 167 155 / 18%);
+}
+
+.dropdown.wmsLegendVariableSelector .dropdown-toggle[aria-expanded="true"] {
+  border-color: var(--cioos-primary-800);
+  background-color: rgb(82 167 155 / 18%);
+}
+
+.dropdown.wmsLegendVariableSelector .dropdown-toggle::after {
+  content: none;
+}
+
+.wmsLegendVariableChevron {
+  flex: 0 0 auto;
+  color: var(--cioos-primary);
 }
 
 .wmsLegendVariableName {

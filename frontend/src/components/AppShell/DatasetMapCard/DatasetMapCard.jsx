@@ -31,7 +31,7 @@ export default function DatasetMapCard({ dataset, className }) {
   const { returnToDatasetList } = useSelection();
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState();
   const { setSidebarOpen } = useUI();
-  const { zoomToDataset, canZoom } = useZoomToDataset();
+  const { zoomToDataset, canZoom, framed } = useZoomToDataset();
 
   const overlay =
     activeWmsOverlay?.pk === dataset.pk ? activeWmsOverlay : undefined;
@@ -45,38 +45,46 @@ export default function DatasetMapCard({ dataset, className }) {
       data-map-cover
       aria-label={dataset.title}
     >
+      {/* One row, so the picker below gets the height: the title opens the
+          page, and zoom sits with the X. */}
       <div className="datasetMapCardHead">
-        <span className="datasetMapCardTitle" title={dataset.title}>
-          {dataset.title}
-        </span>
+        <button
+          type="button"
+          className="datasetMapCardTitle"
+          data-testid="dataset-map-card-details"
+          onClick={() => setSidebarOpen(true)}
+          title={t("sidebarShowDatasetTitle")}
+          aria-label={`${t("datasetMapCardDetailsText")}: ${dataset.title}`}
+        >
+          {/* The page's own title icon, in the text like on that page. */}
+          <span className="datasetMapCardTitleText">
+            <FileEarmarkText
+              className="datasetMapCardTitleIcon"
+              aria-hidden="true"
+            />
+            {dataset.title}
+          </span>
+        </button>
+        {/* Same framed state as the page's own zoom button. */}
+        {canZoom && (
+          <button
+            type="button"
+            className="datasetMapCardZoom"
+            onClick={framed ? undefined : zoomToDataset}
+            title={t(
+              framed ? "zoomToDatasetFramedTitle" : "zoomToDatasetTitle",
+            )}
+            aria-label={t("zoomToDatasetTitle")}
+            aria-disabled={framed || undefined}
+          >
+            <ZoomIn aria-hidden="true" />
+          </button>
+        )}
         <CloseButton
           label={t("closeDatasetText")}
           onClick={returnToDatasetList}
           testId="dataset-map-card-close"
         />
-      </div>
-      <div className="datasetMapCardActions">
-        <button
-          type="button"
-          className="datasetMapCardButton primary"
-          data-testid="dataset-map-card-details"
-          onClick={() => setSidebarOpen(true)}
-          title={t("sidebarShowDatasetTitle")}
-        >
-          <FileEarmarkText size={12} aria-hidden="true" />
-          {t("datasetMapCardDetailsText")}
-        </button>
-        {canZoom && (
-          <button
-            type="button"
-            className="datasetMapCardButton"
-            onClick={zoomToDataset}
-            title={t("zoomToDatasetTitle")}
-          >
-            <ZoomIn size={12} aria-hidden="true" />
-            {t("singleDatasetZoomText")}
-          </button>
-        )}
       </div>
       {/* No close of its own: a second X would read as leaving the dataset. */}
       {overlay && (

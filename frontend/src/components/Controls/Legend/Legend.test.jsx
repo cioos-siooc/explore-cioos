@@ -298,6 +298,15 @@ describe("Legend", () => {
     });
   });
 
+  it("on a phone, drops the ramp while a gridded overlay hides the hexes", () => {
+    setViewportWidth(MOBILE_WIDTH);
+    renderLegend({ wmsOverlayActive: true });
+    expect(
+      document.querySelector(".legendCompactRamp"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTitle("Open legend")).toBeInTheDocument();
+  });
+
   it("draws the ramp as faint as the cells it keys", () => {
     const { rerender } = renderLegend({ zoom: 4 });
     const bar = () => document.querySelector(".legendColorBar");

@@ -92,6 +92,7 @@ export default function AppShell() {
     tracksMode,
     toggleTrackLines,
     dataLayers,
+    activeWmsOverlay,
   } = useMapState();
   const { startDate, endDate, timeFilterActive } = useFilters();
   const { showIntroModal, setShowIntroModal } = useUI();
@@ -171,6 +172,7 @@ export default function AppShell() {
         startDate={startDate}
         endDate={endDate}
         timeFilterActive={timeFilterActive}
+        wmsOverlayActive={Boolean(activeWmsOverlay)}
       />
       <TimeBar />
       <DepthBar />

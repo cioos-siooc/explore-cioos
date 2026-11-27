@@ -53,6 +53,29 @@ describe("UrlSync", () => {
     expect(params().get("wide")).toBe("1");
   });
 
+  it("records a dataset page minimized to its map card, and reopens it that way", async () => {
+    const url = `/?dataset=${pointQueryFixture[0].dataset_id}`;
+    const { unmount } = renderWithProviders(<Probe />, {
+      providers: "app",
+      url,
+    });
+    await waitFor(() => expect(hooks.ui.sidebarOpen).toBe(true));
+    act(() => hooks.mapView.setMapView({ lat: 50, lon: -125, zoom: 6 }));
+    await waitFor(() => expect(params().get("zoom")).toBe("6"));
+    expect(params().has("min")).toBe(false);
+
+    act(() => hooks.ui.setSidebarOpen(false));
+    await waitFor(() => expect(params().get("min")).toBe("1"));
+    unmount();
+
+    renderWithProviders(<Probe />, { providers: "app", url: `${url}&min=1` });
+    await waitFor(() => expect(hooks.selection.inspectDataset).toBeTruthy());
+    expect(hooks.ui.sidebarOpen).toBe(false);
+
+    act(() => hooks.ui.setSidebarOpen(true));
+    await waitFor(() => expect(params().has("min")).toBe(false));
+  });
+
   it("keeps a param written after its last render, as when widening while the page settles", async () => {
     renderWithProviders(<Probe />, {
       providers: "app",

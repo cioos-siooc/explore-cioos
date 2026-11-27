@@ -11,6 +11,7 @@ import isEmpty from "lodash-es/isEmpty";
 
 import { useChanged } from "../../utilities.jsx";
 import { usePersistentState } from "../usePersistentState.js";
+import { MINIMIZED_PARAM } from "../selection/previewParams.js";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import useMediaQuery, { SHORT_QUERY } from "./useMediaQuery.js";
 
@@ -98,8 +99,16 @@ export default function UIProvider({ children }) {
   );
 
   // Keyed on the pk: a results refresh hands the open dataset back as a new
-  // object, which must not reopen a sidebar the user collapsed over it.
-  useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpen);
+  // object, which must not reopen a sidebar the user collapsed over it. A link
+  // to a minimized page skips only the reveal of the page it opened on.
+  const [openingMinimized, setOpeningMinimized] = useState(
+    () =>
+      new URL(window.location.href).searchParams.get(MINIMIZED_PARAM) === "1",
+  );
+  if (useChanged(inspectDataset?.pk) && inspectDataset) {
+    if (openingMinimized) setOpeningMinimized(false);
+    else setSidebarOpen(true);
+  }
 
   useRevealSidebar(selectedTrajectory, Boolean, setSidebarOpen);
 

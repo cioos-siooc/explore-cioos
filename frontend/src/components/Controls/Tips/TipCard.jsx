@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
 import { ChevronLeft, ChevronRight, Lightbulb } from "react-bootstrap-icons";
 import { Trans, useTranslation } from "react-i18next";
@@ -17,6 +17,7 @@ import {
   useTips,
 } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
@@ -70,19 +71,7 @@ export default function TipCard({ inModal }) {
   if (!shown) return null;
 
   if (waiting) {
-    return (
-      <div className="tipBadge" role="status">
-        <button
-          type="button"
-          className="tipBadgeButton"
-          aria-label={t("tipCardOpen")}
-          aria-expanded="false"
-          onClick={() => setOpenedTip(activeTip)}
-        >
-          <Lightbulb size={22} aria-hidden="true" />
-        </button>
-      </div>
-    );
+    return <TipBadge onOpen={() => setOpenedTip(activeTip)} />;
   }
 
   // In a dialog it keeps the place it had when the dialog opened: hung by its
@@ -158,6 +147,28 @@ export default function TipCard({ inModal }) {
         </span>
       </div>
       <TipPointer targets={targets} inModal={Boolean(inModal)} />
+    </div>
+  );
+}
+
+// On a phone the activity indicator shares this corner and stands on it.
+const measureBadgeSpace = (rect) => rect.height + 8;
+
+function TipBadge({ onOpen }) {
+  const { t } = useTranslation();
+  const ref = useRef(null);
+  usePublishedFootprint(ref, "--cioos-tip-badge-space", measureBadgeSpace);
+  return (
+    <div className="tipBadge" role="status" ref={ref}>
+      <button
+        type="button"
+        className="tipBadgeButton"
+        aria-label={t("tipCardOpen")}
+        aria-expanded="false"
+        onClick={onOpen}
+      >
+        <Lightbulb size={22} aria-hidden="true" />
+      </button>
     </div>
   );
 }
