@@ -177,6 +177,8 @@ export default function Legend({
   depthReading,
   // { active, onChange }: the tool that turns map clicks into depth readings.
   depthTool,
+  // A gridded overlay hides the hexes and points (see Map's WMS effect).
+  wmsOverlayActive = false,
 }) {
   const { t } = useTranslation();
   const [legendOpen, setLegendOpen] = useState(true);
@@ -555,9 +557,10 @@ export default function Legend({
   const hexEntry = renderHexEntry();
   // The compact card keeps the keys the map can't give: the hex ramp's
   // days-of-data reading and, at the marker tier, which hue is which platform.
-  // Four ticks fit a phone corner.
-  const compactHexEntry = compact ? renderHexEntry(4) : null;
-  const compactPlatformKey = compact ? renderPlatformKey() : null;
+  // Four ticks fit a phone corner. Neither while an overlay hides what they key.
+  const compactKeys = compact && !wmsOverlayActive;
+  const compactHexEntry = compactKeys ? renderHexEntry(4) : null;
+  const compactPlatformKey = compactKeys ? renderPlatformKey() : null;
   const observationsIcon = hexesOnMap ? HEX_ICON : undefined;
   const compactRamp =
     (compactHexEntry || compactPlatformKey) &&
