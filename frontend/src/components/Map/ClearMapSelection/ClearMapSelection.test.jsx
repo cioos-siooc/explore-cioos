@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
 import ClearMapSelection from "./ClearMapSelection.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -84,6 +85,49 @@ describe("ClearMapSelection", () => {
     await waitFor(() => expect(latestSelection.inspectDataset).toBeFalsy());
     expect(latestMap.featureQuery).toBeNull();
     expect(screen.queryByTestId("clear-map-selection")).not.toBeInTheDocument();
+  });
+
+  it("on a phone, leaves an open dataset to its card's X but still clears on Escape", async () => {
+    setViewportWidth(MOBILE_WIDTH);
+    renderWithProviders(
+      <>
+        <ClearMapSelection />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    await waitFor(() =>
+      expect(latestSelection.initialPointsQueryComplete).toBe(true),
+    );
+    act(() => latestSelection.setInspectDataset(latestSelection.pointsData[0]));
+    await waitFor(() => expect(latestSelection.inspectDataset).toBeTruthy());
+    expect(screen.queryByTestId("clear-map-selection")).not.toBeInTheDocument();
+
+    act(() =>
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })),
+    );
+    await waitFor(() => expect(latestSelection.inspectDataset).toBeFalsy());
+  });
+
+  it("publishes its footprint while shown, so the activity indicator stands on it", async () => {
+    renderWithProviders(
+      <>
+        <ClearMapSelection />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    const space = () =>
+      document.documentElement.style.getPropertyValue(
+        "--cioos-clear-selection-space",
+      );
+    expect(space()).toBe("");
+    act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
+    await screen.findByTestId("clear-map-selection");
+    expect(space()).toMatch(/px$/);
+
+    act(() => latestMap.setFeatureQuery(null));
+    await waitFor(() => expect(space()).toBe(""));
   });
 
   it("clears the open dataset on Escape unless something nearer claims it", async () => {
