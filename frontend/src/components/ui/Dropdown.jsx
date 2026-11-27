@@ -13,6 +13,7 @@ import {
   ToggleButton,
 } from "react-aria-components";
 import { useInteractOutside } from "react-aria";
+import { Check } from "react-bootstrap-icons";
 import classNames from "classnames";
 
 import "./dropdownStyles.css";
@@ -109,6 +110,9 @@ function DropdownShell({
   // 'start' aligns left edges, 'center' centres under a toggle much narrower
   // than its menu (icon buttons), 'end' aligns right edges.
   align = "start",
+  // False keeps the menu below a toggle near the bottom of the screen,
+  // scrolling in the room left there, rather than over what sits above it.
+  shouldFlip = true,
   disabled,
   children,
   "aria-label": label,
@@ -136,6 +140,7 @@ function DropdownShell({
         </Button>
         <Popover
           placement={PLACEMENT[align]}
+          shouldFlip={shouldFlip}
           offset={2}
           className={`dropdown-menu ${menuClassName}`}
           style={
@@ -175,9 +180,25 @@ export function PopoverButton({ children, ...props }) {
 }
 
 // `textValue` is what typeahead reads when the children aren't plain text.
-function DropdownItem({ className, ...props }) {
+// The check says which item is chosen without leaning on the fill alone.
+function DropdownItem({ className, children, textValue, ...props }) {
   return (
-    <MenuItem className={classNames("dropdown-item", className)} {...props} />
+    <MenuItem
+      className={classNames("dropdown-item", className)}
+      textValue={
+        textValue ?? (typeof children === "string" ? children : undefined)
+      }
+      {...props}
+    >
+      {({ isSelected }) => (
+        <>
+          {children}
+          {isSelected && (
+            <Check className="dropdownItemCheck" aria-hidden="true" />
+          )}
+        </>
+      )}
+    </MenuItem>
   );
 }
 
