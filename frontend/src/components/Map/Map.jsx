@@ -71,7 +71,7 @@ import {
 import {
   buildBasemapStyle,
   getLabelTextField,
-  FIRST_LABEL_LAYER_ID,
+  POLAR_CAPS_LAYER_ID,
   LABEL_LAYER_IDS,
   nonnaColorRamp,
 } from "./basemapStyle.js";
@@ -1796,6 +1796,11 @@ export default function CreateMap({
     map.current.setProjection({
       type: projection === "globe" ? "globe" : "mercator",
     });
+    map.current.setLayoutProperty(
+      POLAR_CAPS_LAYER_ID,
+      "visibility",
+      projection === "globe" ? "visible" : "none",
+    );
   }, [projection]);
 
   // The camera settings are shared with ZoomToDataset, which compares them
@@ -2305,7 +2310,7 @@ export default function CreateMap({
           "circle-stroke-width": 10,
         },
       },
-      FIRST_LABEL_LAYER_ID,
+      POLAR_CAPS_LAYER_ID,
     );
 
     // beforeId 'points' must already exist (MapLibre throws otherwise). Below
@@ -2400,7 +2405,7 @@ export default function CreateMap({
           "fill-color-transition": NO_TRANSITION,
         },
       },
-      FIRST_LABEL_LAYER_ID,
+      POLAR_CAPS_LAYER_ID,
     );
 
     map.current.addLayer(
@@ -2426,7 +2431,7 @@ export default function CreateMap({
         },
         filter: ["in", "pk", ""],
       },
-      FIRST_LABEL_LAYER_ID,
+      POLAR_CAPS_LAYER_ID,
     );
 
     // Purely visual: clicks still resolve on 'points'. Below
@@ -2602,7 +2607,7 @@ export default function CreateMap({
             "line-opacity": 0.9,
           },
         },
-        FIRST_LABEL_LAYER_ID,
+        POLAR_CAPS_LAYER_ID,
       ),
     );
   }
@@ -3410,7 +3415,7 @@ export default function CreateMap({
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.
       style: {
-        ...buildBasemapStyle(i18n.language, bathymetryPalette),
+        ...buildBasemapStyle(i18n.language, bathymetryPalette, projection),
         projection: { type: projection === "globe" ? "globe" : "mercator" },
       },
       // The default 'high-performance' wakes the discrete GPU on dual-GPU
