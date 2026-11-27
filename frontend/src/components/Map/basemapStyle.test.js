@@ -4,8 +4,8 @@ import {
   buildBasemapStyle,
   getLabelTextField,
   LABEL_LAYER_IDS,
-  FIRST_LABEL_LAYER_ID,
   nonnaColorRamp,
+  POLAR_CAPS_LAYER_ID,
 } from "./basemapStyle.js";
 import { bathymetryPalettes } from "../config.js";
 
@@ -28,15 +28,28 @@ describe("buildBasemapStyle", () => {
       "imagery",
       "nonna",
       "ofm",
+      "polar-caps",
     ]);
     const layerIds = style.layers.map((layer) => layer.id);
     expect(new Set(layerIds).size).toBe(layerIds.length);
   });
 
-  it("includes every label layer Map.js anchors data layers against", () => {
+  it("paints the polar caps on the globe only, right below the labels", () => {
+    const capsIn = (projection) =>
+      buildBasemapStyle("en", undefined, projection).layers.find(
+        (layer) => layer.id === POLAR_CAPS_LAYER_ID,
+      );
+    expect(capsIn("globe").layout.visibility).toBe("visible");
+    expect(capsIn("mercator").layout.visibility).toBe("none");
+    const layerIds = buildBasemapStyle("en").layers.map((layer) => layer.id);
+    expect(layerIds[layerIds.indexOf(POLAR_CAPS_LAYER_ID) + 1]).toBe(
+      LABEL_LAYER_IDS[0],
+    );
+  });
+
+  it("includes every label layer", () => {
     const layerIds = buildBasemapStyle("en").layers.map((layer) => layer.id);
     LABEL_LAYER_IDS.forEach((id) => expect(layerIds).toContain(id));
-    expect(layerIds).toContain(FIRST_LABEL_LAYER_ID);
   });
 
   it("threads the requested language into every label layer's text-field", () => {

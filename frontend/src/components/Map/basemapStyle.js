@@ -3,7 +3,8 @@
  * Esri imagery at z10, under an OpenFreeMap vector overlay (rivers,
  * boundaries, FR/EN labels). No API keys.
  *
- * Map.jsx inserts data layers below FIRST_LABEL_LAYER_ID so labels stay on top.
+ * Map.jsx inserts data layers below POLAR_CAPS_LAYER_ID so the caps and labels
+ * stay on top.
  */
 
 import { server } from "../../config";
@@ -91,9 +92,33 @@ export const LABEL_LAYER_IDS = [
   "label-water-line",
   "label-place",
 ];
-// Anchor for every data layer Map.js adds: insert *before* this id so data
-// renders under the labels.
-export const FIRST_LABEL_LAYER_ID = "label-waterway";
+// Past ±85.05° the globe has no tiles and MapLibre stretches each edge tile to
+// the pole. A fill touching the tile edge gets the same pole wedges, so these
+// bands paint the caps instead. Also the anchor Map.jsx inserts every data layer
+// before: data cells on the edge would wedge over the caps. Globe only: on the
+// flat map they'd be a strip along the world's edge.
+export const POLAR_CAPS_LAYER_ID = "polar-caps";
+const POLAR_CAP_EDGE_LAT = 85;
+const polarCapBand = (fromLat, toLat) => [
+  [
+    [-180, fromLat],
+    [180, fromLat],
+    [180, toLat],
+    [-180, toLat],
+    [-180, fromLat],
+  ],
+];
+const POLAR_CAPS = {
+  type: "Feature",
+  properties: {},
+  geometry: {
+    type: "MultiPolygon",
+    coordinates: [
+      polarCapBand(POLAR_CAP_EDGE_LAT, 90),
+      polarCapBand(-90, -POLAR_CAP_EDGE_LAT),
+    ],
+  },
+};
 
 export function getLabelTextField(lang) {
   return ["coalesce", ["get", `name:${lang}`], ["get", "name"]];
@@ -139,6 +164,7 @@ const WATER_LABEL_PAINT = {
 export function buildBasemapStyle(
   lang = "en",
   bathymetryPalette = defaultBathymetryPalette,
+  projection = "mercator",
 ) {
   const layers = [
     {
@@ -431,6 +457,13 @@ export function buildBasemapStyle(
       },
     },
     {
+      id: POLAR_CAPS_LAYER_ID,
+      type: "fill",
+      source: "polar-caps",
+      layout: { visibility: projection === "globe" ? "visible" : "none" },
+      paint: { "fill-color": "#C9D7DA" },
+    },
+    {
       id: "label-waterway",
       type: "symbol",
       source: "ofm",
@@ -568,6 +601,7 @@ export function buildBasemapStyle(
         maxzoom: 14,
         attribution: CHS_ATTRIBUTION,
       },
+      "polar-caps": { type: "geojson", data: POLAR_CAPS },
       ofm: {
         type: "vector",
         url: OFM_TILEJSON,
