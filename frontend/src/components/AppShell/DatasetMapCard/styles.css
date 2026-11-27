@@ -9,7 +9,7 @@
   width: min(320px, calc(100vw - 24px));
   overflow: hidden auto;
   scrollbar-width: none;
-  padding: 6px 6px 8px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--cioos-primary);
   border-radius: var(--cioos-radius-lg);
   background-color: var(--cioos-white);
@@ -39,86 +39,103 @@
   gap: 6px;
 }
 
+/* The way into the page: teal like a link, led by the page's title icon. */
 .datasetMapCardTitle {
+  display: flex;
   flex: 1 1 auto;
+  align-items: flex-start;
+  gap: 6px;
   min-width: 0;
-  padding-top: 4px;
+  margin: 0;
+  padding: 2px 4px 2px 0;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--cioos-font-size-base);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--cioos-primary-800);
+  text-align: left;
+  cursor: pointer;
+}
+
+.datasetMapCardTitleText {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  font-size: var(--cioos-font-size-base);
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--cioos-primary-800);
 }
 
-/* Level with the title's first line (CloseButton centres itself by default). */
+.datasetMapCardTitleIcon {
+  width: 1em;
+  height: 1em;
+  margin: -0.15em 0.35em 0 0;
+  vertical-align: middle;
+  color: var(--cioos-primary);
+}
+
+@media (hover: hover) {
+  .datasetMapCardTitle:hover .datasetMapCardTitleText {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .datasetMapCardZoom:not([aria-disabled="true"]):hover {
+    background-color: var(--cioos-surface-2);
+  }
+}
+
+.datasetMapCardTitle:focus-visible,
+.datasetMapCardZoom:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 .datasetMapCardHead .closeButton {
   align-self: flex-start;
 }
 
-.datasetMapCardActions {
-  display: flex;
-  gap: 6px;
-  padding-right: 4px;
-}
-
-.datasetMapCardButton {
+.datasetMapCardZoom {
   display: inline-flex;
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-height: 26px;
-  padding: 3px 10px;
-  border: 1px solid rgb(82 167 155 / 45%);
-  border-radius: var(--cioos-radius-pill);
-  background-color: rgb(82 167 155 / 14%);
-  font: inherit;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
   color: var(--cioos-primary-800);
-  white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    border-color var(--cioos-transition-fast);
 }
 
-.datasetMapCardButton > svg {
-  flex: 0 0 auto;
-  color: var(--cioos-primary);
+.datasetMapCardZoom > svg {
+  width: 16px;
+  height: 16px;
 }
 
-.datasetMapCardButton.primary {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-primary);
-  color: var(--cioos-on-primary);
+/* Already framed: still focusable, so its title can say why. */
+.datasetMapCardZoom[aria-disabled="true"] {
+  color: var(--cioos-ink-60);
+  cursor: default;
 }
 
-.datasetMapCardButton.primary > svg {
-  color: var(--cioos-white);
+/* Concentric with the card's corners: its radius less the padding between. */
+.datasetMapCard .wmsLegendFold,
+.datasetMapCard .wmsLegendPeek,
+.datasetMapCard .wmsLegendVariableSelector .dropdown-toggle {
+  border-radius: calc(var(--cioos-radius-lg) - 8px);
 }
 
-@media (hover: hover) {
-  .datasetMapCardButton:hover {
-    border-color: var(--cioos-primary);
-    background-color: rgb(82 167 155 / 26%);
-  }
-
-  .datasetMapCardButton.primary:hover {
-    border-color: var(--cioos-primary-800);
-    background-color: var(--cioos-primary-800);
-  }
-}
-
-.datasetMapCardButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
+/* The dataset above the rule, what the map draws of it below. */
+.datasetMapCard .wmsLegend.card {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cioos-hairline);
 }
 
 @media (max-width: 700px), (max-height: 500px) {
@@ -129,7 +146,22 @@
     margin: 0 8px;
   }
 
-  .datasetMapCardButton {
-    min-height: 36px;
+  /* Lettered like the top bar's buttons above the card. */
+  .datasetMapCard .wmsLegendFold,
+  .datasetMapCard .wmsLegendPeek,
+  .datasetMapCard .wmsLegendVariableSelector .dropdown-toggle {
+    min-height: 34px;
+    font-size: var(--cioos-font-size-xs);
+  }
+
+  .datasetMapCardHead .closeButton,
+  .datasetMapCardZoom {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* The same size as the pickers under it. */
+  .datasetMapCardTitle {
+    font-size: var(--cioos-font-size-sm);
   }
 }

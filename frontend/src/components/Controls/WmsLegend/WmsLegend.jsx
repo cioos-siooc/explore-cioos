@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronUp, Grid3x3Gap } from "react-bootstrap-icons";
+import { ChevronDown, ChevronUp, Grid3x3Gap } from "react-bootstrap-icons";
 import classNames from "classnames";
 import CloseButton from "../../ui/CloseButton.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
@@ -51,7 +51,10 @@ export default function WmsLegend({
 
   if (useChanged(legendUrl)) setLegendFailed(false);
 
-  if (isCompact && !compactOpen) {
+  // Folded on a phone, a picker stays out so a variable is one tap away; only
+  // the colorbar and the slices fold. With nothing to pick, the button alone.
+  const folded = isCompact && !compactOpen;
+  if (folded && variables.length < 2) {
     return (
       <button
         type="button"
@@ -59,12 +62,13 @@ export default function WmsLegend({
         onClick={() => setCompactOpen(true)}
         title={t("wmsLegendShowTitle")}
       >
-        <Grid3x3Gap size={15} color="var(--cioos-primary)" aria-hidden="true" />
+        <Grid3x3Gap size={15} aria-hidden="true" />
         <span className="wmsLegendPeekLabel">
           {overlay.variable
             ? variableLabel(overlay.variable)
             : t("wmsLegendShowTitle")}
         </span>
+        <ChevronDown aria-hidden="true" />
       </button>
     );
   }
@@ -75,6 +79,8 @@ export default function WmsLegend({
       <div className="wmsLegendHeader">
         {variables.length > 1 && (
           <div className="wmsLegendField">
+            {/* The card is short on height; its field reads as a picker
+                and its name says what it picks. */}
             {variant === "inline" && (
               <span className="wmsLegendFieldLabel">
                 {t("griddapVariableSelect")}
@@ -82,14 +88,22 @@ export default function WmsLegend({
             )}
             <DropdownButton
               className="wmsLegendVariableSelector"
-              size="sm"
-              variant="outline-secondary"
-              tooltip={t("griddapVariableSelect")}
+              aria-label={`${t("griddapVariableSelect")}: ${
+                overlay.variable ? variableLabel(overlay.variable) : ""
+              }`}
               selectedKey={overlay.variable?.name}
+              // Over the colorbar it is choosing for, not the label above.
+              shouldFlip={false}
               title={
-                <span className="wmsLegendVariableName">
-                  {overlay.variable ? variableLabel(overlay.variable) : ""}
-                </span>
+                <>
+                  <span className="wmsLegendVariableName">
+                    {overlay.variable ? variableLabel(overlay.variable) : ""}
+                  </span>
+                  <ChevronDown
+                    className="wmsLegendVariableChevron"
+                    aria-hidden="true"
+                  />
+                </>
               }
             >
               {variables.map((variable) => (
@@ -104,62 +118,79 @@ export default function WmsLegend({
             </DropdownButton>
           </div>
         )}
-        {/* Folds back to the button; the other X turns the overlay off. */}
         {isCompact && (
-          <CloseButton
-            label={t("wmsLegendCollapseTitle")}
-            onClick={() => setCompactOpen(false)}
-            icon={ChevronUp}
-          />
+          <button
+            type="button"
+            className="wmsLegendFold"
+            onClick={() => setCompactOpen(!compactOpen)}
+            aria-expanded={compactOpen}
+            title={t(
+              compactOpen ? "wmsLegendCollapseTitle" : "wmsLegendShowTitle",
+            )}
+          >
+            <Grid3x3Gap aria-hidden="true" />
+            {t("wmsLegendFoldText")}
+            {compactOpen ? (
+              <ChevronUp aria-hidden="true" />
+            ) : (
+              <ChevronDown aria-hidden="true" />
+            )}
+          </button>
         )}
         {onClose && (
           <CloseButton label={t("wmsLegendCloseTitle")} onClick={onClose} />
         )}
       </div>
-      {legendUrl && !legendFailed ? (
-        <a
-          className="wmsLegendFigure"
-          href={overlay.erddapUrl}
-          target="_blank"
-          rel="noreferrer"
-          title={overlay.erddapUrl}
-        >
-          <img
-            className="wmsLegendImage"
-            src={legendUrl}
-            alt={`${overlay.variable?.name} ${t("griddapLegendAltText")}`}
-            onError={() => setLegendFailed(true)}
-          />
-        </a>
-      ) : (
-        <div className="wmsLegendFallback">
-          <a
-            className="wmsLegendTitle"
-            href={overlay.erddapUrl}
-            target="_blank"
-            rel="noreferrer"
-            title={overlay.erddapUrl}
-          >
-            {abbreviateString(overlay.title, 45)}
-          </a>
-          {overlay.variable && (
-            <div className="wmsLegendVariable">
-              {variableLabel(overlay.variable)}
+      {!folded && (
+        <>
+          {legendUrl && !legendFailed ? (
+            <a
+              className="wmsLegendFigure"
+              href={overlay.erddapUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={overlay.erddapUrl}
+            >
+              <img
+                className="wmsLegendImage"
+                src={legendUrl}
+                alt={`${overlay.variable?.name} ${t("griddapLegendAltText")}`}
+                onError={() => setLegendFailed(true)}
+              />
+            </a>
+          ) : (
+            <div className="wmsLegendFallback">
+              <a
+                className="wmsLegendTitle"
+                href={overlay.erddapUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={overlay.erddapUrl}
+              >
+                {abbreviateString(overlay.title, 45)}
+              </a>
+              {overlay.variable && (
+                <div className="wmsLegendVariable">
+                  {variableLabel(overlay.variable)}
+                </div>
+              )}
+              <div className="wmsLegendUnavailable">
+                {t("griddapLegendUnavailable")}
+              </div>
             </div>
           )}
-          <div className="wmsLegendUnavailable">
-            {t("griddapLegendUnavailable")}
-          </div>
-        </div>
+          <GridTimeSlice
+            overlay={overlay}
+            onChange={(time) => setActiveWmsOverlay({ ...overlay, time })}
+          />
+          <GridDepthSlice
+            overlay={overlay}
+            onChange={(elevation) =>
+              setActiveWmsOverlay({ ...overlay, elevation })
+            }
+          />
+        </>
       )}
-      <GridTimeSlice
-        overlay={overlay}
-        onChange={(time) => setActiveWmsOverlay({ ...overlay, time })}
-      />
-      <GridDepthSlice
-        overlay={overlay}
-        onChange={(elevation) => setActiveWmsOverlay({ ...overlay, elevation })}
-      />
     </div>
   );
 }

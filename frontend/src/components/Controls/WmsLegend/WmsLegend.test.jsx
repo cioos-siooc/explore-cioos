@@ -49,7 +49,24 @@ describe("WmsLegend", () => {
         setActiveWmsOverlay={() => {}}
       />,
     );
-    expect(screen.queryByTitle("Variable")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Variable:/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("names the picker for what it picks, without a label row in the card", () => {
+    renderWithProviders(
+      <WmsLegend
+        overlay={OVERLAY}
+        onClose={() => {}}
+        setActiveWmsOverlay={() => {}}
+        variant="card"
+      />,
+    );
+    expect(screen.queryByText("Variable")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Variable: Temperature (C)" }),
+    ).toBeInTheDocument();
   });
 
   it("the close button calls onClose", async () => {
@@ -95,7 +112,7 @@ describe("WmsLegend", () => {
     setViewportWidth(MOBILE_WIDTH);
     renderWithProviders(
       <WmsLegend
-        overlay={OVERLAY}
+        overlay={{ ...OVERLAY, variables: [VAR_TEMP] }}
         onClose={() => {}}
         setActiveWmsOverlay={() => {}}
         variant="card"
@@ -103,6 +120,29 @@ describe("WmsLegend", () => {
     );
     expect(document.querySelector(".wmsLegendPeek")).toBeInTheDocument();
     expect(document.querySelector(".wmsLegendImage")).not.toBeInTheDocument();
+  });
+
+  it("folded at phone width, keeps the variable picker out and folds only the colorbar", async () => {
+    setViewportWidth(MOBILE_WIDTH);
+    const { user } = renderWithProviders(
+      <WmsLegend
+        overlay={OVERLAY}
+        setActiveWmsOverlay={() => {}}
+        variant="card"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Variable: Temperature (C)" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector(".wmsLegendImage")).not.toBeInTheDocument();
+
+    const fold = screen.getByRole("button", { name: /Legend/ });
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    await user.click(fold);
+    expect(fold).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() =>
+      expect(document.querySelector(".wmsLegendImage")).toBeInTheDocument(),
+    );
   });
 
   it("an inline card (dataset page) is never collapsed to a peek button, even at phone width", async () => {

@@ -108,6 +108,17 @@ describe("DropdownButton / Dropdown.Item", () => {
       "aria-checked",
       "false",
     );
+    // Marked by a check too, not by the fill alone.
+    expect(
+      screen
+        .getByRole("menuitemradio", { name: "A-Z" })
+        .querySelector(".dropdownItemCheck"),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("menuitemradio", { name: "Z-A" })
+        .querySelector(".dropdownItemCheck"),
+    ).not.toBeInTheDocument();
   });
 
   it("floors the menu at the toggle's width unless menuClassName sizes it", async () => {

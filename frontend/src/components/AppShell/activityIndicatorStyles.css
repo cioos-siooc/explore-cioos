@@ -1,12 +1,16 @@
 /* Bottom offsets: the error banner's figure already includes the time bar's
    clearance, so the two are alternatives, not a sum. Below the modal rung:
-   on a phone its corner is a dialog's own footer or close button. */
+   on a phone its corner is a dialog's own footer or close button. Stands on
+   the clear-selection pill, which shares the spot, while that is up. */
 .activityIndicator {
   position: fixed;
   left: 50%;
-  bottom: max(
-    calc(12px + var(--cioos-time-bar-space, 0px)),
-    var(--cioos-api-error-space, 0px)
+  bottom: calc(
+    max(
+        calc(12px + var(--cioos-time-bar-space, 0px)),
+        var(--cioos-api-error-space, 0px)
+      ) +
+      var(--cioos-clear-selection-space, 0px)
   );
   transform: translateX(-50%);
   z-index: var(--cioos-z-dock, 35);
@@ -49,11 +53,23 @@
   color: var(--cioos-primary);
 }
 
-/* Phones: the centre of a narrow map is all of it, so it moves to the corner. */
+/* Phones: the centre of a narrow map is all of it, so it moves to the corner,
+   above the tip badge that lives there too. The pill is centred but wide
+   enough to reach the corner, so the taller of the two sets the height. */
 @media (max-width: 700px), (max-height: 500px) {
   .activityIndicator {
     left: auto;
     right: 8px;
+    bottom: calc(
+      max(
+          calc(12px + var(--cioos-time-bar-space, 0px)),
+          var(--cioos-api-error-space, 0px)
+        ) +
+        max(
+          var(--cioos-clear-selection-space, 0px),
+          var(--cioos-tip-badge-space, 0px)
+        )
+    );
     transform: none;
     align-items: flex-end;
   }
