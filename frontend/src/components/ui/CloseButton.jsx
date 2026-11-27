@@ -6,7 +6,7 @@ import Button from "./Button.jsx";
 import "./closeButtonStyles.css";
 
 // The one way out of anything dismissable, so "this closes" is learned once.
-// `icon` is for the WMS legend's fold-back control beside its X.
+// `icon` swaps the X for a window control (the sidebar's widen and narrow).
 export default function CloseButton({
   label,
   onClick,
