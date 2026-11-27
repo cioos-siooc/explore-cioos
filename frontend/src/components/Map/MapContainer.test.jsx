@@ -226,23 +226,20 @@ describe("MapContainer", () => {
     );
   });
 
-  it("shows the map spinner while a data layer loads, not the basemap", async () => {
+  it("shows the map spinner while data loads", async () => {
     await renderReady();
     act(() => latestMapProps.onFirstPaint());
 
-    act(() => latestMapProps.setLoadingLayers(["bathymetry"]));
-    expect(screen.queryByTestId("map-loading-spinner")).toBeNull();
-
-    act(() => latestMapProps.setLoadingLayers(["bathymetry", "observations"]));
+    act(() => latestMapProps.setDataLoading(true));
     expect(screen.getByTestId("map-loading-spinner")).toBeInTheDocument();
 
-    act(() => latestMapProps.setLoadingLayers([]));
+    act(() => latestMapProps.setDataLoading(false));
     expect(screen.queryByTestId("map-loading-spinner")).toBeNull();
   });
 
   it("leaves the first load to the splash", async () => {
     await renderReady();
-    act(() => latestMapProps.setLoadingLayers(["observations"]));
+    act(() => latestMapProps.setDataLoading(true));
     expect(latestMapState.firstPaintPending).toBe(true);
     expect(screen.queryByTestId("map-loading-spinner")).toBeNull();
   });

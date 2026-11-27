@@ -13,9 +13,6 @@ import reportError from "../../state/reportError.js";
 import { useMapState, useMapView } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 
-// Map.jsx's WATCHED_MAP_LAYERS ids that draw data rather than basemap.
-const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
-
 export default function MapContainer() {
   const {
     mapQueryString,
@@ -50,9 +47,9 @@ export default function MapContainer() {
   const {
     setLoading,
     reportFirstPaint,
-    setLoadingLayers,
+    setDataLoading,
     mapView,
-    loadingLayers,
+    dataLoading,
     firstPaintPending,
     setMapView,
     setViewportHexRange,
@@ -75,11 +72,8 @@ export default function MapContainer() {
     combinedQueries,
   } = useSelection();
 
-  // Basemap layers still arriving don't count; the splash covers the first
-  // load.
-  const dataLoading =
-    !firstPaintPending &&
-    loadingLayers.some((id) => DATA_LAYER_IDS.includes(id));
+  // The splash covers the first load.
+  const showDataSpinner = !firstPaintPending && dataLoading;
 
   // While a dataset is open the card hides itself, but the click still names
   // the area its record list pins trajectories by, so it is recorded.
@@ -127,7 +121,7 @@ export default function MapContainer() {
           polygon={polygon}
           setPolygon={setPolygon}
           setLoading={setLoading}
-          setLoadingLayers={setLoadingLayers}
+          setDataLoading={setDataLoading}
           mapQueryString={mapQueryString}
           initialView={mapView}
           setMapView={setMapView}
@@ -172,7 +166,7 @@ export default function MapContainer() {
       <DrawHint map={mapInstance} />
       {/* The bottom activity panel names what is loading; this is the mark
           over the map itself, where the eye is. */}
-      {dataLoading && (
+      {showDataSpinner && (
         <div
           className="mapLoadingSpinner cioosSpinnerDisc"
           data-testid="map-loading-spinner"

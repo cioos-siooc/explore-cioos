@@ -11,6 +11,7 @@ import {
   griddapTitle,
   isOnAPointIn,
   loadTurfUnion,
+  nearestFeature,
   trackItemsIn,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
@@ -515,5 +516,28 @@ describe("idsOutsideDataset", () => {
         7,
       ),
     ).toEqual([2, 4]);
+  });
+});
+
+describe("nearestFeature", () => {
+  const marker = (pk, x) => ({
+    properties: { pk },
+    geometry: { coordinates: [x, 0] },
+  });
+  const project = ([x, y]) => ({ x, y });
+
+  it("picks the marker whose position is nearest the cursor", () => {
+    const hits = [marker(1, 10), marker(2, 3), marker(3, -6)];
+    expect(nearestFeature(hits, { x: 0, y: 0 }, project).properties.pk).toBe(2);
+  });
+
+  it("keeps the first copy of a marker hit in two tiles", () => {
+    const first = marker(1, 4);
+    const hits = [first, marker(1, 4), marker(2, 9)];
+    expect(nearestFeature(hits, { x: 0, y: 0 }, project)).toBe(first);
+  });
+
+  it("is null with nothing hit", () => {
+    expect(nearestFeature([], { x: 0, y: 0 }, project)).toBeNull();
   });
 });

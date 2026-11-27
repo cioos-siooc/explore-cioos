@@ -334,3 +334,24 @@ export const idsOutsideDataset = (features, pk) => [
       .map((feature) => feature.id),
   ),
 ];
+
+// The wide invisible hit stroke means one click commonly hits several nearby
+// stations, so the one whose true position is nearest the cursor wins. Deduped
+// by pk: a station straddling a tile boundary hits twice.
+export function nearestFeature(features, point, project) {
+  let nearest = null;
+  let nearestDistSq = Infinity;
+  const seenPks = new Set();
+  for (const feature of features) {
+    const { pk } = feature.properties;
+    if (seenPks.has(pk)) continue;
+    seenPks.add(pk);
+    const projected = project(feature.geometry.coordinates);
+    const distSq = (projected.x - point.x) ** 2 + (projected.y - point.y) ** 2;
+    if (distSq < nearestDistSq) {
+      nearestDistSq = distSq;
+      nearest = feature;
+    }
+  }
+  return nearest;
+}

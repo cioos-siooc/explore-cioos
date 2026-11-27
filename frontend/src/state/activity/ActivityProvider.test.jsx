@@ -5,7 +5,6 @@ import { act, render, screen } from "@testing-library/react";
 import ActivityProvider, {
   useActivity,
   useActivityTask,
-  useActivityTasks,
 } from "./ActivityProvider.jsx";
 
 function Probe() {
@@ -24,11 +23,6 @@ function TaskFlag({ label, active }) {
   return null;
 }
 
-function TaskList({ labels }) {
-  useActivityTasks(labels);
-  return null;
-}
-
 describe("ActivityProvider outside a provider (index.jsx's Suspense fallback)", () => {
   it("defaults to an empty, non-busy registry rather than crashing", () => {
     render(<Probe />);
@@ -36,7 +30,7 @@ describe("ActivityProvider outside a provider (index.jsx's Suspense fallback)", 
   });
 });
 
-describe("useActivityTask / useActivityTasks", () => {
+describe("useActivityTask", () => {
   it("registers a key while active, and unregisters it once inactive", () => {
     function Harness({ active }) {
       return (
@@ -72,23 +66,6 @@ describe("useActivityTask / useActivityTasks", () => {
 
     rerender(<Harness first={false} second={false} />);
     expect(state().labelKeys).toEqual([]);
-  });
-
-  it("registers every key in a dynamic list via useActivityTasks", () => {
-    function Harness({ labels }) {
-      return (
-        <ActivityProvider>
-          <TaskList labels={labels} />
-          <Probe />
-        </ActivityProvider>
-      );
-    }
-    render(
-      <Harness labels={["activityLayerTracks", "activityLayerBathymetry"]} />,
-    );
-    expect(state().labelKeys.sort()).toEqual(
-      ["activityLayerBathymetry", "activityLayerTracks"].sort(),
-    );
   });
 });
 
