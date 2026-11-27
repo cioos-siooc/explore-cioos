@@ -15,6 +15,7 @@ import { wmsSliceParams } from "../wmsUtilities.js";
 import { anyTrajectoryLayerOn, chosenDataLayerKeys } from "./dataLayers.js";
 import { GROUP_NONE } from "./datasetGroups.js";
 import {
+  MINIMIZED_PARAM,
   PERIOD_PARAM,
   PLOT_PARAMS,
   RECORD_PARAM,
@@ -84,7 +85,7 @@ export default function UrlSync() {
     selectedTrajectory,
     mappedRecord,
   } = useSelection();
-  const { coverageAxis, taxonomyView } = useUI();
+  const { coverageAxis, taxonomyView, sidebarOpen } = useUI();
   const [isPageLoad, setIsPageLoad] = useState(true);
 
   useEffect(() => {
@@ -118,6 +119,7 @@ export default function UrlSync() {
       // Owned by useWideView.
       ...(current.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
+      ...(dataset && !sidebarOpen ? { [MINIMIZED_PARAM]: "1" } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.
       ...(dataset
@@ -193,6 +195,7 @@ export default function UrlSync() {
     mappedRecord,
     coverageAxis,
     taxonomyView,
+    sidebarOpen,
     dataset,
     poppedTo,
   ]);

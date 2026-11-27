@@ -31,6 +31,10 @@ export const TAB_PARAM = "tab";
 // map; absent is the sidebar.
 export const WIDE_PARAM = "wide";
 
+// `1` when the dataset page is minimized to its map card (DatasetMapCard);
+// absent is the page shown in the sidebar.
+export const MINIMIZED_PARAM = "min";
+
 // Anything else in the address reads as the default, not as a request for it.
 export function parseRowLimit(value) {
   const limit = Number(value);
