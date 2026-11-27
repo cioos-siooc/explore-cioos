@@ -93,3 +93,51 @@ test("rejects tile coordinates outside the grid at that zoom", async () => {
   assert.equal(res.status, 400);
   assert.equal(axios.calls.length, 0);
 });
+
+// Ordered: the Arctic mosaic has one cache key, and a failure must not fill it.
+test("serves the placeholder when an Arctic tile fails, without caching it", async () => {
+  for (let i = 0; i < 15; i++) axios.queueResponse({ data: await opaquePng() });
+  axios.queueError(new Error("timeout"));
+
+  const res = await agent.get("/emodnet/arctic.webp");
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["content-type"], "image/png");
+  assert.ok(res.headers["cache-control"].includes("max-age=60"));
+});
+
+test("stitches the polar stereographic z4 tiles around the pole into one WebP", async () => {
+  axios.reset();
+  for (let i = 0; i < 16; i++) axios.queueResponse({ data: await opaquePng() });
+
+  const res = await agent
+    .get("/emodnet/arctic.webp")
+    .buffer(true)
+    .parse((r, cb) => {
+      const chunks = [];
+      r.on("data", (c) => chunks.push(c));
+      r.on("end", () => cb(null, Buffer.concat(chunks)));
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers["content-type"], "image/webp");
+  const urls = axios.calls.map((c) => c.url).sort();
+  assert.equal(urls.length, 16);
+  assert.equal(
+    urls[0],
+    "https://tiles.emodnet-bathymetry.eu/2020/baselayer/epsg_3996/4/6/6.png",
+  );
+  assert.equal(
+    urls[15],
+    "https://tiles.emodnet-bathymetry.eu/2020/baselayer/epsg_3996/4/9/9.png",
+  );
+  const meta = await sharp(res.body).metadata();
+  assert.deepEqual(
+    [meta.width, meta.height, meta.hasAlpha],
+    [1024, 1024, false],
+  );
+
+  const again = await agent.get("/emodnet/arctic.webp");
+  assert.equal(again.headers["content-type"], "image/webp");
+  assert.equal(axios.calls.length, 16);
+});

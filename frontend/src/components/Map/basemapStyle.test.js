@@ -124,3 +124,13 @@ describe("buildBasemapStyle", () => {
     );
   });
 });
+
+describe("EMODnet attribution", () => {
+  it("cites the World Base Layer by the DOI EMODnet asks for", () => {
+    const { attribution } = buildBasemapStyle("en").sources.bathymetry;
+    expect(attribution).toContain(
+      "https://doi.org/10.12770/386fe2aa-84c4-4cea-9e22-fcba4d5f2e75",
+    );
+    expect(attribution).toContain("EMODnet Bathymetry Consortium");
+  });
+});
