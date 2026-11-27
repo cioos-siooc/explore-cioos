@@ -263,24 +263,24 @@ exactly one deploy job runs. A tag other than these is rejected:
 | Trigger | Release type | Target | Commit must be on |
 |---|---|---|---|
 | push to `main` | — | staging | `main` |
-| `beta*` tag | prerelease | beta | `development*` or `main` |
 | `vX.Y.Z` tag | full release | production | `main`, with a successful staging deployment of the same commit |
 
 Before any deploy, `release` waits for the Integration Tests of the same push or
 release to pass; a release's run also includes visual regression. A release must
-not be a draft. Production's extra gate reads GitHub's deployment records: the
+be a full release, not a draft or prerelease; prereleases deploy nothing.
+Production's extra gate reads GitHub's deployment records: the
 `vX.Y.Z` commit must have been deployed to staging successfully by its push to
-`main`. A beta deploy never satisfies it.
+`main`.
 
 ```bash
 git push origin main                                                    # staging
-gh release create beta3 --target <branch-or-sha> --prerelease          # beta
 gh release create v1.2.0 --target main                                 # production
 ```
 
-Beta and staging are one stack on one Juno host (`beta.explore.cioos.ca`) and
-deploy one at a time; production is another host. All run over WireGuard through
-the shared `cioos-deploy-docker-compose` action, pinned to the deployed commit. To
+Staging runs on one Juno host, served at `beta.explore.cioos.ca` for now (its
+`NOTICES` keeps the beta banner); production is another host. Both run over
+WireGuard through the shared `cioos-deploy-docker-compose` action, pinned to
+the deployed commit. To
 roll back or redeploy, dispatch Deploy with an existing published release tag
 (the target follows from the tag), or re-run a push's Deploy run for staging.
 
@@ -288,7 +288,7 @@ roll back or redeploy, dispatch Deploy with an existing published release tag
 references name 1Password items, everything else ships as written. Change
 production settings there, not on the box.
 
-`.env.staging` is the beta/staging template. Create its referenced
+`.env.staging` is the staging template. Create its referenced
 `explore-cioos-staging` 1Password item with the listed fields.
 Deploys always keep the stack's volumes (`explore-cioos-staging_postgres18-data`,
 `_harvest_data`, `_harvester_cache`, `_obis_cache`); nothing resets them

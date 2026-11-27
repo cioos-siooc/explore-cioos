@@ -90,8 +90,9 @@ Postgres or Docker behaviour. Keep that.
 - One concern per PR. The backlog items in `TODO-cde-revisions.md` are written
   to be taken one at a time.
 - `CODEOWNERS` requests review automatically.
-- Deploys are triggered by publishing a GitHub release, not by merging: `beta*`
-  deploys beta, `vX.Y.Z-rc.N` staging, `vX.Y.Z` production — see
+- Merging to `main` deploys staging. Only a full (not prerelease) `vX.Y.Z`
+  release deploys production, and only for a `main` commit that staging
+  deployed successfully. Prereleases deploy nothing. See
   "Deployment" in `README.md` and `.github/workflows/deploy.yml`.
 
 ## Things that will bite you
