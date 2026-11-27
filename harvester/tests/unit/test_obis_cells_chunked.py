@@ -10,11 +10,12 @@ deliberately:
     turns "no depth recorded in this chunk" into a real 0.0 that then wins a
     min()/max() against another chunk's real depth.
 """
+import h3
 import pandas as pd
 import pytest
 from cde_harvester.core.harvest_warnings import OCCURRENCES_DROPPED, HarvestWarnings
 from cde_harvester.core.obis_cells import merge_cell_partials
-from cde_harvester.sources.obis.harvester import OBISHarvester, _epoch_ms_to_utc
+from cde_harvester.sources.obis.harvester import OBIS_H3_RES, OBISHarvester, _epoch_ms_to_utc
 
 DAY_MS = 86_400_000
 BASE_MS = 1_600_000_000_000
@@ -207,3 +208,28 @@ class TestDroppedOccurrencesWarning:
         [warning] = warnings
         assert warning["code"] == OCCURRENCES_DROPPED
         assert warning["count"] == 1
+
+
+class TestH3Binning:
+    """An OBIS cell is one fine map hex: the database re-derives the hex from the
+    stored centre, so the centre must map back to the occurrences' cell."""
+
+    def test_occurrences_in_one_cell_merge_at_its_centre(self, harvester):
+        cell = h3.latlng_to_cell(50.0, -60.0, OBIS_H3_RES)
+        lat, lon = h3.cell_to_latlng(cell)
+        got = single(harvester, [occ(lat=lat, lon=lon), occ(lat=lat + 0.001, lon=lon - 0.001)])
+        assert len(got) == 1
+        assert got["n_records"].iloc[0] == 2
+        assert h3.latlng_to_cell(got["latitude"].iloc[0], got["longitude"].iloc[0], OBIS_H3_RES) == cell
+
+    def test_neighbouring_cells_stay_separate(self, harvester):
+        # ~0.2 deg of longitude at 70N is ~7.6 km: more than one res-6 cell across.
+        got = single(harvester, [occ(lat=70.0, lon=-60.0), occ(lat=70.0, lon=-59.8)])
+        assert len(got) == 2
+
+    def test_cell_centre_is_identical_across_chunks(self, harvester):
+        a = [occ(lat=50.0, lon=-60.0, day=0)]
+        b = [occ(lat=50.0005, lon=-60.0005, day=1)]
+        got = chunked(harvester, [a, b])
+        assert len(got) == 1
+        assert got["days"].iloc[0] == 2

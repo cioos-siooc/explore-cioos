@@ -1,33 +1,44 @@
 /*
 
-   hex_cell()               - covering hex-grid cell (i, j, geom) for a point,
-                              pure function
+   hex_cell()               - covering H3 cell for a point, pure function
+   hex_geom()               - an H3 cell's polygon in EPSG:3857
    create_hexes()           - assign hex cells to points and propagate the FKs
    trajectory_gap_secs()    - per-trajectory "no data past here" threshold
    trajectory_segments()    - consecutive-fix track segments worth trusting
    trajectory_build_hexes() - sweep those segments through the hex grid into
                               cde.trajectory_hexes
 
-   The hex grid is PostGIS's origin-anchored hexagon tiling, so a point's cell
-   is a pure function of its geometry and cells never move between runs.
-   hexes_zoom_0 (100 km) / hexes_zoom_1 (10 km) are append-only, keyed on
-   (i, j): cells are inserted and NEVER deleted or renumbered, so hex pks are
-   stable across loads. Cells that lose their last row are harmless leftovers
-   (queries reach hexes only via FKs) and can be GC'd out of band.
+   The hex grid is H3, which is (near) equal-area: a cell covers the same
+   ground everywhere, so it looks larger toward the poles on the Mercator map.
+   A point's cell is a pure function of its position and never moves between
+   runs. hexes_zoom_0 (res 3, ~12,400 km2) / hexes_zoom_1 (res 6, ~36 km2) are
+   append-only, keyed on h3: cells are inserted and NEVER deleted or
+   renumbered, so hex pks are stable across loads. Cells that lose their last
+   row are harmless leftovers (queries reach hexes only via FKs) and can be
+   GC'd out of band.
+
+   The resolutions must match web-api/utils/hexTiers.js, and res 6 must match
+   the OBIS harvester's binning (OBIS_H3_RES), so an OBIS cell is exactly one
+   fine hex.
 
  */
 
 
--- Covering grid cell for a point. ST_HexagonGrid with a degenerate (point)
--- bounds emits just the covering cell(s); a point exactly on a cell edge can
--- match several, so ORDER BY makes the choice deterministic across runs.
-CREATE OR REPLACE FUNCTION hex_cell(pt geometry, size float8)
-RETURNS TABLE (i integer, j integer, geom geometry) AS $$
-  SELECT g.i::int, g.j::int, g.geom
-  FROM ST_HexagonGrid(size, pt) g
-  WHERE ST_Intersects(pt, g.geom)
-  ORDER BY g.i, g.j
-  LIMIT 1
+CREATE OR REPLACE FUNCTION hex_cell(pt geometry, res integer)
+RETURNS h3index AS $$
+  SELECT h3_latlng_to_cell(ST_Transform(pt, 4326), res)
+$$ LANGUAGE sql IMMUTABLE PARALLEL SAFE;
+
+
+-- Clipped to Web Mercator's latitude limit: a polar cell's boundary reaches
+-- the pole, which transforms to infinity. A cell crossing the antimeridian
+-- comes back split in two, hence ST_Multi.
+CREATE OR REPLACE FUNCTION hex_geom(cell h3index)
+RETURNS geometry AS $$
+  SELECT ST_Multi(ST_Transform(
+           ST_Intersection(h3_cell_to_boundary_geometry(cell),
+                           ST_MakeEnvelope(-180, -85.0511287798, 180, 85.0511287798, 4326)),
+           3857))
 $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE;
 
 
@@ -35,46 +46,32 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   BEGIN
 
   -- Add newly-occupied cells; existing cells (and their pks) are untouched.
-  INSERT INTO cde.hexes_zoom_0 (i, j, geom)
-  SELECT DISTINCT ON (h.i, h.j) h.i, h.j, h.geom
-  FROM cde.points p
-  CROSS JOIN LATERAL hex_cell(p.geom, 100000) h
-  WHERE p.hex_0_pk IS NULL
-  ON CONFLICT (i, j) DO NOTHING;
+  INSERT INTO cde.hexes_zoom_0 (h3, geom)
+  SELECT c, hex_geom(c)
+  FROM (SELECT DISTINCT hex_cell(p.geom, 3) AS c
+        FROM cde.points p WHERE p.hex_0_pk IS NULL) cells
+  ON CONFLICT (h3) DO NOTHING;
 
-  INSERT INTO cde.hexes_zoom_1 (i, j, geom)
-  SELECT DISTINCT ON (h.i, h.j) h.i, h.j, h.geom
-  FROM cde.points p
-  CROSS JOIN LATERAL hex_cell(p.geom, 10000) h
-  WHERE p.hex_1_pk IS NULL
-  ON CONFLICT (i, j) DO NOTHING;
+  INSERT INTO cde.hexes_zoom_1 (h3, geom)
+  SELECT c, hex_geom(c)
+  FROM (SELECT DISTINCT hex_cell(p.geom, 6) AS c
+        FROM cde.points p WHERE p.hex_1_pk IS NULL) cells
+  ON CONFLICT (h3) DO NOTHING;
 
   -- Assign cells to the points that don't have one yet — only points added
   -- by this load (cde.points is append-only with stable pks, so existing
   -- assignments never change).
-  WITH assign AS (
-    SELECT p.pk AS point_pk, hz.pk AS hex_pk
-    FROM cde.points p
-    CROSS JOIN LATERAL hex_cell(p.geom, 100000) h
-    JOIN cde.hexes_zoom_0 hz ON hz.i = h.i AND hz.j = h.j
-    WHERE p.hex_0_pk IS NULL
-  )
   UPDATE cde.points p
-  SET hex_0_pk = a.hex_pk
-  FROM assign a
-  WHERE p.pk = a.point_pk;
+  SET hex_0_pk = hz.pk
+  FROM cde.hexes_zoom_0 hz
+  WHERE p.hex_0_pk IS NULL
+    AND hz.h3 = hex_cell(p.geom, 3);
 
-  WITH assign AS (
-    SELECT p.pk AS point_pk, hz.pk AS hex_pk
-    FROM cde.points p
-    CROSS JOIN LATERAL hex_cell(p.geom, 10000) h
-    JOIN cde.hexes_zoom_1 hz ON hz.i = h.i AND hz.j = h.j
-    WHERE p.hex_1_pk IS NULL
-  )
   UPDATE cde.points p
-  SET hex_1_pk = a.hex_pk
-  FROM assign a
-  WHERE p.pk = a.point_pk;
+  SET hex_1_pk = hz.pk
+  FROM cde.hexes_zoom_1 hz
+  WHERE p.hex_1_pk IS NULL
+    AND hz.h3 = hex_cell(p.geom, 6);
 
   -- Only rows without an FK yet: point and hex pks are stable, so rows linked
   -- by a previous run are already correct.
@@ -190,8 +187,9 @@ BEGIN
   DROP TABLE IF EXISTS _traj_hex_span;
   CREATE TEMP TABLE _traj_hex_span ON COMMIT DROP AS
   WITH tiers AS (
-    SELECT * FROM (VALUES (0::smallint, 100000::float8),
-                          (1::smallint,  10000::float8)) t(tier, size)
+    -- edge_m: the resolution's average edge length, for sampling segments.
+    SELECT * FROM (VALUES (0::smallint, 3, 68980::float8),
+                          (1::smallint, 6,  3725::float8)) t(tier, res, edge_m)
   ),
   seg AS (
     SELECT * FROM trajectory_segments(p_dataset_pks)
@@ -199,12 +197,20 @@ BEGIN
   -- moving: the segment crosses one or more hexes; the fraction of the segment
   -- inside each hex gives the entry/exit times.
   moving AS (
-    SELECT s.dataset_pk, s.trajectory_id, t.tier, h.i, h.j,
+    SELECT s.dataset_pk, s.trajectory_id, t.tier, h.cell,
            s.t1 + (s.t2 - s.t1) * LEAST(f.f1, f.f2)    AS t_enter,
            s.t1 + (s.t2 - s.t1) * GREATEST(f.f1, f.f2) AS t_exit
       FROM seg s
       CROSS JOIN tiers t
-      CROSS JOIN LATERAL ST_HexagonGrid(t.size, s.seg) h
+      -- Candidate cells: those of points sampled along the segment, plus their
+      -- neighbours, which catch a cell the segment only clips at a corner. A
+      -- Mercator metre is never longer than a ground metre, so sampling at
+      -- half an edge in EPSG:3857 is at least that dense on the ground.
+      CROSS JOIN LATERAL (
+        SELECT DISTINCT d.cell, hex_geom(d.cell) AS geom
+          FROM ST_DumpPoints(ST_Segmentize(s.seg, t.edge_m / 2)) dp
+          CROSS JOIN LATERAL h3_grid_disk(hex_cell(dp.geom, t.res), 1) d(cell)
+      ) h
       CROSS JOIN LATERAL (SELECT ST_Intersection(s.seg, h.geom) AS part) x
       CROSS JOIN LATERAL (
         -- A hexagon is convex, so a line's intersection with it is a single
@@ -221,19 +227,19 @@ BEGIN
   -- beached drifter). One hex, the whole interval — dropping these would lose
   -- every day between the two fixes.
   still AS (
-    SELECT s.dataset_pk, s.trajectory_id, t.tier, h.i, h.j, s.t1, s.t2
+    SELECT s.dataset_pk, s.trajectory_id, t.tier,
+           hex_cell(ST_StartPoint(s.seg), t.res), s.t1, s.t2
       FROM seg s
       CROSS JOIN tiers t
-      CROSS JOIN LATERAL hex_cell(ST_StartPoint(s.seg), t.size) h
      WHERE ST_Length(s.seg) = 0
   ),
   -- fixes: every retained fix as an instantaneous occupancy, so a single-fix
   -- trajectory and the far side of a dropped segment still light their hex.
   fixes AS (
-    SELECT p.dataset_pk, p.trajectory_id, t.tier, h.i, h.j, p.time, p.time
+    SELECT p.dataset_pk, p.trajectory_id, t.tier, hex_cell(p.geom, t.res),
+           p.time, p.time
       FROM cde.trajectory_points p
       CROSS JOIN tiers t
-      CROSS JOIN LATERAL hex_cell(p.geom, t.size) h
      WHERE p.dataset_pk IS NOT NULL
        AND (p_dataset_pks IS NULL OR p.dataset_pk = ANY (p_dataset_pks))
   )
@@ -245,12 +251,12 @@ BEGIN
   --    the hex on that day (the weight used to apportion the day's records).
   DROP TABLE IF EXISTS _traj_hex_day;
   CREATE TEMP TABLE _traj_hex_day ON COMMIT DROP AS
-  SELECT dataset_pk, trajectory_id, tier, i, j, day,
+  SELECT dataset_pk, trajectory_id, tier, cell, day,
          min(d_start) AS time_min,
          max(d_end)   AS time_max,
          sum(extract(epoch FROM d_end - d_start)) AS secs
     FROM (
-      SELECT sp.dataset_pk, sp.trajectory_id, sp.tier, sp.i, sp.j,
+      SELECT sp.dataset_pk, sp.trajectory_id, sp.tier, sp.cell,
              g.day::date AS day,
              GREATEST(sp.t_enter, g.day)                     AS d_start,
              LEAST(sp.t_exit, g.day + interval '1 day')      AS d_end
@@ -259,19 +265,19 @@ BEGIN
                                            date_trunc('day', sp.t_exit),
                                            interval '1 day') g(day)
     ) split
-   GROUP BY 1,2,3,4,5,6;
+   GROUP BY 1,2,3,4,5;
 
   -- 3. Make sure every occupied cell exists in the hex tables. Append-only and
-  --    keyed on (i, j) — an existing cell keeps its pk (see the header).
-  INSERT INTO cde.hexes_zoom_0 (i, j, geom)
-  SELECT DISTINCT i, j, ST_SetSRID(ST_Hexagon(100000, i, j), 3857)
-    FROM _traj_hex_day WHERE tier = 0
-  ON CONFLICT (i, j) DO NOTHING;
+  --    keyed on h3 — an existing cell keeps its pk (see the header).
+  INSERT INTO cde.hexes_zoom_0 (h3, geom)
+  SELECT cell, hex_geom(cell)
+    FROM (SELECT DISTINCT cell FROM _traj_hex_day WHERE tier = 0) c
+  ON CONFLICT (h3) DO NOTHING;
 
-  INSERT INTO cde.hexes_zoom_1 (i, j, geom)
-  SELECT DISTINCT i, j, ST_SetSRID(ST_Hexagon(10000, i, j), 3857)
-    FROM _traj_hex_day WHERE tier = 1
-  ON CONFLICT (i, j) DO NOTHING;
+  INSERT INTO cde.hexes_zoom_1 (h3, geom)
+  SELECT cell, hex_geom(cell)
+    FROM (SELECT DISTINCT cell FROM _traj_hex_day WHERE tier = 1) c
+  ON CONFLICT (h3) DO NOTHING;
 
   -- 4. Aggregate to one row per (dataset, trajectory, tier, hex), joining the
   --    per-day ERDDAP aggregates. `share` splits a day's records across the
@@ -286,7 +292,7 @@ BEGIN
       FROM _traj_hex_day hd
     WINDOW w AS (PARTITION BY hd.dataset_pk, hd.trajectory_id, hd.tier, hd.day)
   ), agg AS (
-    SELECT w.dataset_pk, w.trajectory_id, w.tier, w.i, w.j,
+    SELECT w.dataset_pk, w.trajectory_id, w.tier, w.cell,
            count(DISTINCT w.day)::integer         AS days,
            min(w.time_min)                        AS time_min,
            max(w.time_max)                        AS time_max,
@@ -299,31 +305,31 @@ BEGIN
              ON d.dataset_pk = w.dataset_pk
             AND d.trajectory_id = w.trajectory_id
             AND d.day = w.day
-     GROUP BY 1,2,3,4,5
+     GROUP BY 1,2,3,4
   ), runs AS (
     -- The same day set as `days`, as maximal runs of consecutive UTC days so
     -- the map can union day sets across features (day_union_days).
     -- `day - row_number()` is constant within a run of consecutive days.
-    SELECT dataset_pk, trajectory_id, tier, i, j,
+    SELECT dataset_pk, trajectory_id, tier, cell,
            array_agg(daterange(lo, hi + 1) ORDER BY lo) AS day_ranges
       FROM (
-        SELECT dataset_pk, trajectory_id, tier, i, j,
+        SELECT dataset_pk, trajectory_id, tier, cell,
                min(day) AS lo, max(day) AS hi
           FROM (
-            SELECT dataset_pk, trajectory_id, tier, i, j, day,
+            SELECT dataset_pk, trajectory_id, tier, cell, day,
                    day - (row_number() OVER (PARTITION BY dataset_pk,
                                                           trajectory_id,
-                                                          tier, i, j
+                                                          tier, cell
                                                  ORDER BY day))::integer AS run
               FROM _traj_hex_day
           ) numbered
-         GROUP BY 1,2,3,4,5, run
+         GROUP BY 1,2,3,4, run
       ) r
-     GROUP BY 1,2,3,4,5
+     GROUP BY 1,2,3,4
   )
   SELECT agg.*, runs.day_ranges
     FROM agg
-    JOIN runs USING (dataset_pk, trajectory_id, tier, i, j);
+    JOIN runs USING (dataset_pk, trajectory_id, tier, cell);
 
   -- 5. Swap in the new rows for the scoped datasets. DELETE+INSERT (not
   --    TRUNCATE): TRUNCATE takes ACCESS EXCLUSIVE and deadlocks with live
@@ -333,20 +339,21 @@ BEGIN
 
   -- The display point is a property of the HEX, not of the row (many
   -- trajectories sweep the same cell), so resolve it once per distinct cell.
+  -- The H3 cell centre, not the polygon centroid: an antimeridian cell's two
+  -- halves would put its centroid on the far side of the world.
   WITH used_cells AS (
-    SELECT DISTINCT tier, i, j FROM _traj_hex_agg
+    SELECT DISTINCT tier, cell, h3_cell_to_geometry(cell) AS centre
+      FROM _traj_hex_agg
   ),
   hex_pos AS (
-    SELECT u.tier, u.i, u.j, h.pk, ST_Y(c.geom_4326) AS latitude,
-           ST_X(c.geom_4326) AS longitude
+    SELECT u.tier, u.cell, h.pk, ST_Y(u.centre) AS latitude,
+           ST_X(u.centre) AS longitude
       FROM used_cells u
-      JOIN cde.hexes_zoom_0 h ON u.tier = 0 AND h.i = u.i AND h.j = u.j
-      CROSS JOIN LATERAL (SELECT ST_Transform(ST_Centroid(h.geom), 4326)) AS c(geom_4326)
+      JOIN cde.hexes_zoom_0 h ON u.tier = 0 AND h.h3 = u.cell
     UNION ALL
-    SELECT u.tier, u.i, u.j, h.pk, ST_Y(c.geom_4326), ST_X(c.geom_4326)
+    SELECT u.tier, u.cell, h.pk, ST_Y(u.centre), ST_X(u.centre)
       FROM used_cells u
-      JOIN cde.hexes_zoom_1 h ON u.tier = 1 AND h.i = u.i AND h.j = u.j
-      CROSS JOIN LATERAL (SELECT ST_Transform(ST_Centroid(h.geom), 4326)) AS c(geom_4326)
+      JOIN cde.hexes_zoom_1 h ON u.tier = 1 AND h.h3 = u.cell
   )
   INSERT INTO cde.trajectory_hexes
         (dataset_pk, trajectory_id, hex_tier, hex_pk, latitude, longitude,
@@ -357,7 +364,7 @@ BEGIN
          a.n_records, a.n_profiles,
          a.n_records::float / GREATEST(a.days, 1)
     FROM _traj_hex_agg a
-    JOIN hex_pos p USING (tier, i, j);
+    JOIN hex_pos p USING (tier, cell);
 
   GET DIAGNOSTICS n = ROW_COUNT;
 

@@ -57,6 +57,24 @@ test("GET /tiles/:z/:x/:y.mvt an OBIS-only selection drops the profiles/trajecto
   assert.doesNotMatch(sql, /FROM cde\.trajectory_hexes/);
 });
 
+test("GET /tiles/:z/:x/:y.mvt widens the cell prefilter toward the poles", async () => {
+  // Equal-area hexes are larger in EPSG:3857 the further they are from the
+  // equator, so a straddling hex reaches further past a polar tile's edge.
+  const expandFor = async (y) => {
+    db.reset();
+    resetCache();
+    db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+    await agent.get(`/tiles/12/2000/${y}.mvt`);
+    return Number(
+      db.queries[0].match(/ST_Expand\(ST_TileEnvelope\([^)]*\), (\d+)\)/)[1],
+    );
+  };
+  // z12: past the zoom where the tile-width floor outweighs a cell.
+  const equator = await expandFor(2048);
+  const arctic = await expandFor(680); // ~76N
+  assert.ok(arctic > 3 * equator, `${arctic} vs ${equator}`);
+});
+
 const ROLLUP = /FROM cde\.hexes_zoom_0_rollup/;
 
 test("GET /tiles/:z/:x/:y.mvt reads the coarse rollup for a dataset-level selection", async () => {
