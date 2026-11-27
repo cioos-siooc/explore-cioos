@@ -9,7 +9,7 @@
   width: min(320px, calc(100vw - 24px));
   overflow: hidden auto;
   scrollbar-width: none;
-  padding: 6px 6px 6px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--cioos-primary);
   border-radius: var(--cioos-radius-lg);
   background-color: var(--cioos-white);
@@ -122,6 +122,13 @@
 .datasetMapCardZoom[aria-disabled="true"] {
   color: var(--cioos-ink-60);
   cursor: default;
+}
+
+/* Concentric with the card's corners: its radius less the padding between. */
+.datasetMapCard .wmsLegendFold,
+.datasetMapCard .wmsLegendPeek,
+.datasetMapCard .wmsLegendVariableSelector .dropdown-toggle {
+  border-radius: calc(var(--cioos-radius-lg) - 8px);
 }
 
 /* The dataset above the rule, what the map draws of it below. */
